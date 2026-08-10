@@ -18,6 +18,7 @@ import type {
   LLMProvider,
   Agent,
   CreateAgentRequest,
+  McpAccess,
   McpServer,
   CreateMcpServerRequest,
   UpdateMcpServerRequest,
@@ -254,6 +255,13 @@ export const api = {
 
     remove: (id: string) =>
       apiFetch<null>(`/api/mcp-servers/${id}`, { method: "DELETE" }),
+  },
+
+  /** Agent Coder'ın kendisini dışarıya MCP olarak açması. */
+  mcpAccess: {
+    get: () => apiFetch<McpAccess>("/api/mcp-access"),
+    rotate: () =>
+      apiFetch<McpAccess>("/api/mcp-access/rotate", { method: "POST" }),
   },
 
   credentials: {

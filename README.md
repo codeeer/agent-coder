@@ -254,6 +254,52 @@ otomatik tetikleme durur, elle çalıştırma açık kalır.
 
 ---
 
+# Dış araçlar (MCP)
+
+Agent Coder, [Model Context Protocol](https://modelcontextprotocol.io) ile **iki
+yönde** de konuşur.
+
+## Agent'larınız dış araçlara erişsin
+
+**Ayarlar → Dış araçlar (MCP) → Sunucu ekle.** Uzak (HTTP/SSE) bir MCP sunucusu
+tanımlayın — hata takip sistemi, dokümantasyon, veritabanı şeması…
+
+Kaydetmeden önce sunucuya bağlanılır ve sunduğu araçlar listelenir; böylece bir
+agent'a **neye erişim verdiğinizi** görürsünüz. Erişim anahtarı şifreli saklanır
+ve agent'ın okuyabileceği hiçbir dosyaya yazılmaz.
+
+Sonra **Agent'lar** ekranından hangi agent'ın hangi sunucuyu kullanacağını
+seçin. Seçilmeyen sunucuların araçları o agent'a **hiç sunulmaz**.
+
+> Bir sunucuya bağlanılamazsa çalışma sessizce devam etmez — canlı olay akışında
+> uyarı görürsünüz. Aksi halde agent'ın neden araçsız kaldığı görünmezdi.
+
+## Akışın kendisi bir aracı çağırsın
+
+Tuvale **MCP aracı** düğümü ekleyin. Agent'ın kararına bırakmadan, belirli bir
+aracı belirli argümanlarla çağırır:
+
+```json
+{
+  "repoName": "modelcontextprotocol/go-sdk",
+  "question": "{{ input }}"
+}
+```
+
+Şablonlar JSON'un içinde, tırnak arasında yazılır. Aracın çıktısı sonraki adıma
+`{{ steps.<adım>.output }}` ile geçer.
+
+## Agent Coder'ı başka araçlardan kullanın
+
+**Ayarlar → Agent Coder'ı dışarıya aç** bölümündeki adresi Claude Desktop veya
+Cursor yapılandırmanıza ekleyin. Üç araç sunulur: `akislari_listele`,
+`akis_calistir`, `calisma_durumu`.
+
+> Adres bir anahtardır — bilen herkes akışlarınızı başlatabilir. Sızdıysa aynı
+> bölümden yenileyin.
+
+---
+
 # Hazır agent'lar
 
 Beş agent kurulu gelir ve talimatları **Agent'lar** ekranından düzenlenebilir:

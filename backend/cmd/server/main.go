@@ -30,6 +30,7 @@ import (
 	"github.com/agent-coder/backend/internal/jiratrigger"
 	"github.com/agent-coder/backend/internal/llm"
 	"github.com/agent-coder/backend/internal/mcp"
+	"github.com/agent-coder/backend/internal/mcpserver"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
@@ -216,6 +217,11 @@ func run() error {
 
 	workflowLauncher := workflow.NewLauncher(workflowStore, workflowExec)
 
+	// Agent Coder'ın kendisi bir MCP sunucusu: dışarıdaki istemciler akışları
+	// listeleyip başlatabilir. Başlatma mevcut Launcher'dan geçer.
+	mcpAccess := mcpserver.NewAccess(database.Pool)
+	mcpOut := mcpserver.New(workflowStore, workflowLauncher, httpapi.Version)
+
 	// Jira tetikleyici: tarama ve webhook aynı işleme yolundan geçer.
 	jiraTrigger := jiratrigger.New(
 		workflowStore, workflowLauncher, credStore, jira.New(),
@@ -234,6 +240,8 @@ func run() error {
 		GitProviders:  gitStore,
 		MCPServers:    mcpStore,
 		MCPClient:     mcpClient,
+		MCPAccess:     mcpAccess,
+		MCPServer:     mcpOut,
 		GitValidator:  gitprovider.NewValidator(),
 		Credentials:   credStore,
 		JiraValidator: credentials.NewValidator(),

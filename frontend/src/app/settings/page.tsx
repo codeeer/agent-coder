@@ -8,6 +8,7 @@ import {
   type CredentialSpec,
 } from "@/components/settings/CredentialCard";
 import { GitProviderSection } from "@/components/settings/GitProviderSection";
+import { McpAccessSection } from "@/components/settings/McpAccessSection";
 import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
@@ -53,6 +54,8 @@ export default function SettingsPage() {
         <GitProviderSection />
 
         <McpServerSection />
+
+        <McpAccessSection />
 
         <Section
           title="Çalışma ayarları"

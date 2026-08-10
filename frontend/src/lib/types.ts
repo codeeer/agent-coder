@@ -574,6 +574,12 @@ export interface WorkflowNodeConfig {
   arguments?: string;
 }
 
+/** Agent Coder'ı dışarıya MCP olarak açan adres. */
+export interface McpAccess {
+  /** MCP istemcisine yapıştırılacak tam adres — kendisi anahtardır. */
+  url: string;
+}
+
 /** Bir akışın son Jira taramasının sonucu. */
 export interface JiraScanState {
   workflowId: string;
@@ -609,13 +615,14 @@ export interface WorkflowGraph {
  * Jira eklenince ikisi de sessizce "elle" göstermeye başladı. Kapalı bir küme
  * ternary ile değil, eksiksiz bir eşlemeyle karşılanır.
  */
-export type TriggerKind = "manual" | "webhook" | "jira";
+export type TriggerKind = "manual" | "webhook" | "jira" | "mcp";
 
 /** Tetikleyicinin ekranda görünen adı. Kayıt eksiksiz olmak zorunda. */
 export const TRIGGER_TEXT: Record<TriggerKind, { short: string; long: string }> = {
   manual: { short: "elle", long: "elle başlatıldı" },
   webhook: { short: "dışarıdan", long: "dışarıdan tetiklendi" },
   jira: { short: "Jira", long: "Jira task'ı tetikledi" },
+  mcp: { short: "MCP", long: "dış bir MCP istemcisi başlattı" },
 };
 
 export type WorkflowRunStatus =

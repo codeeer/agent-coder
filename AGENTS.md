@@ -372,6 +372,15 @@ başarısız sayılmaz: araç olmadan da iş bitebilir. Bu kontrolü kaldırmay�
 (harf, rakam, `-`, `_`): motor izin verilmeyen karakterleri alt çizgiye çeviriyor ve
 kullanıcının yazdığı ad ile modelin gördüğü araç adı ayrışırdı.
 
+**MCP sunucu handler'ı BİR KEZ kurulur.** `mcpserver.New` içinde üretilir ve paylaşılır.
+İstek başına yeni handler üretmek oturum durumunu kaybettiriyor: MCP el sıkışması birden
+fazla isteğe yayılıyor ve ikincisi "session not found" alıyor (ölçüldü — spec 011 Ölçüm 5).
+Oturum başına yeniden kurulan şey handler değil, MCP *sunucusu*.
+
+**Dışarıya açılan MCP ucu `/api` altında DEĞİL.** Webhook uçlarıyla aynı yerde durur çünkü
+aynı güvenlik modelini paylaşır: kimlik doğrulama yok, adresin kendisi anahtardır. Anahtar
+karşılaştırması sabit zamanlıdır (`subtle.ConstantTimeCompare`).
+
 **MCP argümanları önce AYRIŞTIRILIR, sonra şablonlanır.** `mcp.call` düğümünün argümanları
 bir JSON nesnesi ve içinde şablon var. Ters sırayla (önce şablon, sonra JSON) yapılsaydı
 içinde tırnak olan bir agent çıktısı JSON'u bozardı — hem de yalnızca belirli çıktılarda.
@@ -463,7 +472,9 @@ ve hepsi veritabanında **AES-256-GCM ile şifreli** saklanır. Uyulması gereke
 argümanlar şablonlanabilir, çıktı sonraki adıma geçer. Yanlış araç adı ve bozuk JSON
 **kaydetme anında** reddedilir.
 
-Sırada: Agent Coder'ın kendisinin MCP sunucusu olması (Aşama 3).
+**MCP Aşama 3 tamamlandı:** Agent Coder'ın kendisi bir MCP sunucusu. Claude Desktop veya
+Cursor akışları listeleyip başlatabiliyor; başlatma mevcut `Launcher`'dan geçiyor, dördüncü
+bir yol açılmadı. Adres Ayarlar'da, kopyalanabilir kurulum örneğiyle birlikte.
 
 **Arayüz denetimi tamamlandı** ([spec 010](specs/010-arayuz-denetimi/spec.md)):
 

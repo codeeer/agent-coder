@@ -26,6 +26,7 @@ import (
 	"github.com/agent-coder/backend/internal/jiratrigger"
 	"github.com/agent-coder/backend/internal/llm"
 	"github.com/agent-coder/backend/internal/mcp"
+	"github.com/agent-coder/backend/internal/mcpserver"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
@@ -60,6 +61,10 @@ type Deps struct {
 	// Agent'ların erişebileceği dış araç sunucuları
 	MCPServers *mcp.Store
 	MCPClient  *mcp.Client
+
+	// Agent Coder'ın kendisini dışarıya MCP olarak açması (spec 011 Aşama 3)
+	MCPAccess *mcpserver.Access
+	MCPServer *mcpserver.Server
 
 	// Jira (spec 002'den sonra credentials paketinin ilgilendiği tek şey)
 	Credentials   *credentials.Store
@@ -138,6 +143,10 @@ func (h *Handler) Routes() http.Handler {
 	r.Post("/hooks/{token}", h.triggerHook)
 	r.Post("/hooks/jira/{token}", h.jiraHook)
 
+	// MCP sunucusu: dışarıdaki bir istemci akışları listeler ve başlatır.
+	// Adres anahtar olduğu için /api altında değil.
+	r.Handle("/mcp/{token}", http.HandlerFunc(h.mcpServe))
+
 	r.Route("/api", func(r chi.Router) {
 		r.Route("/llm-providers", func(r chi.Router) {
 			r.Get("/", h.listLLMProviders)
@@ -153,6 +162,9 @@ func (h *Handler) Routes() http.Handler {
 			r.Put("/{id}", h.updateGitProvider)
 			r.Delete("/{id}", h.deleteGitProvider)
 		})
+
+		r.Get("/mcp-access", h.getMCPAccess)
+		r.Post("/mcp-access/rotate", h.rotateMCPAccess)
 
 		r.Route("/mcp-servers", func(r chi.Router) {
 			r.Get("/", h.listMCPServers)

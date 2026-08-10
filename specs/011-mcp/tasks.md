@@ -1,7 +1,7 @@
 # Görevler: MCP Desteği
 
 - **Spec no:** 011 — [spec.md](spec.md) · [plan.md](plan.md)
-- **Durum:** Aşama 1–2 uygulandı; Aşama 3 bekliyor
+- **Durum:** Uygulandı (Aşama 1–3)
 
 ---
 
@@ -49,14 +49,14 @@
 
 ## Aşama 3 — Agent Coder MCP sunucusu
 
-- [ ] T60 `internal/mcpserver/` — akışları araç olarak açar
-- [ ] T61 `/mcp` ucu; adres anahtar niteliğinde
-- [ ] T62 README'ye istemci kurulumu
-- [ ] T63 Doğrulama: dış bir istemciden akış başlatılır
+- [x] T60 `internal/mcpserver/` — akışları araç olarak açar
+- [x] T61 `/mcp` ucu; adres anahtar niteliğinde
+- [x] T62 README'ye istemci kurulumu
+- [x] T63 Doğrulama: dış bir istemciden akış başlatılır
 
 ## Kapanış
 
-- [ ] T90 `AGENTS.md`, `plans/01`, `/nasil-calisir` diyagramı güncellenir
+- [x] T90 `AGENTS.md`, `plans/01`, `/nasil-calisir` diyagramı güncellenir
 
 ---
 
@@ -156,3 +156,46 @@ Not: o sunucu hatayı **normal bir metin sonucu** olarak döndürdü, protokol
 düzeyinde hata olarak değil. Yani "araç hata döndürdü" kontrolü (`IsError`) bu
 durumu yakalayamaz; akış hata metnini veri sanıp bir sonraki adıma taşır. Bunun
 genel bir çözümü yok — araçların hatayı nasıl bildireceği kendilerine kalmış.
+
+---
+
+### T63 — Aşama 3 doğrulama sonuçları
+
+Gerçek bir MCP istemcisiyle (resmi Go SDK, `internal/mcpserver/canli_test.go`)
+ayakta duran sunucuya bağlanılarak ölçüldü.
+
+| # | Adım | Sonuç |
+|---|------|-------|
+| 1 | Dış istemci bağlanıyor | ✓ el sıkışma tamam |
+| 2 | Araçlar görünüyor | ✓ `akislari_listele`, `akis_calistir`, `calisma_durumu` |
+| 3 | Akışlar listeleniyor | ✓ 6 çalıştırılabilir akış |
+| 4 | **Akış gerçekten başlıyor** | ✓ `runId` döndü, durum `pending` |
+| 5 | Durum sorgulanıyor | ✓ `running`, 2 adım |
+| 6 | Çalışma arayüzde görünüyor | ✓ tetikleyici `mcp`, akış `succeeded` |
+| 7 | Yanlış adres | ✓ 404 (var olmayanla aynı cevap) |
+| 8 | Testler + tema | ✓ 20 paket, 82 kontrol 0 kalan |
+
+### Ölçüm 5 — "session not found": handler istek başına kuruluyordu
+
+İlk denemede dış istemci bağlanamadı: `sending "notifications/initialized":
+session not found`.
+
+Sebep: `Handler()` her çağrıldığında **yeni bir** HTTP handler üretiyordu. MCP
+el sıkışması birden fazla isteğe yayılıyor ve oturum durumu handler'da duruyor;
+her istekte yeni handler, her istekte yeni (boş) oturum tablosu demekti.
+
+Handler artık `New` içinde bir kez kuruluyor. Oturum başına yeniden kurulan şey
+handler değil, MCP *sunucusu* — o durum taşımıyor.
+
+**Ders:** durum tutan bir bileşeni "her seferinde üret" diye yazmak, tek istekli
+bir protokolde fark edilmez; çok istekli bir protokolde ilk denemede patlar.
+
+### Ölçüm 6 — eksiksiz `Record` yine işini yaptı
+
+`TriggerKind`'a `mcp` eklendiğinde TypeScript hemen uyardı:
+`Property 'mcp' is missing in type ... Record<TriggerKind, …>`.
+
+Bu tam olarak spec 010 Ölçüm 5'te canlı bir hatadan sonra kurulan koruma:
+o zaman `jira` eklenmiş ve etiket eksik kaldığı için Jira'nın başlattığı
+çalışmalar listede "elle" görünmüştü. Aynı hata bu sefer derleme zamanında
+yakalandı.

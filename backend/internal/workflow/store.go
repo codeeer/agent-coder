@@ -58,6 +58,7 @@ const (
 	TriggerManual  TriggerKind = "manual"
 	TriggerWebhook TriggerKind = "webhook"
 	TriggerJira    TriggerKind = "jira"
+	TriggerMCP     TriggerKind = "mcp"
 )
 
 // Workflow, kaydedilmiş bir akış.
