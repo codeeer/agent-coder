@@ -252,6 +252,26 @@ Dar ekranda diyagram küçülmez, **kaydırılır**: `minWidth` ile taban geniş
 verilir ve yalnızca çizim `overflow-x-auto` bir kaba sarılır. Kartın tamamını
 kaydırmak, altındaki açıklama paragrafını da yatay kaydırırdı.
 
+### Ayarlar ekranının düzeni
+
+İki kural:
+
+1. **Her ayar, ait olduğu şeyin yanında durur.** "Jira tarama aralığı" Jira
+   erişiminin altında, "MCP süre sınırı" MCP sunucularının altında. Bütün
+   davranış parametrelerini tek bir "Çalışma ayarları" yığınına toplamak,
+   kullanıcının tek bir şey için sayfanın iki ayrı yerine bakması demekti.
+2. **Bölümler alt alta değil, yan menüde.** Dizildiklerinde sayfa her yeni
+   bölümle uzuyordu ve en alttaki neredeyse görünmüyordu. Yeni bölüm eklemek
+   artık `TABS` listesine bir satır; kimsenin kaydırma mesafesi artmıyor.
+
+`RuntimeSettings` bir `groups` süzgeci alır, böylece kayıt defterindeki bir grup
+ait olduğu sekmede çizilir. Yeni bir ayar eklemek yine tek satır — ama grubunu
+seçerken hangi sekmede görüneceğini de seçmiş olursunuz.
+
+**Sekme adı değişirse belgelerdeki "Ayarlar → X" yolları da değişir.** Bu
+projede bir kez, arayüzde karşılığı olmayan bir yol belgeye yazıldı (spec 010
+Ölçüm 6).
+
 ### Grafikler
 
 Rapor ekranındaki grafikler elle yazılmış SVG/CSS'tir; grafik kütüphanesi yok.

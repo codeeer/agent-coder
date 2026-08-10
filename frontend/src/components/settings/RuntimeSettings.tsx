@@ -14,7 +14,22 @@ import { Badge, Button, Card, Input, Notice } from "@/components/ui/primitives";
  * defterinden alır ve etiket, açıklama, birim, aralık bilgisiyle kendini çizer.
  * Yeni bir parametre eklendiğinde buraya dokunmak gerekmez.
  */
-export function RuntimeSettings() {
+export function RuntimeSettings({
+  /**
+   * Yalnızca bu grupları çiz. Verilmezse hepsi.
+   *
+   * Ayarlar ekranı her grubu AİT OLDUĞU bölümde gösteriyor: "Jira tarama
+   * aralığı" Jira erişiminin yanında, "MCP süre sınırı" MCP sunucularının
+   * yanında. Hepsini tek bir "Çalışma ayarları" yığınına koymak, kullanıcının
+   * bir şeyi ayarlamak için iki ayrı yere bakması demekti.
+   */
+  groups: only,
+  /** Grup başlıkları — tek gruplu bölümde başlık tekrar olur. */
+  showHeadings = true,
+}: {
+  groups?: string[];
+  showHeadings?: boolean;
+} = {}) {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["settings"],
     queryFn: api.settings.list,
@@ -26,19 +41,24 @@ export function RuntimeSettings() {
   // Ayarları gruplarına göre böl; sıra kayıt defterinden gelir.
   const groups = new Map<string, SettingValue[]>();
   for (const item of data.items) {
+    if (only && !only.includes(item.group)) continue;
     const list = groups.get(item.group) ?? [];
     list.push(item);
     groups.set(item.group, list);
   }
 
+  if (groups.size === 0) return null;
+
   return (
     <div className="space-y-6">
       {[...groups.entries()].map(([group, items]) => (
         <div key={group}>
-          <h3 className="text-sm font-medium text-ink-2">
-            {data.groups[group] ?? group}
-          </h3>
-          <div className="mt-2 space-y-2">
+          {showHeadings && (
+            <h3 className="text-sm font-medium text-ink-2">
+              {data.groups[group] ?? group}
+            </h3>
+          )}
+          <div className={showHeadings ? "mt-2 space-y-2" : "space-y-2"}>
             {items.map((item) => (
               <SettingRow key={item.key} setting={item} />
             ))}

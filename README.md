@@ -152,7 +152,7 @@ Açılış ekranı size üç adımlık bir kontrol listesi gösterir. Sırayla:
 
 ## 1️⃣ Model sağlayıcı tanımlayın
 
-**Ayarlar → LLM sağlayıcılar → Sağlayıcı ekle**
+**Ayarlar → Modeller → Sağlayıcı ekle**
 
 En kolayı [OpenRouter](https://openrouter.ai/keys): ücretsiz hesap açıp bir API
 anahtarı alın (`sk-or-v1-...`). Tek anahtarla Claude, GPT, Gemini, Llama ve
@@ -183,7 +183,7 @@ Agent'ların üzerinde çalışacağı kod deposu:
 Sistem kaydetmeden önce depoya **gerçekten erişebildiğini** doğrular.
 
 Özel (private) bir depo veya PR açma isteğiniz varsa önce
-**Ayarlar → Git erişimleri**'nden bir erişim tanımlayın:
+**Ayarlar → Kod depoları**'ndan bir erişim tanımlayın:
 
 - **GitHub:** [Personal access token](https://github.com/settings/tokens) — `repo` yetkisi yeterli
 - **Bitbucket:** kullanıcı adı + app password
@@ -245,7 +245,7 @@ project = SCRUM AND status = "Yapılacaklar" AND labels = agent
 Eşleşen her task akışı **bir kez** başlatır. Task Jira'da güncellenirse yeniden
 çalışır; akışın kendi yazdığı yorum tetikleyici sayılmaz.
 
-Varsayılan olarak 5 dakikada bir taranır (**Ayarlar → Jira tetikleyici**).
+Varsayılan olarak 5 dakikada bir taranır (**Ayarlar → Jira → Tetikleyici**).
 Anında işlenmesini isterseniz aynı panelde görünen **webhook adresini** Jira'ya
 tanımlayın — tarama yedek yol olarak kalır, ikisi aynı korumadan geçer.
 
@@ -261,7 +261,7 @@ yönde** de konuşur.
 
 ## Agent'larınız dış araçlara erişsin
 
-**Ayarlar → Dış araçlar (MCP) → Sunucu ekle.** Uzak (HTTP/SSE) bir MCP sunucusu
+**Ayarlar → Dış araçlar → Sunucu ekle.** Uzak (HTTP/SSE) bir MCP sunucusu
 tanımlayın — hata takip sistemi, dokümantasyon, veritabanı şeması…
 
 Kaydetmeden önce sunucuya bağlanılır ve sunduğu araçlar listelenir; böylece bir
@@ -291,7 +291,7 @@ aracı belirli argümanlarla çağırır:
 
 ## Agent Coder'ı başka araçlardan kullanın
 
-**Ayarlar → Agent Coder'ı dışarıya aç** bölümündeki adresi Claude Desktop veya
+**Ayarlar → Dış araçlar** bölümünün altındaki *Agent Coder'ı dışarıya aç* adresini Claude Desktop veya
 Cursor yapılandırmanıza ekleyin. Üç araç sunulur: `akislari_listele`,
 `akis_calistir`, `calisma_durumu`.
 
@@ -381,7 +381,7 @@ komutunu çalıştırmayı atlamışsınız. Bu imaj agent'ların içinde koştu
 <details>
 <summary><b>Model listesi boş</b></summary>
 
-Ayarlar → LLM sağlayıcılar bölümünde bir sağlayıcı tanımlı olmalı. Tanımlıysa
+Ayarlar → Modeller bölümünde bir sağlayıcı tanımlı olmalı. Tanımlıysa
 **Kataloğu yenile** düğmesine basın; hata varsa satırın altında yazar.
 </details>
 
