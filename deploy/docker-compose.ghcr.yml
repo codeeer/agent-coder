@@ -4,10 +4,9 @@
 # imaja çevirir. `build: !reset null` olmadan compose iki tanımı birleştirir ve
 # imaj adı verilmiş olsa bile kaynaktan derlemeye devam eder.
 #
-# FRONTEND BURADA YOK — bilinçli. Arayüzün API adresi derleme anında bundle'a
-# gömüldüğü için hazır bir frontend imajı tek bir adrese mühürlü olurdu. Frontend
-# yerelde derlenmeye devam eder (~1-2 dakika); asıl uzun adım olan runner imajı
-# zaten çekiliyor.
+# Frontend de yayınlanıyor: API adresi artık bundle'a gömülmüyor, sunucu her
+# istekte ortamdan okuyup sayfaya yazıyor (`lib/runtime-config.ts`). Bu yüzden
+# TEK imaj her kuruluma uyuyor.
 #
 # Runner bir compose servisi değildir: backend onu çalışma anında başlatır ve
 # hangi imajı kullanacağını RUNNER_IMAGE ortam değişkeninden okur.
@@ -15,4 +14,8 @@
 services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/codeeer/agent-coder-backend:latest}
+    build: !reset null
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/codeeer/agent-coder-frontend:latest}
     build: !reset null

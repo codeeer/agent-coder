@@ -138,10 +138,14 @@ PUBLIC_HOST=192.168.1.40        # ya da agent.sirket.local
 
 Sonra `make restart`.
 
-Sebebi şu: arayüzün API adresi **derleme anında** içine gömülür. `localhost`
-kalırsa, siz uzaktan açtığınızda tarayıcı **kendi bilgisayarınıza** bağlanmaya
-çalışır ve ekran boş gelir. `PUBLIC_HOST` hem arayüzün API adresini hem de
-sunucunun CORS ayarını birlikte düzeltir.
+Sebebi şu: tarayıcı sunucuya **doğrudan** bağlanır. `localhost` kalırsa, siz
+uzaktan açtığınızda tarayıcı **kendi bilgisayarınıza** bağlanmaya çalışır ve
+ekran boş gelir. `PUBLIC_HOST` hem arayüzün API adresini hem de sunucunun CORS
+ayarını birlikte düzeltir.
+
+> Bu adres arayüz imajına **gömülmez** — sunucu her istekte ortamdan okuyup
+> sayfaya yazar. Bu yüzden aynı hazır imaj her kuruluma uyar ve değişiklik
+> yeniden derleme gerektirmez.
 
 Ters vekil (nginx, Traefik) arkasındaysanız iki adresi de tam yazın:
 
@@ -163,9 +167,8 @@ CORS_ORIGINS=https://agent.sirket.com
 make quickstart
 ```
 
-Agent çalıştırma ortamı ve sunucu, yayınlanmış imajlardan **çekilir**; yalnızca
-arayüz yerelde derlenir (~1-2 dakika). En uzun adım olan runner imajını
-derlemezsiniz.
+Üç imaj da yayınlanmış hallerinden **çekilir — hiçbir şey derlenmez.**
+`make runner` adımına da gerek kalmaz.
 
 > İmajlar `ghcr.io/codeeer/...` altında, **amd64 ve arm64** için yayınlanır.
 > Intel/AMD sunucu da Apple Silicon da doğru imajı kendiliğinden çeker.

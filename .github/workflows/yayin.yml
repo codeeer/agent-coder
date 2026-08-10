@@ -9,10 +9,9 @@
 # amd64. Tek mimarili imaj yayınlamak, kullanıcıların yarısına
 # "exec format error" vermek demektir.
 #
-# FRONTEND BİLİNÇLİ OLARAK YOK: arayüzün API adresi derleme anında bundle'a
-# gömülüyor. Hazır bir frontend imajı `localhost:8080` ile mühürlenmiş olurdu ve
-# portunu değiştiren ya da sunucuya kuran herkes boş ekran görürdü. Çalışma anı
-# yapılandırması eklenmeden yayınlanmamalı.
+# FRONTEND DE YAYINLANIR: API adresi artık bundle'a gömülmüyor, sunucu her
+# istekte ortamdan okuyup sayfaya yazıyor. Bu, imajın taşınabilirliğinin tek
+# dayanağı — aşağıdaki duman testi tam olarak onu sınar.
 
 name: İmaj yayını
 
@@ -48,6 +47,9 @@ jobs:
           - ad: backend
             dockerfile: backend/Dockerfile
             baglam: backend
+          - ad: frontend
+            dockerfile: frontend/Dockerfile
+            baglam: frontend
 
     steps:
       - uses: actions/checkout@v4
@@ -131,3 +133,39 @@ jobs:
           docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
           docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
           echo "Backend imajı doğrulandı."
+
+      # EN KRİTİK KONTROL: frontend imajı taşınabilir mi?
+      #
+      # İmaj bir adresle derlenip BAŞKA bir adresle çalıştırılır. Sayfada
+      # çalışma anındaki adres görünmeli, derleme anındaki hiç görünmemeli.
+      # Bu test düşerse imaj tek bir kuruluma mühürlenmiş demektir ve
+      # yayınlanmamalıdır.
+      - name: Frontend imajı taşınabilir mi
+        run: |
+          set -euo pipefail
+          IMAJ="ghcr.io/${{ github.repository }}-frontend:${{ steps.etiket.outputs.deger }}"
+          docker pull "$IMAJ"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
+
+          docker run -d --name fe -p 3099:3000 \
+            -e API_URL=http://calisma-aninda-verilen:9999 "$IMAJ"
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3099 >/dev/null && break
+            sleep 2
+          done
+
+          HTML=$(curl -s http://localhost:3099)
+
+          if ! echo "$HTML" | grep -q "calisma-aninda-verilen:9999"; then
+            echo "HATA: çalışma anı adresi sayfada yok"; docker logs fe; exit 1
+          fi
+          # `grep -q ... && { exit 1; }` YAZILMAZ: grep bulamadığında (yani
+          # BAŞARI durumunda) AND-listesi başarısız döner ve `set -e` betiği
+          # düşürür — test tam ters çalışırdı.
+          if echo "$HTML" | grep -q "localhost:8080"; then
+            echo "HATA: derleme anındaki adres sayfaya sızmış"; exit 1
+          fi
+
+          docker rm -f fe
+          echo "Frontend imajı taşınabilir."

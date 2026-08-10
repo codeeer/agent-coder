@@ -49,8 +49,13 @@ import type {
   UpdateGitProviderRequest,
   UpdateLLMProviderRequest,
 } from "./types";
+import { apiBase } from "./runtime-config";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+/*
+ * API kök adresi ÇAĞRI BAŞINA çözülür (`apiBase`), modül seviyesinde sabit
+ * olarak değil. Sabit olsaydı bundle'a derleme anındaki değer gömülür ve hazır
+ * imaj tek bir adrese mühürlü kalırdı — bkz. `runtime-config.ts`.
+ */
 
 /** Backend'in döndürdüğü yapılandırılmış hata. */
 export class ApiError extends Error {
@@ -101,7 +106,7 @@ export async function apiFetch<T>(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${apiBase()}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -373,7 +378,7 @@ export const api = {
       }),
 
     /** Canlı olay akışının adresi — EventSource ile açılır. */
-    eventsUrl: (id: string) => `${BASE_URL}/api/runs/${id}/events`,
+    eventsUrl: (id: string) => `${apiBase()}/api/runs/${id}/events`,
   },
 
   workflows: {
@@ -428,13 +433,13 @@ export const api = {
       apiFetch<null>(`/api/workflow-runs/${id}/cancel`, { method: "POST" }),
 
     /** Canlı ilerleme akışının adresi. */
-    eventsUrl: (id: string) => `${BASE_URL}/api/workflow-runs/${id}/events`,
+    eventsUrl: (id: string) => `${apiBase()}/api/workflow-runs/${id}/events`,
 
     /** Dışarıdan tetikleme adresi — kullanıcıya gösterilir, kopyalanır. */
-    hookUrl: (token: string) => `${BASE_URL}/hooks/${token}`,
+    hookUrl: (token: string) => `${apiBase()}/hooks/${token}`,
 
     /** Jira'nın çağıracağı adres — genel webhook'tan ayrı, gövdesi Jira biçimindedir. */
-    jiraHookUrl: (token: string) => `${BASE_URL}/hooks/jira/${token}`,
+    jiraHookUrl: (token: string) => `${apiBase()}/hooks/jira/${token}`,
   },
 
   reports: {

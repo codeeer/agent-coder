@@ -77,18 +77,20 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* derleme anında gömülür ve TARAYICIDAN görünen adres
-        # olmalı — container adı değil.
-        #
-        # Bu yüzden `localhost` sabit yazılamaz: sunucuya kurulup başka bir
-        # makineden açıldığında tarayıcı KENDİ localhost'una gider ve arayüz
-        # "sunucuya ulaşılamıyor" der. PUBLIC_HOST sunucunun adresine ayarlanır;
-        # ters vekil arkasında ise NEXT_PUBLIC_API_URL tümüyle yazılır.
+        # Yalnızca yedek değer. Asıl adres aşağıdaki API_URL ile ÇALIŞMA ANINDA
+        # veriliyor; bu yüzden aynı imaj her kuruluma uyar.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      # TARAYICIDAN görünen backend adresi — container adı değil.
+      #
+      # `NEXT_PUBLIC_` ÖNEKSİZ olması zorunlu: Next, o önekle başlayan her
+      # okumayı derleme anında metne çeviriyor (sunucu bileşeninde bile). O adı
+      # taşısaydı çalışma anında okuduğumuzu sanırken derleme değerini gömerdik.
+      API_URL: ${NEXT_PUBLIC_API_URL:-http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}}
     ports:
       - "${FRONTEND_PORT:-3002}:3000"
     networks:
