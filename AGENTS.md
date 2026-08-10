@@ -14,6 +14,11 @@ Bu dosya projenin tek kural kaynağıdır. Claude Code ve opencode aynı dosyay�
    hepsi `agent-coder/` içinde kalır. Plan dokümanları `plans/NN-konu-YYYY-AA-GG.md` formatında.
 2. **Spec-driven.** Kod yazılmadan önce `specs/NNN-ozellik/spec.md` → `plan.md` → `tasks.md`
    sırası tamamlanır. Detay: [.claude/skills/spec-driven/SKILL.md](.claude/skills/spec-driven/SKILL.md)
+
+   **Bir konunun tek spec'i vardır.** Var olan bir ekranın davranışı değişiyorsa yeni klasör
+   açılmaz; o spec'e bir karar ve **Karar geçmişi** kaydı eklenir. Aksi halde aynı ekranın iki
+   spec'i olur ve hangisinin geçerli olduğu ancak ikisi de okununca anlaşılır — bir kez oldu
+   (`004-rapor` / eski `012-rapor-yonetici`). Dizin: [specs/README.md](specs/README.md)
 3. **Anlaşılmayan bir şey varsa sor.** Varsayımla ilerlemek yerine soru sor.
 4. **opencode bağımlılığı `internal/runner` dışına sızmaz.** Sistemin geri kalanı sadece
    `runner.Runner` arayüzünü bilir — ileride kendi motorumuzla değiştireceğiz.
@@ -261,7 +266,7 @@ kaldırılırsa ekran yanlış bir iddiada bulunmaya başlar.
 ve büyümesi kötü haber değildir; yönetilebilir olan birim maliyettir ("PR başına
 $0,004"). Kahraman rakam sonuç olur, maliyet onun altında durur.
 
-Gerekçe ve ölçümler: [spec 012](specs/012-rapor-yonetici/spec.md).
+Gerekçe ve ölçümler: [spec 004](specs/004-rapor/spec.md).
 
 ### Diyagramlar
 

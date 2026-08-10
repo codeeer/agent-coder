@@ -60,3 +60,20 @@ değil, **bakan kişinin** tercihidir.
 Sunucuda tutulsaydı aynı kurulumu kullanan iki kişiden biri temayı değiştirince
 diğerinin ekranı da değişirdi. Kimlik doğrulama geldiğinde (v1'de yok) kullanıcı
 başına saklamak istenirse o zaman yeniden değerlendirilir.
+
+---
+
+## Karar geçmişi
+
+### 2026-08-10 — renk değerleri ölçülerek düzeltildi
+
+Bu spec temanın **mekanizmasını** tanımlıyor (üç durum, jeton kapsamları,
+`color-scheme`) ve o kısım hâlâ geçerli.
+
+Ama **jetonların değerleri** [spec 010](../010-arayuz-denetimi/spec.md) ile
+değişti. Sebep: değerler gözle seçilmişti ve ölçülünce bir kısmı eşiğin altında
+çıktı — `ink-3` koyu temada, `info` açık temada. Ayrıca denetim sınırı diye ayrı
+bir jeton (`control-line`) eklendi.
+
+Kural da oradan geldi: **açık tema, koyu temanın tersi değildir** — her bileşenin
+her temadaki kontrastı bağımsız değerlendirilir (`AGENTS.md`, Tema bölümü).

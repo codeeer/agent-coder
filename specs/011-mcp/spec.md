@@ -2,7 +2,7 @@
 
 - **Spec no:** 011
 - **Tarih:** 2026-08-10
-- **Durum:** Onaylandı
+- **Durum:** Uygulandı (Aşama 1–3)
 - **İlgili plan:** [plans/01-mimari-ve-yol-haritasi-2026-08-09.md](../../plans/01-mimari-ve-yol-haritasi-2026-08-09.md)
 
 ---
