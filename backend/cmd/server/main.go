@@ -37,6 +37,7 @@ import (
 	"github.com/agent-coder/backend/internal/runner/opencode"
 	"github.com/agent-coder/backend/internal/runner/sandbox"
 	"github.com/agent-coder/backend/internal/runs"
+	"github.com/agent-coder/backend/internal/scripts"
 	"github.com/agent-coder/backend/internal/secrets"
 	"github.com/agent-coder/backend/internal/settings"
 	"github.com/agent-coder/backend/internal/workflow"
@@ -104,6 +105,7 @@ func run() error {
 	gitStore := gitprovider.NewStore(database.Pool, cipher)
 	credStore := credentials.NewStore(database.Pool, cipher)
 	mcpStore := mcp.NewStore(database.Pool, cipher)
+	scriptStore := scripts.NewStore(database.Pool)
 	mcpClient := mcp.NewClient(func() time.Duration {
 		return time.Duration(settingsSvc.Int(settings.KeyMCPTimeoutSeconds)) * time.Second
 	})
@@ -175,7 +177,7 @@ func run() error {
 
 	// ── Akış motoru ─────────────────────────────────────────────────────────
 
-	runBuilder := runbuild.New(projectStore, agentStore, llmStore, gitStore, mcpStore)
+	runBuilder := runbuild.New(projectStore, agentStore, llmStore, gitStore, mcpStore, scriptStore)
 	runPusher := runs.NewPusher(runStore)
 	workflowStore := workflow.NewStore(database.Pool)
 
@@ -239,6 +241,7 @@ func run() error {
 		Syncer:        syncer,
 		GitProviders:  gitStore,
 		MCPServers:    mcpStore,
+		Scripts:       scriptStore,
 		MCPClient:     mcpClient,
 		MCPAccess:     mcpAccess,
 		MCPServer:     mcpOut,

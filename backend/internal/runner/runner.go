@@ -92,6 +92,26 @@ type AgentSpec struct {
 	// Yetkiler gibi AGENT'A bağlıdır (spec 011 K1): "bu agent neler yapabilir"
 	// sorusunun parçası. Boş liste, hiçbir dış araca erişim yok demektir.
 	MCPServers []MCPServerSpec
+
+	// Scripts, bu agent'ın çalıştırabileceği hazır kabuk betikleri.
+	//
+	// Yalnızca AllowBash açıkken işleme alınır (spec 012 K3): kapalıyken dosya
+	// container'a hiç girmez.
+	Scripts []ScriptSpec
+}
+
+// ScriptSpec, container'a konacak tek bir betik.
+//
+// `internal/scripts` tipini doğrudan taşımıyoruz: `runner` paketi bilinçli
+// olarak depolama katmanını tanımıyor, yalnızca çalıştırmak için gerekeni alıyor
+// (MCPServerSpec'teki kararın aynısı).
+type ScriptSpec struct {
+	// Name, `.sh` uzantısı olmadan dosya adı.
+	Name string
+	// Description, agent'ın talimatına yazılır — betiğin NE ZAMAN çağrılacağını
+	// modele anlatan tek şey budur.
+	Description string
+	Content     string
 }
 
 // MCPServerSpec, tek bir MCP sunucusuna bağlanmak için gerekenler.

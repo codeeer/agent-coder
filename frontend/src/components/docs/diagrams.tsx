@@ -517,3 +517,68 @@ export function MCPDirections() {
     </Frame>
   );
 }
+
+/**
+ * Betikler — doğaçlama ile prosedür arasındaki fark.
+ *
+ * Diyagramın taşıdığı tek fikir: aynı işi iki kez yaptırdığınızda üstteki yol
+ * iki farklı sonuç verebilir, alttaki yol veremez. Bu yüzden üst şeritte iki
+ * farklı komut, alt şeritte tek bir dosya gösteriliyor.
+ */
+export function ScriptDeterminism() {
+  return (
+    <Frame viewBox="0 0 1020 340" label="Betiklerin getirdiği belirlilik">
+      <text x={30} y={30} fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        BETİKSİZ — model her seferinde yeniden karar verir
+      </text>
+
+      <Box x={30} y={44} w={170} h={46} title="Agent adımı" subtitle="&quot;yükselt&quot;" tone="accent" />
+      <Arrow x1={206} y1={58} x2={300} y2={48} />
+      <Arrow x1={206} y1={78} x2={300} y2={100} />
+      <Box x={306} y={30} w={230} h={36} title="npm update" tone="muted" />
+      <Box x={306} y={82} w={230} h={36} title="npm i paket@latest" tone="muted" />
+      <Arrow x1={542} y1={48} x2={620} y2={62} />
+      <Arrow x1={542} y1={100} x2={620} y2={78} />
+      <Box x={626} y={44} w={200} h={46} title="Farklı sonuçlar" tone="muted" />
+      <text x={846} y={72} fontSize={11.5} fill="var(--color-ink-2)">
+        1. çalıştırma ≠ 2.
+      </text>
+
+      <line x1={30} y1={148} x2={990} y2={148} stroke="var(--color-line)" strokeDasharray="5 5" />
+
+      <text x={30} y={182} fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        BETİKLE — model NE ZAMAN&apos;a, betik NE YAPILACAĞINA karar verir
+      </text>
+
+      <Box x={30} y={196} w={170} h={46} title="Agent adımı" subtitle="&quot;yükselt&quot;" tone="accent" />
+      <Arrow x1={206} y1={219} x2={300} y2={219} label="çağırır" />
+      <Box
+        x={306}
+        y={196}
+        w={230}
+        h={46}
+        title="upgrade-deps.sh"
+        subtitle="gözden geçirilmiş"
+        tone="accent"
+      />
+      <Arrow x1={542} y1={219} x2={620} y2={219} />
+      <Box x={626} y={196} w={200} h={46} title="Aynı sonuç" />
+      <text x={846} y={224} fontSize={11.5} fill="var(--color-ink-2)">
+        1. çalıştırma = 2.
+      </text>
+
+      <text x={30} y={286} fontSize={11.5} fill="var(--color-ink-2)">
+        Betik kütüphanede bir kez durur; birden fazla agent&apos;a atanır ve çalıştırma
+        anında ortamına kopyalanır.
+      </text>
+      <text x={30} y={306} fontSize={11.5} fill="var(--color-ink-2)">
+        Güncellersiniz — bir sonraki çalıştırma yeni sürümü kullanır, imaj yeniden
+        derlenmez.
+      </text>
+      <text x={30} y={326} fontSize={11.5} fill="var(--color-ink-3)">
+        Yalnızca komut çalıştırma yetkisi açık agent&apos;lara verilir; kapalıysa dosya
+        ortama hiç girmez.
+      </text>
+    </Frame>
+  );
+}

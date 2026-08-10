@@ -176,6 +176,40 @@ export interface UpdateMcpServerRequest {
   clearSecret?: boolean;
 }
 
+// ─── Betikler ───────────────────────────────────────────────────────────────
+
+/**
+ * Agent'ların çalıştırabileceği hazır kabuk betiği.
+ *
+ * Gizli değer TAŞIMAZ ve şifrelenmez: içerik container içinde zaten düz metin
+ * olarak duruyor. Gizli değerler betiğe değil ortam değişkenine konur.
+ */
+export interface Script {
+  id: string;
+  /** Dosya adına dönüşür: `<name>.sh`. Küçük harf, rakam ve `-`. */
+  name: string;
+  /** Agent'ın talimatına yazılır — betiğin NE ZAMAN çağrılacağını anlatır. */
+  description: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateScriptRequest {
+  name: string;
+  description?: string;
+  content: string;
+}
+
+export interface UpdateScriptRequest {
+  name?: string;
+  description?: string;
+  content?: string;
+}
+
+/** Betiklerin container içindeki dizini — arayüzde yol göstermek için. */
+export const SCRIPT_DIR = "/home/agent/scripts";
+
 // ─── Jira (credentials) ─────────────────────────────────────────────────────
 
 /** Spec 002'den sonra bu uç yalnızca Jira ile ilgilenir. */
@@ -327,6 +361,8 @@ export interface Agent {
   allowWebfetch: boolean;
   /** Bu agent'ın erişebileceği MCP sunucuları. */
   mcpServerIds: string[];
+  /** Bu agent'ın çalıştırabileceği hazır betikler. */
+  scriptIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -355,6 +391,8 @@ export interface UpdateAgentRequest {
   allowWebfetch?: boolean;
   /** nil ise dokunulmaz; boş dizi "hiçbiri" demektir. */
   mcpServerIds?: string[];
+  /** Aynı kural: nil dokunulmaz, boş dizi "hiçbiri". */
+  scriptIds?: string[];
 }
 
 // ─── Çalıştırmalar ──────────────────────────────────────────────────────────

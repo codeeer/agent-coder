@@ -31,6 +31,7 @@ import (
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
 	"github.com/agent-coder/backend/internal/runs"
+	"github.com/agent-coder/backend/internal/scripts"
 	"github.com/agent-coder/backend/internal/settings"
 	"github.com/agent-coder/backend/internal/workflow"
 )
@@ -61,6 +62,9 @@ type Deps struct {
 	// Agent'ların erişebileceği dış araç sunucuları
 	MCPServers *mcp.Store
 	MCPClient  *mcp.Client
+
+	// Agent'ların çalıştırabileceği hazır kabuk betikleri (spec 012)
+	Scripts *scripts.Store
 
 	// Agent Coder'ın kendisini dışarıya MCP olarak açması (spec 011 Aşama 3)
 	MCPAccess *mcpserver.Access
@@ -171,6 +175,13 @@ func (h *Handler) Routes() http.Handler {
 			r.Post("/", h.createMCPServer)
 			r.Put("/{id}", h.updateMCPServer)
 			r.Delete("/{id}", h.deleteMCPServer)
+		})
+
+		r.Route("/scripts", func(r chi.Router) {
+			r.Get("/", h.listScripts)
+			r.Post("/", h.createScript)
+			r.Put("/{id}", h.updateScript)
+			r.Delete("/{id}", h.deleteScript)
 		})
 
 		r.Route("/settings", func(r chi.Router) {

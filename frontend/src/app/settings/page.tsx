@@ -13,6 +13,7 @@ import { McpAccessSection } from "@/components/settings/McpAccessSection";
 import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
+import { ScriptSection } from "@/components/settings/ScriptSection";
 import {
   IconChip,
   IconComment,
@@ -20,6 +21,7 @@ import {
   IconPlay,
   IconPlug,
   IconReport,
+  IconTerminal,
 } from "@/components/ui/icons";
 import { Notice, PageHeader, Section } from "@/components/ui/primitives";
 
@@ -61,6 +63,7 @@ const TABS = [
   { id: "repos", label: "Kod depoları", Icon: IconFolder },
   { id: "jira", label: "Jira", Icon: IconComment },
   { id: "mcp", label: "Dış araçlar", Icon: IconPlug },
+  { id: "scripts", label: "Betikler", Icon: IconTerminal },
   { id: "runner", label: "Çalıştırma", Icon: IconPlay },
   { id: "reports", label: "Rapor", Icon: IconReport },
 ] as const;
@@ -127,6 +130,9 @@ function TabContent({ tab }: { tab: TabID }) {
           <McpAccessSection />
         </div>
       );
+
+    case "scripts":
+      return <ScriptSection />;
 
     case "runner":
       return (

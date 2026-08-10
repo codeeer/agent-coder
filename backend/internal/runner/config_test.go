@@ -177,17 +177,104 @@ func TestBuildAgentFile_BosAciklamaVarsayilanAlir(t *testing.T) {
 }
 
 func TestBuildConfigFiles_KullanicininDeposunaYazilmaz(t *testing.T) {
+	// Betikli hali sınanıyor: `/work` yasağı EN ÇOK onlar için geçerli, çünkü
+	// "agent çalıştırsın" diye depo köküne koymak ilk akla gelen yer.
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
-		AgentSpec{Slug: "x", Prompt: "y"},
+		AgentSpec{
+			Slug: "x", Prompt: "y", AllowBash: true,
+			Scripts: []ScriptSpec{{Name: "upgrade", Content: "#!/bin/bash\n"}},
+		},
 	)
 	require.NoError(t, err)
 
 	for _, f := range files {
 		require.False(t, strings.HasPrefix(f.Path, "/work"),
-			"yapılandırma klonlanan depoya yazılmamalı, diff'e karışır: %s", f.Path)
-		require.True(t, strings.HasPrefix(f.Path, "/home/agent/.config/"))
+			"dosyalar klonlanan depoya yazılmamalı, diff'e karışır: %s", f.Path)
+		require.True(t, strings.HasPrefix(f.Path, "/home/agent/"),
+			"dosyalar agent'ın ev dizininde olmalı: %s", f.Path)
 	}
+}
+
+/*
+ * Betikler (spec 012).
+ *
+ * En kritik testi ilk sırada: bash yetkisi kapalıyken betik dosyası container'a
+ * HİÇ girmemeli. Bu, "betikler yeni bir yetenek açmıyor" iddiasının kod
+ * karşılığı — girseydi bir sonraki geliştirici "madem duruyor, izin de verelim"
+ * derdi ve `betik.sh; env` ile token'lar okunurdu (spec 012 K2).
+ */
+func TestBuildConfigFiles_Betikler(t *testing.T) {
+	build := func(t *testing.T, a AgentSpec) []ConfigFile {
+		t.Helper()
+		files, err := BuildConfigFiles(ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a)
+		require.NoError(t, err)
+		return files
+	}
+
+	spec := ScriptSpec{
+		Name:        "upgrade-deps",
+		Description: "Bağımlılıkları yükseltir",
+		Content:     "#!/bin/bash\nnpm update\n",
+	}
+
+	t.Run("bash yetkisi kapalıyken betik dosyası ÜRETİLMEZ", func(t *testing.T) {
+		files := build(t, AgentSpec{Slug: "x", Prompt: "y", AllowBash: false, Scripts: []ScriptSpec{spec}})
+
+		for _, f := range files {
+			require.NotContains(t, f.Path, "/scripts/",
+				"bash yetkisi olmayan agent'a betik konmamalı: %s", f.Path)
+		}
+	})
+
+	t.Run("bash yetkisi kapalıyken talimatta da yazmaz", func(t *testing.T) {
+		files := build(t, AgentSpec{Slug: "x", Prompt: "y", AllowBash: false, Scripts: []ScriptSpec{spec}})
+
+		// Çalıştıramayacağı bir betiği anlatmak, agent'ı var olmayan bir yolu
+		// denemeye ve "izin yok" hatasına iter.
+		require.NotContains(t, string(findFile(t, files, "x.md").Content), "upgrade-deps")
+	})
+
+	t.Run("bash yetkisi açıkken çalıştırılabilir olarak yazılır", func(t *testing.T) {
+		files := build(t, AgentSpec{Slug: "x", Prompt: "y", AllowBash: true, Scripts: []ScriptSpec{spec}})
+
+		f := findFile(t, files, "upgrade-deps.sh")
+		require.Equal(t, "/home/agent/scripts/upgrade-deps.sh", f.Path)
+		require.Equal(t, int64(0o755), f.Mode, "betik çalıştırılabilir olmalı")
+		require.Equal(t, spec.Content, string(f.Content))
+	})
+
+	t.Run("talimat dosyası yolu ve açıklamayı içerir", func(t *testing.T) {
+		files := build(t, AgentSpec{Slug: "x", Prompt: "y", AllowBash: true, Scripts: []ScriptSpec{spec}})
+
+		// Model, varlığını bilmediği dosyayı çağırmaz; liste talimatta ZORUNLU.
+		agentFile := string(findFile(t, files, "x.md").Content)
+		require.Contains(t, agentFile, "/home/agent/scripts/upgrade-deps.sh")
+		require.Contains(t, agentFile, "Bağımlılıkları yükseltir")
+	})
+
+	t.Run("betik yokken boş başlık yazılmaz", func(t *testing.T) {
+		files := build(t, AgentSpec{Slug: "x", Prompt: "y", AllowBash: true})
+		require.NotContains(t, string(findFile(t, files, "x.md").Content), "Kullanabileceğin betikler")
+	})
+
+	t.Run("çok satırlı açıklama liste öğesini bozmaz", func(t *testing.T) {
+		files := build(t, AgentSpec{
+			Slug: "x", Prompt: "y", AllowBash: true,
+			Scripts: []ScriptSpec{{Name: "a", Description: "birinci\nikinci", Content: "#!/bin/bash\n"}},
+		})
+
+		agentFile := string(findFile(t, files, "x.md").Content)
+		require.Contains(t, agentFile, "birinci ikinci")
+	})
+
+	t.Run("yetki kuralları DEĞİŞMEZ", func(t *testing.T) {
+		// Bu özelliğin yetki katmanına dokunmaması, "yeni yetenek açmıyor"
+		// iddiasının tek kanıtı (spec 012 K3). Kural eklenirse burası düşer.
+		withScripts := BuildPermissions(AgentSpec{AllowBash: true, Scripts: []ScriptSpec{spec}})
+		without := BuildPermissions(AgentSpec{AllowBash: true})
+		require.Equal(t, without, withScripts)
+	})
 }
 
 func TestBuildPermissions(t *testing.T) {

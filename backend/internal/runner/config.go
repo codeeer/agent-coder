@@ -28,6 +28,23 @@ type ConfigFile struct {
 // görünürdü (spec 003 davranış kuralı).
 const configDir = "/home/agent/.config/opencode"
 
+/*
+ * scriptsDir, hazır betiklerin container içindeki dizini.
+ *
+ * `/work` altında DEĞİL: orası klonlama hedefi ve boş olmak zorunda; ayrıca
+ * bizim dosyalarımız kullanıcının diff'inde görünürdü (spec 012 K6, spec 003
+ * davranış kuralı).
+ *
+ * Dizin imajda önceden açılır (`runner/Dockerfile`): tar kopyalaması dizin
+ * oluşturmuyor.
+ */
+const scriptsDir = "/home/agent/scripts"
+
+// scriptMode, betiklerin dosya izinleri.
+//
+// Diğer yapılandırma dosyaları 0o600; betik ÇALIŞTIRILABİLİR olmak zorunda.
+const scriptMode int64 = 0o755
+
 // BuildConfigFiles, bir çalıştırma için container'a kopyalanacak dosyaları üretir.
 //
 // Dosyalar container BAŞLATILMADAN ÖNCE kopyalanır: çalıştırma motoru agent
@@ -45,11 +62,50 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec) ([]ConfigFile, error) {
 		return nil, err
 	}
 
-	return []ConfigFile{
+	files := []ConfigFile{
 		{Path: configDir + "/opencode.json", Content: providerCfg, Mode: 0o600},
 		{Path: configDir + "/agents/" + a.Slug + ".md", Content: buildAgentFile(a), Mode: 0o600},
-	}, nil
+	}
+
+	/*
+	 * Hazır betikler.
+	 *
+	 * GÜVENLİK KAPISI: yalnızca bash yetkisi AÇIKKEN yazılırlar (spec 012 K3).
+	 *
+	 * Yetkisi kapalıyken dosyayı yine de koymak teknik olarak zararsız olurdu —
+	 * çalıştırılamazdı zaten. Ama orada durması yanlış bir izlenim verir ve bir
+	 * sonraki geliştiriciyi "madem duruyor, izin de verelim" demeye davet eder.
+	 * O izin, yetki eşleşmesi ham komut metnine yapıldığı için (`betik.sh; env`)
+	 * kapalı bir kapıyı açmak olurdu.
+	 *
+	 * Bu özellik `BuildPermissions`'a HİÇ dokunmaz; "yeni yetenek açmıyor"
+	 * iddiasının tek kanıtı budur.
+	 */
+	for _, s := range scriptsFor(a) {
+		files = append(files, ConfigFile{
+			Path:    scriptPath(s.Name),
+			Content: []byte(s.Content),
+			Mode:    scriptMode,
+		})
+	}
+
+	return files, nil
 }
+
+// scriptsFor, agent'ın gerçekten kullanabileceği betikler.
+//
+// Tek kapı: bash yetkisi kapalıysa liste boştur. Hem dosya yazımı hem talimat
+// metni buradan geçer ki ikisi ayrışmasın — agent'a çalıştıramayacağı bir betik
+// anlatmak, onu var olmayan bir yolu denemeye iter.
+func scriptsFor(a AgentSpec) []ScriptSpec {
+	if !a.AllowBash {
+		return nil
+	}
+	return a.Scripts
+}
+
+// scriptPath, bir betiğin container içindeki mutlak yolu.
+func scriptPath(name string) string { return scriptsDir + "/" + name + ".sh" }
 
 // mcpTimeoutMS, MCP sunucusuna bağlanma ve araç çağırma süre sınırı.
 //
@@ -162,8 +218,50 @@ func buildAgentFile(a AgentSpec) []byte {
 	if !strings.HasSuffix(a.Prompt, "\n") {
 		b.WriteString("\n")
 	}
+	b.WriteString(scriptSection(a))
 
 	return []byte(b.String())
+}
+
+/*
+ * scriptSection, agent'a hangi betiklerin hazır olduğunu anlatan blok.
+ *
+ * Dosyayı container'a koymak YETMEZ: model, varlığını bilmediği bir dosyayı
+ * çağırmaz. MCP araçlarından farkı bu — onlar modele araç olarak sunuluyor,
+ * betikler ise sadece dosya. Bu yüzden liste talimatta yazmak ZORUNDA.
+ *
+ * Betik yoksa blok hiç yazılmaz: boş bir başlık modelin dikkatini boşa harcar.
+ */
+func scriptSection(a AgentSpec) string {
+	list := scriptsFor(a)
+	if len(list) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n## Kullanabileceğin betikler\n\n")
+	b.WriteString("Aşağıdaki betikler önceden yazılmış ve gözden geçirilmiştir. ")
+	b.WriteString("Açıklamasına uyan bir iş yapman gerekirse komutu kendin kurma, ")
+	b.WriteString("ilgili betiği çalıştır — sonucun her seferinde aynı olması için.\n\n")
+
+	for _, s := range list {
+		b.WriteString("- `" + scriptPath(s.Name) + "`")
+		// Açıklama, betiğin NE ZAMAN çağrılacağını anlatan tek ipucu; boşsa
+		// satırı kırpmak yerine yalnızca yolu yazıyoruz.
+		if d := oneLine(s.Description); d != "" {
+			b.WriteString(" — " + d)
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// oneLine, markdown liste öğesini bozmayacak tek satırlık metin üretir.
+func oneLine(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return strings.TrimSpace(s)
 }
 
 // yamlSafe, tek satırlık bir YAML değeri üretir.

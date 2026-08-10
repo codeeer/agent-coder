@@ -20,6 +20,7 @@ anlaşılıyordu. Birleştirildi.
 | [009](009-jira-ve-depo-dugumleri/spec.md) | Jira ve kod deposu düğümleri | PR açma, Jira yorumu, Jira tetikleyici | Uygulandı |
 | [010](010-arayuz-denetimi/spec.md) | Arayüz denetimi | mobil kabuk, açılış ekranı, sayfalama, tema eşliği | Uygulandı |
 | [011](011-mcp/spec.md) | MCP desteği | agent'lara dış araçlar, `mcp.call` düğümü, MCP sunucusu | Uygulandı |
+| [012](012-betikler/spec.md) | Betikler | merkezî betik kütüphanesi, agent'ın çalıştırabildiği hazır prosedürler | Uygulandı |
 
 ## Hangi spec'e bakmalı?
 

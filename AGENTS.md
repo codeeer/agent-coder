@@ -459,6 +459,27 @@ içinde tırnak olan bir agent çıktısı JSON'u bozardı — hem de yalnızca 
 bilinmiyor; bu yüzden toptan bir "geri kalan yasak" kuralı yazılmadı. Erişim yapılandırmayla
 sınırlanıyor. Ölçmeden beyaz liste kurmayın.
 
+**Yetki desenleri GÜVENLİK SINIRI DEĞİLDİR.** Motorun `bash` yetkisi desen kabul ediyor ama
+eşleşme **ham komut metnine** yapılıyor; bash ayrıştırması yok. `betik.sh` için izin veren bir
+desen `betik.sh; env` komutunu da geçirir — ve `env` çıktısında `GIT_TOKEN` ile
+`AGENT_CODER_PROVIDER_KEY` var. "Bash kapalı ama şu komuta izinli" diye bir mod kurmayın
+(spec 012 K2). Yetki ikili kalır: ya bash var ya yok.
+
+**Betikler yalnızca bash yetkisi AÇIK agent'lara kopyalanır** (spec 012 K3). Kapalıyken dosya
+container'a hiç girmez — çalıştırılamayacak bir dosyanın orada durması, bir sonraki
+geliştiriciyi "madem duruyor, izin de verelim" demeye davet eder. `BuildPermissions` bu
+özellik için **hiç değişmedi**; "yeni yetenek açmıyor" iddiasının tek kanıtı bu, bir test de
+bunu kilitliyor.
+
+**Betikler `/home/agent/scripts/<ad>.sh`, mod `0o755`.** `/work` altına konamaz: orası
+klonlama hedefi ve boş olmak zorunda, ayrıca bizim dosyalarımız kullanıcının diff'ine karışır.
+Dizin imajda önceden açılır — tar kopyalaması dizin oluşturmuyor. Betik adı doğrudan dosya
+adına dönüştüğü için dar (`[a-z0-9-]`) ve sessizce dönüştürülmez, baştan reddedilir.
+
+**Betik içeriği gizli değer değildir.** Şifrelenmez, arayüzde tam metin görünür. Container
+içinde zaten düz metin duruyor ve agent okuyabiliyor; şifrelemek yanlış bir güvenlik hissi
+verirdi. Gizli değer betiğe değil ortam değişkenine konur.
+
 **compose `--project-directory` zorunlu.** Compose dosyaları `deploy/` altında ama `.env`
 proje kökünde. Bu bayrak olmadan compose `.env`'i `deploy/` altında arar, bulamaz ve tüm
 port ayarları **sessizce** varsayılana düşer. Makefile bunu zaten geçiriyor; compose'u elle
@@ -527,6 +548,20 @@ ve hepsi veritabanında **AES-256-GCM ile şifreli** saklanır. Uyulması gereke
   geri gelir — istemeyen değişkeni boşaltır.
 
 ## Durum
+
+**Betikler tamamlandı** ([spec 012](specs/012-betikler/spec.md)):
+
+- **Prosedür işleri artık doğaçlanmıyor** — Ayarlar'da merkezî bir betik kütüphanesi;
+  bir kez yazılan betik birden fazla agent'a atanır. Model **ne zaman** çağıracağına
+  karar verir, **ne yapacağına** betik karar verir
+- **Tek yerden güncelleme** — içerik çalıştırma anında okunur, imaj yeniden derlenmez
+- **Güvenlik deltası sıfır** — betikler yalnızca bash yetkisi zaten açık agent'lara
+  gider; o agent betiği bugün de kendisi yazıp çalıştırabiliyordu. `BuildPermissions`
+  hiç değişmedi
+- **Reddedilen fikir kayıtlı** — "bash kapalı ama şu betiğe izinli" modu gerçek bir açık
+  olduğu için düşürüldü (spec 012 K2), ertelenmedi
+- İki gerçek çalıştırmayla doğrulandı: yetkili agent betiği çağırdı ve çıktısını verdi;
+  yetkisiz agent talimatında betikleri hiç görmedi
 
 **MCP Aşama 1 tamamlandı** ([spec 011](specs/011-mcp/spec.md)):
 

@@ -39,7 +39,11 @@ ENV HOME=/home/agent
 # ve opencode onları yalnızca açılışta okuyor (spec 003'te ölçüldü).
 #
 # Dizin önceden oluşturulur ki kopyalama sahiplik sorunu yaşamasın.
-RUN mkdir -p /home/agent/.config/opencode/agents
+#
+# scripts/ — agent'a atanmış hazır kabuk betikleri (spec 012). Bunlar da
+# çalıştırma anında kopyalanır; imaja gömülmezler. /work altında DEĞİL: orası
+# klonlama hedefi ve boş olmak zorunda.
+RUN mkdir -p /home/agent/.config/opencode/agents /home/agent/scripts
 
 COPY --chmod=755 runner/entrypoint.sh /usr/local/bin/entrypoint.sh
 

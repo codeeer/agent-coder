@@ -22,6 +22,9 @@ import type {
   McpServer,
   CreateMcpServerRequest,
   UpdateMcpServerRequest,
+  Script,
+  CreateScriptRequest,
+  UpdateScriptRequest,
   ModelList,
   Paged,
   ModelQuery,
@@ -255,6 +258,21 @@ export const api = {
 
     remove: (id: string) =>
       apiFetch<null>(`/api/mcp-servers/${id}`, { method: "DELETE" }),
+  },
+
+  /** Agent'ların çalıştırabileceği hazır kabuk betikleri (spec 012). */
+  scripts: {
+    list: (page: PageQuery = {}) =>
+      apiFetch<Paged<Script>>(`/api/scripts${pageQuery(page)}`),
+
+    create: (body: CreateScriptRequest) =>
+      apiFetch<Script>("/api/scripts", { method: "POST", body }),
+
+    update: (id: string, body: UpdateScriptRequest) =>
+      apiFetch<Script>(`/api/scripts/${id}`, { method: "PUT", body }),
+
+    remove: (id: string) =>
+      apiFetch<null>(`/api/scripts/${id}`, { method: "DELETE" }),
   },
 
   /** Agent Coder'ın kendisini dışarıya MCP olarak açması. */

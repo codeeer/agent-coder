@@ -36,37 +36,49 @@ type updateAgentRequest struct {
 	// MCPServerIDs, agent'ın erişebileceği dış araç sunucuları.
 	// nil ise dokunulmaz; boş dizi "hiçbiri" demektir.
 	MCPServerIDs *[]uuid.UUID `json:"mcpServerIds"`
+	// ScriptIDs, agent'ın çalıştırabileceği hazır betikler. Aynı kural.
+	ScriptIDs *[]uuid.UUID `json:"scriptIds"`
 }
 
 /*
- * agentResponse, agent kaydı + erişebildiği MCP sunucuları.
+ * agentResponse, agent kaydı + erişebildiği dış araçlar ve betikler.
  *
- * Sunucular ayrı bir uçtan istenseydi arayüz her agent için bir istek daha
- * atardı; liste ekranında beş agent = beş fazladan istek.
+ * Ayrı uçlardan istenseydi arayüz her agent için iki istek daha atardı; liste
+ * ekranında beş agent = on fazladan istek.
  */
 type agentResponse struct {
 	agentreg.Agent
 	MCPServerIDs []uuid.UUID `json:"mcpServerIds"`
+	ScriptIDs    []uuid.UUID `json:"scriptIds"`
 }
 
-// withMCP, agent kaydına erişebildiği MCP sunucularını ekler.
+// withRelations, agent kaydına erişebildiği MCP sunucularını ve betikleri ekler.
 //
-// Okuma hatası agent'ı gizlemez: liste boş görünür ve log'a düşer. Bir MCP
-// sorunu yüzünden agent ekranının hiç açılmaması orantısız olurdu.
-func (h *Handler) withMCP(ctx contextT, a agentreg.Agent) agentResponse {
-	out := agentResponse{Agent: a, MCPServerIDs: []uuid.UUID{}}
-	if h.deps.MCPServers == nil {
-		return out
+// Okuma hatası agent'ı gizlemez: liste boş görünür ve log'a düşer. Bir yan
+// tablo sorunu yüzünden agent ekranının hiç açılmaması orantısız olurdu.
+func (h *Handler) withRelations(ctx contextT, a agentreg.Agent) agentResponse {
+	out := agentResponse{Agent: a, MCPServerIDs: []uuid.UUID{}, ScriptIDs: []uuid.UUID{}}
+
+	if h.deps.MCPServers != nil {
+		servers, err := h.deps.MCPServers.ForAgent(ctx, a.ID)
+		if err != nil {
+			slog.WarnContext(ctx, "agent'ın MCP sunucuları okunamadı", "agent_id", a.ID, "error", err)
+		}
+		for _, s := range servers {
+			out.MCPServerIDs = append(out.MCPServerIDs, s.ID)
+		}
 	}
 
-	servers, err := h.deps.MCPServers.ForAgent(ctx, a.ID)
-	if err != nil {
-		slog.WarnContext(ctx, "agent'ın MCP sunucuları okunamadı", "agent_id", a.ID, "error", err)
-		return out
+	if h.deps.Scripts != nil {
+		list, err := h.deps.Scripts.ForAgent(ctx, a.ID)
+		if err != nil {
+			slog.WarnContext(ctx, "agent'ın betikleri okunamadı", "agent_id", a.ID, "error", err)
+		}
+		for _, s := range list {
+			out.ScriptIDs = append(out.ScriptIDs, s.ID)
+		}
 	}
-	for _, s := range servers {
-		out.MCPServerIDs = append(out.MCPServerIDs, s.ID)
-	}
+
 	return out
 }
 
@@ -85,7 +97,7 @@ func (h *Handler) listAgents(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]agentResponse, 0, len(list))
 	for _, a := range list {
-		out = append(out, h.withMCP(r.Context(), a))
+		out = append(out, h.withRelations(r.Context(), a))
 	}
 	respondJSON(w, http.StatusOK, paged(out, total, page))
 }
@@ -151,8 +163,15 @@ func (h *Handler) updateAgent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.ScriptIDs != nil && h.deps.Scripts != nil {
+		if err := h.deps.Scripts.SetAgentScripts(r.Context(), a.ID, *req.ScriptIDs); err != nil {
+			h.respondScriptError(w, r, err)
+			return
+		}
+	}
+
 	slog.InfoContext(r.Context(), "agent güncellendi", "id", a.ID, "değiştirilmiş", a.IsModified)
-	respondJSON(w, http.StatusOK, h.withMCP(r.Context(), a))
+	respondJSON(w, http.StatusOK, h.withRelations(r.Context(), a))
 }
 
 // resetAgent, hazır bir agent'ı özgün haline döndürür.

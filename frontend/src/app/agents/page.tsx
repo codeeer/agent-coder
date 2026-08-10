@@ -256,6 +256,9 @@ function PermissionLine({ agent }: { agent: Agent }) {
   ].filter(Boolean) as string[];
 
   const mcp = agent.mcpServerIds.length;
+  // Betikler yalnızca komut yetkisi açıkken çalıştırılabiliyor; kapalıyken
+  // sayıyı yazmak, olmayan bir yeteneği varmış gibi göstermek olurdu.
+  const betik = agent.allowBash ? agent.scriptIds.length : 0;
 
   return (
     <p className="mt-2 text-xs text-ink-2">
@@ -264,6 +267,7 @@ function PermissionLine({ agent }: { agent: Agent }) {
           {mcp} dış araç sunucusuna erişebilir ·{" "}
         </>
       )}
+      {betik > 0 && <>{betik} hazır betik çalıştırabilir · </>}
       {izinli.length === 0 ? (
         <>Yalnızca okur — hiçbir şeyi değiştiremez.</>
       ) : (
@@ -302,8 +306,14 @@ function AgentForm({
   const [allowBash, setAllowBash] = useState(agent?.allowBash ?? true);
   const [allowWebfetch, setAllowWebfetch] = useState(agent?.allowWebfetch ?? false);
   const [mcpIds, setMcpIds] = useState<string[]>(agent?.mcpServerIds ?? []);
+  const [scriptIds, setScriptIds] = useState<string[]>(agent?.scriptIds ?? []);
 
   const mcpServers = useQuery({ queryKey: ["mcp-servers"], queryFn: api.mcpServers.list });
+  // Seçim listesi olduğu için tek sayfa yetmez; sınır yüksek tutuluyor.
+  const scripts = useQuery({
+    queryKey: ["scripts", "all"],
+    queryFn: () => api.scripts.list({ limit: 200 }),
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -319,6 +329,7 @@ function AgentForm({
             allowBash,
             allowWebfetch,
             mcpServerIds: mcpIds,
+            scriptIds,
           })
         : api.agents.create({
             name: name.trim(),
@@ -331,11 +342,11 @@ function AgentForm({
             allowWebfetch,
           }),
     onSuccess: async (saved) => {
-      // Oluşturma ucu MCP atamasını almıyor; yeni agent kaydedildikten sonra
-      // atama ikinci bir çağrıyla yazılır. Aksi halde kullanıcı formda seçim
+      // Oluşturma ucu atamaları almıyor; yeni agent kaydedildikten sonra
+      // ikinci bir çağrıyla yazılırlar. Aksi halde kullanıcı formda seçim
       // yapar, kaydeder ve seçimi kaybolurdu.
-      if (!editing && mcpIds.length > 0) {
-        await api.agents.update(saved.id, { mcpServerIds: mcpIds });
+      if (!editing && (mcpIds.length > 0 || scriptIds.length > 0)) {
+        await api.agents.update(saved.id, { mcpServerIds: mcpIds, scriptIds });
       }
       void queryClient.invalidateQueries({ queryKey: ["agents"] });
       onDone();
@@ -449,22 +460,80 @@ function AgentForm({
             Tanımlı sunucu yok. Ayarlar → Dış araçlar bölümünden ekleyebilirsiniz.
           </p>
         ) : (
-          <div className="space-y-2">
-            {mcpServers.data.map((srv) => (
-              <Checkbox
-                key={srv.id}
-                label={`${srv.name} — ${srv.tools.length} araç`}
-                checked={mcpIds.includes(srv.id)}
-                onChange={(on) =>
-                  setMcpIds((prev) =>
-                    on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
-                  )
-                }
-              />
-            ))}
-            <p className="text-[11px] text-ink-3">
+          <div>
+            <PickerList>
+              {mcpServers.data.map((srv) => (
+                <PickerRow
+                  key={srv.id}
+                  title={srv.name}
+                  note={`${srv.tools.length} araç`}
+                  checked={mcpIds.includes(srv.id)}
+                  onChange={(on) =>
+                    setMcpIds((prev) =>
+                      on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
+                    )
+                  }
+                />
+              ))}
+            </PickerList>
+            <p className="mt-2 text-[11px] text-ink-3">
               Seçilmeyen sunucuların araçları bu agent&apos;a hiç sunulmaz.
             </p>
+          </div>
+        )}
+      </fieldset>
+
+      {/* Betikler: model NE ZAMAN çağıracağına karar verir, NE YAPACAĞINA betik
+          karar verir. Prosedür işlerinde doğaçlamayı kesen tek şey bu. */}
+      <fieldset className="mt-3 rounded border border-line p-3">
+        <legend className="px-1 text-xs text-ink-2">Betikler</legend>
+        {scripts.data === undefined ? (
+          <p className="text-[12px] text-ink-3">Yükleniyor…</p>
+        ) : scripts.data.items.length === 0 ? (
+          <p className="text-[12px] text-ink-3">
+            Tanımlı betik yok. Ayarlar → Betikler bölümünden ekleyebilirsiniz.
+          </p>
+        ) : (
+          <div>
+            <PickerList>
+              {scripts.data.items.map((s) => (
+                <PickerRow
+                  key={s.id}
+                  title={s.name}
+                  note={s.description}
+                  mono
+                  checked={scriptIds.includes(s.id)}
+                  onChange={(on) =>
+                    setScriptIds((prev) =>
+                      on ? [...prev, s.id] : prev.filter((id) => id !== s.id),
+                    )
+                  }
+                />
+              ))}
+            </PickerList>
+
+            {/*
+             * Sessiz bir kural görünür kılınıyor.
+             *
+             * Komut yetkisi kapalıyken betik container'a hiç kopyalanmıyor.
+             * Yazılmasaydı kullanıcı betiği seçer, kaydeder, çalıştırır ve
+             * agent'ın onu neden hiç çağırmadığını arardı — hiçbir hata mesajı
+             * çıkmadan.
+             */}
+            {!allowBash && scriptIds.length > 0 ? (
+              <div className="mt-2">
+                <Notice tone="warning">
+                  Bu agent&apos;ın <strong>komut çalıştırma</strong> yetkisi kapalı.
+                  Seçilen betikler kaydedilir ama çalıştırma ortamına
+                  kopyalanmaz — yetkiyi açana kadar kullanılamazlar.
+                </Notice>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-ink-3">
+                Seçilen betikler agent&apos;ın ortamına konur ve talimatına
+                yazılır. Ne zaman çağıracağına agent karar verir.
+              </p>
+            )}
           </div>
         )}
       </fieldset>
@@ -502,5 +571,54 @@ function AgentForm({
   );
 
   return inline ? body : <Card>{body}</Card>;
+}
+
+/*
+ * Seçim listesi — dış araçlar ve betikler için ortak.
+ *
+ * `Checkbox` bileşeni `inline-flex`; bir kapta yan yana dizilirler. Tek kayıt
+ * varken sorun görünmüyordu, ikinci kayıt eklenince iki satır aynı satıra
+ * yapıştı. `space-y-*` bunu düzeltmez — dikey boşluk satır içi öğelerde akmaz.
+ * Kap açıkça `flex-col` olmak zorunda.
+ *
+ * Ayrıca bu liste iki bilgi taşıyor (ad + ne olduğu). Tek satıra "ad — açıklama"
+ * diye sıkıştırıldığında uzun açıklama satırı taşırıyor ve göz adı bulamıyor;
+ * ad üstte, açıklama altında duruyor.
+ */
+function PickerList({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col divide-y divide-line">{children}</div>;
+}
+
+function PickerRow({
+  title,
+  note,
+  mono = false,
+  checked,
+  onChange,
+}: {
+  title: string;
+  note?: string;
+  /** Ad bir dosya adına dönüşüyorsa tek aralıklı yazılır. */
+  mono?: boolean;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5 py-2 first:pt-0 last:pb-0">
+      {/* mt: kutu, iki satırlık metnin ortasına değil ilk satırın hizasına oturur. */}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 size-3.5 shrink-0 accent-accent"
+      />
+      <span className="min-w-0">
+        <span className={`block text-[13px] ${mono ? "font-mono" : "font-medium"}`}>
+          {title}
+        </span>
+        {note && <span className="mt-0.5 block text-[12px] text-ink-2">{note}</span>}
+      </span>
+    </label>
+  );
 }
 

@@ -5,6 +5,7 @@ import {
   Parallelism,
   MCPDirections,
   ProductFlow,
+  ScriptDeterminism,
   StepLifecycle,
   TriggerPaths,
 } from "@/components/docs/diagrams";
@@ -120,6 +121,21 @@ export default function HowItWorksPage() {
 
       <Step
         no={7}
+        title="Standart işte standart sonuç"
+        lead="Model her seferinde yeniden karar verir. Keşifte bu doğru; prosedürde risk. Betikler bu ikisini ayırıyor."
+      >
+        <ScriptDeterminism />
+        <Note>
+          Ayarlar&apos;da bir <b>betik kütüphanesi</b> var: bir kez yazarsınız, birden
+          fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
+          <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği bugün de
+          kendisi yazıp çalıştırabiliyordu. Değişen tek şey, çalıştırdığı metnin sizin
+          gözden geçirdiğiniz metin olması.
+        </Note>
+      </Step>
+
+      <Step
+        no={8}
         title="Neyi nerede saklıyor"
         lead="Kaydedilen graf değişmez. Geçmiş bir çalışma, o gün hangi tanımla koştuysa onu gösterir."
       >
@@ -131,7 +147,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={8}
+        no={9}
         title="Üç karar"
         lead="Sistemin bugünkü halini belirleyen, geri alınması pahalı olan seçimler."
       >
@@ -153,7 +169,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={9}
+        no={10}
         title="Güvenlik sınırları"
         lead="Neyin nereye eriştiği bilinçli olarak dar tutuldu."
       >
@@ -175,6 +191,13 @@ export default function HowItWorksPage() {
             Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi agent&apos;ın
             kullanabileceği ayrı seçilir; seçilmeyenlere araçlar <b>hiç sunulmaz</b>.
             Bağlanamayan bir sunucu sessiz kalmaz, uyarı üretir.
+          </Decision>
+          <Decision title="Betikler yeni bir kapı açmaz">
+            Bir betik yalnızca <b>komut çalıştırma yetkisi zaten açık</b> agent&apos;a
+            kopyalanır; kapalıysa dosya ortama hiç girmez. Yetki kuralları bu özellik
+            için değişmedi. &quot;Bash kapalı ama şu betiğe izinli&quot; gibi bir ara mod
+            bilinçli olarak <b>yapılmadı</b>: izin eşleşmesi ham komut metnine yapıldığı
+            için kapalı bir kapıyı açardı.
           </Decision>
           <Decision title="Dışarıya açılan adres bir anahtardır" tone="warn">
             Agent Coder&apos;ı MCP olarak kullanmanın adresi, bilen herkesin akış

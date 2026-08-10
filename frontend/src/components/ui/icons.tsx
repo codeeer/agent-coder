@@ -306,3 +306,13 @@ export function IconPlug(p: IconProps) {
     </Svg>
   );
 }
+
+/** Terminal — hazır kabuk betikleri. */
+export function IconTerminal(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 17l5-5-5-5" />
+      <path d="M13 18h7" />
+    </Svg>
+  );
+}

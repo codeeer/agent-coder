@@ -21,6 +21,7 @@ import (
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runs"
+	"github.com/agent-coder/backend/internal/scripts"
 )
 
 // ErrNoModel, ne istekte ne agent'ta model belirtilmemiş.
@@ -33,13 +34,38 @@ type Builder struct {
 	llm      *llm.Store
 	git      *gitprovider.Store
 	mcp      *mcp.Store
+	scripts  *scripts.Store
 }
 
 // New yeni bir Builder üretir.
 func New(p *projects.Store, a *agentreg.Store, l *llm.Store, g *gitprovider.Store,
-	m *mcp.Store,
+	m *mcp.Store, s *scripts.Store,
 ) *Builder {
-	return &Builder{projects: p, agents: a, llm: l, git: g, mcp: m}
+	return &Builder{projects: p, agents: a, llm: l, git: g, mcp: m, scripts: s}
+}
+
+// agentScripts, agent'a atanmış hazır betikleri çözer.
+//
+// İçerik burada, çalıştırma anında okunur: kütüphanedeki betik güncellenmişse
+// SONRAKİ çalıştırma yeni içerikle koşar. Kopyalanmış bir sürüm saklansaydı
+// "tek yerden güncelle" vaadi bozulurdu (spec 012 hikâye 2).
+func (b *Builder) agentScripts(ctx context.Context, agentID uuid.UUID) ([]runner.ScriptSpec, error) {
+	if b.scripts == nil {
+		return nil, nil
+	}
+
+	list, err := b.scripts.ForAgent(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]runner.ScriptSpec, 0, len(list))
+	for _, s := range list {
+		out = append(out, runner.ScriptSpec{
+			Name: s.Name, Description: s.Description, Content: s.Content,
+		})
+	}
+	return out, nil
 }
 
 /*
@@ -196,6 +222,11 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 		return runs.StartInput{}, err
 	}
 
+	agentScripts, err := b.agentScripts(ctx, agent.ID)
+	if err != nil {
+		return runs.StartInput{}, err
+	}
+
 	return runs.StartInput{
 		Create: runs.CreateInput{
 			ProjectID: project.ID, AgentID: agent.ID, ProviderID: &provider.ID,
@@ -209,6 +240,7 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 			AllowEdit: agent.AllowEdit, AllowBash: agent.AllowBash,
 			AllowWebfetch: agent.AllowWebfetch,
 			MCPServers:    mcpServers,
+			Scripts:       agentScripts,
 		},
 		Provider: runner.ProviderSpec{
 			Slug: provider.Slug, Kind: string(provider.Type),
