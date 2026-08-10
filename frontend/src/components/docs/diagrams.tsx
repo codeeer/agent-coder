@@ -455,3 +455,65 @@ export function DataModel() {
     </Frame>
   );
 }
+
+/* ── 7. MCP: iki yön ─────────────────────────────────────────────────────── */
+
+/**
+ * Dış araçlarla iki yönlü ilişki.
+ *
+ * Tek diyagramda iki yön: dışarıya doğru (biz araç kullanırız) ve içeriye
+ * doğru (bizi araç olarak kullanırlar). Ayrı çizilseydi aradaki simetri —
+ * aynı protokol, ters yön — görünmezdi.
+ */
+export function MCPDirections() {
+  return (
+    <Frame viewBox="0 0 1020 330" label="MCP'nin iki yönü">
+      {/* Ortadaki ayraç: iki yön arasındaki sınır. */}
+      <line x1={512} y1={20} x2={512} y2={300} stroke="var(--color-line)" strokeDasharray="5 5" />
+
+      <text x={256} y={30} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        DIŞARIYA — biz araç kullanırız
+      </text>
+      <text x={768} y={30} textAnchor="middle" fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        İÇERİYE — bizi araç olarak kullanırlar
+      </text>
+
+      {/* Yön 1a: agent karar verir */}
+      <text x={30} y={58} fontSize={11} fill="var(--color-ink-3)">
+        1. Agent kendi karar verir
+      </text>
+      <Box x={30} y={68} w={150} h={50} title="Agent adımı" subtitle="kod yazar" tone="accent" />
+      <Arrow x1={186} y1={80} x2={280} y2={72} />
+      <Arrow x1={186} y1={93} x2={280} y2={97} />
+      <Arrow x1={186} y1={106} x2={280} y2={122} />
+      <Box x={286} y={54} w={190} h={34} title="Sentry" />
+      <Box x={286} y={94} w={190} h={34} title="Notion" />
+      <Box x={286} y={134} w={190} h={34} title="Veritabanı şeması" />
+
+      {/* Yön 1b: akış karar verir */}
+      <text x={30} y={205} fontSize={11} fill="var(--color-ink-3)">
+        2. Akış karar verir — her seferinde aynı
+      </text>
+      <Box x={30} y={215} w={150} h={50} title="MCP düğümü" subtitle="araç seçili" tone="accent" />
+      <Arrow x1={186} y1={240} x2={280} y2={240} label="ask_question" />
+      <Box x={286} y={215} w={190} h={50} title="Belirli araç" subtitle="belirli argümanlar" />
+
+      {/* Yön 2: dışarıdan bize */}
+      <Box x={620} y={54} w={280} h={50} title="Claude Desktop · Cursor" subtitle="başka bir agent" />
+      <Arrow x1={760} y1={110} x2={760} y2={148} label="MCP" />
+      <Box x={620} y={154} w={280} h={62} title="Agent Coder" subtitle="akislari_listele · akis_calistir · calisma_durumu" tone="accent" />
+      <Arrow x1={760} y1={222} x2={760} y2={252} />
+      <Box x={620} y={258} w={280} h={44} title="Akış çalışır" tone="muted" />
+
+      <text x={256} y={300} textAnchor="middle" fontSize={11.5} fill="var(--color-ink-2)">
+        Hangi agent&apos;ın hangi sunucuya erişeceği ayrı seçilir.
+      </text>
+      <text x={256} y={318} textAnchor="middle" fontSize={11.5} fill="var(--color-ink-2)">
+        Seçilmeyenin araçları o agent&apos;a hiç sunulmaz.
+      </text>
+      <text x={768} y={318} textAnchor="middle" fontSize={11.5} fill="var(--color-ink-2)">
+        Başlatma, elle ve Jira ile aynı kapıdan geçer.
+      </text>
+    </Frame>
+  );
+}

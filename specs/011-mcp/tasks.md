@@ -190,6 +190,20 @@ handler değil, MCP *sunucusu* — o durum taşımıyor.
 **Ders:** durum tutan bir bileşeni "her seferinde üret" diye yazmak, tek istekli
 bir protokolde fark edilmez; çok istekli bir protokolde ilk denemede patlar.
 
+### Not — "Nasıl çalışır" sayfası iki aşama geriden geldi
+
+Aşama 1'de sayfaya MCP kutusu ve güvenlik notu eklenmişti; Aşama 2 ve 3'te
+belgeler (`AGENTS.md`, `README`, spec) güncellendi ama **sayfa atlandı** ve
+kullanıcı fark etti.
+
+Sayfa artık MCP'ye ayrı bir bölüm ayırıyor: tek diyagramda iki yön —
+dışarıya (agent karar verir / akış karar verir) ve içeriye (bizi araç olarak
+kullanırlar). Ayrı çizilseydi aradaki simetri, yani aynı protokolün ters yönde
+işlemesi, görünmezdi.
+
+**Ders:** "belgeleri güncelle" maddesi kapanış görevi olarak yazıldığında
+sayfa gibi ürün içi anlatımlar listeden düşüyor. Bu sayfa da bir belgedir.
+
 ### Ölçüm 6 — eksiksiz `Record` yine işini yaptı
 
 `TriggerKind`'a `mcp` eklendiğinde TypeScript hemen uyardı:

@@ -3,6 +3,7 @@ import {
   Architecture,
   DataModel,
   Parallelism,
+  MCPDirections,
   ProductFlow,
   StepLifecycle,
   TriggerPaths,
@@ -104,6 +105,21 @@ export default function HowItWorksPage() {
 
       <Step
         no={6}
+        title="Dış araçlar — iki yön"
+        lead="Bir agent yalnızca klonlanmış depoyla çalışırsa çok şey bilmez. MCP, standart bir protokolle dış kaynaklara bağlanmayı sağlıyor — ve aynı protokol ters yönde de işliyor."
+      >
+        <MCPDirections />
+        <Note>
+          Üç kullanım aynı protokolün üç yüzü. <b>Agent karar verirse</b> esnektir:
+          &quot;bu hatayı düzelt&quot; dediğinizde yığın izini kendisi çeker.{" "}
+          <b>Akış karar verirse</b> tekrarlanabilir: her çalıştırmada aynı araç, aynı
+          argümanlarla. <b>Ters yönde</b> ise Agent Coder başka bir agent&apos;ın aracı
+          olur — akışlarınız Claude Desktop&apos;tan tetiklenebilir.
+        </Note>
+      </Step>
+
+      <Step
+        no={7}
         title="Neyi nerede saklıyor"
         lead="Kaydedilen graf değişmez. Geçmiş bir çalışma, o gün hangi tanımla koştuysa onu gösterir."
       >
@@ -115,7 +131,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={7}
+        no={8}
         title="Üç karar"
         lead="Sistemin bugünkü halini belirleyen, geri alınması pahalı olan seçimler."
       >
@@ -137,7 +153,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={8}
+        no={9}
         title="Güvenlik sınırları"
         lead="Neyin nereye eriştiği bilinçli olarak dar tutuldu."
       >
@@ -159,6 +175,11 @@ export default function HowItWorksPage() {
             Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi agent&apos;ın
             kullanabileceği ayrı seçilir; seçilmeyenlere araçlar <b>hiç sunulmaz</b>.
             Bağlanamayan bir sunucu sessiz kalmaz, uyarı üretir.
+          </Decision>
+          <Decision title="Dışarıya açılan adres bir anahtardır" tone="warn">
+            Agent Coder&apos;ı MCP olarak kullanmanın adresi, bilen herkesin akış
+            başlatabileceği anlamına gelir. Ayarlar&apos;dan yenilenebilir. Kimlik
+            doğrulama gelene kadar bu adres paylaşılırken dikkat edilmeli.
           </Decision>
           <Decision title="Kimlik doğrulama henüz yok" tone="warn">
             v1 tek kullanıcılıktır ve <b>internete açık bir sunucuda çalıştırılmamalıdır</b>. Şema
