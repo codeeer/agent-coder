@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   IconAgent,
+  IconBook,
   IconPlay,
   IconReport,
   IconChip,
@@ -23,6 +24,7 @@ const NAV = [
   { href: "/reports", label: "Rapor", Icon: IconReport },
   { href: "/models", label: "Modeller", Icon: IconChip },
   { href: "/settings", label: "Ayarlar", Icon: IconSettings },
+  { href: "/nasil-calisir", label: "Nasıl çalışır", Icon: IconBook },
 ] as const;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {

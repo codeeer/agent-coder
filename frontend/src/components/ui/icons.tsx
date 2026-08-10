@@ -285,3 +285,13 @@ export function IconClose(p: IconProps) {
     </Svg>
   );
 }
+
+export function IconBook(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v13" />
+      <path d="M4 5.5v13A2.5 2.5 0 0 0 6.5 21H20" />
+      <path d="M20 17H6.5a2.5 2.5 0 0 0 0 5" />
+    </Svg>
+  );
+}

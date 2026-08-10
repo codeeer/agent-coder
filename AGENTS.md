@@ -219,6 +219,17 @@ girdininki 1,31:1 ölçüldü — yani düğme ve kutu sınırından tanınamıy
 
 Süsleme çizgilerini koyulaştırmak yanlış cevaptı: arayüz gereksizce ağırlaşırdı.
 
+### Diyagramlar
+
+`/nasil-calisir` sayfasındaki mimari ve akış diyagramları elle yazılmış SVG
+(`components/docs/diagrams.tsx`) — grafik kütüphanesi yok, rapor grafikleriyle
+aynı yaklaşım. Renkler `var(--color-*)` token'larından okunur, bu yüzden iki
+temada da doğru görünürler ve tema denetiminden geçerler.
+
+Dar ekranda diyagram küçülmez, **kaydırılır**: `minWidth` ile taban genişlik
+verilir ve yalnızca çizim `overflow-x-auto` bir kaba sarılır. Kartın tamamını
+kaydırmak, altındaki açıklama paragrafını da yatay kaydırırdı.
+
 ### Grafikler
 
 Rapor ekranındaki grafikler elle yazılmış SVG/CSS'tir; grafik kütüphanesi yok.

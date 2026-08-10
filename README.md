@@ -140,6 +140,10 @@ make ps                        # üç servis de "healthy" olmalı
 
 Tarayıcıda **<http://localhost:3002>** adresini açın.
 
+> 💡 Sistemin nasıl çalıştığını mimari diyagramlarıyla anlatan bir sayfa
+> uygulamanın içinde var: sol menüde **Nasıl çalışır**. Birine anlatırken
+> doğrudan onu kullanabilirsiniz.
+
 ---
 
 # İlk akışınız
