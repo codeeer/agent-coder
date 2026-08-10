@@ -1,0 +1,16 @@
+# Geliştirme imajı — air ile hot reload.
+# Kaynak kod bind-mount edilir, container içinde derlenir.
+FROM golang:1.25-alpine
+
+RUN apk add --no-cache git wget \
+    && go install github.com/air-verse/air@latest
+
+WORKDIR /src
+
+# Bağımlılıkları önceden indir; ilk açılış hızlansın.
+COPY go.mod go.sum ./
+RUN go mod download
+
+EXPOSE 8080
+
+CMD ["air", "-c", ".air.toml"]

@@ -1,0 +1,6 @@
+tmp
+bin
+*.out
+coverage.txt
+.env
+.DS_Store

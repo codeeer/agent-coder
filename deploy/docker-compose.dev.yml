@@ -1,0 +1,41 @@
+# Geliştirme kaplaması — hot reload.
+#
+# Çalıştırma: proje kökünden `make dev`
+# (docker-compose.yml ile birlikte kullanılır, tek başına değil.)
+
+services:
+  backend:
+    build:
+      # Yollar proje köküne göredir (bkz. Makefile: --project-directory).
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      - ./backend:/src
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Modül önbelleği container'da kalsın; her yeniden başlatmada indirilmesin.
+      - go-mod-cache:/go/pkg/mod
+    # air kendi süreç yönetimini yapar; compose healthcheck'i derleme sırasında
+    # başarısız olabileceğinden gevşetilir.
+    healthcheck:
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8080}
+    volumes:
+      - ./frontend:/app
+      # node_modules ve .next host'tan gölgelenmesin — container'ınki kullanılır.
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  go-mod-cache:

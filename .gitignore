@@ -1,0 +1,45 @@
+# Ortam değişkenleri ve secret'lar
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Go
+backend/bin/
+backend/tmp/
+*.test
+*.out
+coverage.txt
+# Geliştirme sırasında container içinde derlenen tek seferlik ikililer.
+# Bir kez 14 MB'lık bir ELF ikilisi commit'e girmek üzereydi.
+backend/probe
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Derleme çıktıları
+dist/
+build/
+
+# Editör / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Yerel geliştirme verisi
+deploy/data/
+*.db
+*.sqlite
+
+# Claude Code yerel ayarları (paylaşılan .claude/agents ve .claude/skills izlenir)
+.claude/settings.local.json

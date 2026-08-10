@@ -1,0 +1,362 @@
+@import "tailwindcss";
+
+/*
+ * `dark:` varyantı İŞLETİM SİSTEMİNİ değil, kullanıcının seçimini takip eder.
+ *
+ * Tailwind'in varsayılanı `prefers-color-scheme` medya sorgusudur. O haliyle
+ * kalırsa, sistemi koyu olan bir kullanıcı açık temayı seçtiğinde `dark:` ile
+ * yazılmış her kural yine koyu davranır — arayüzün bir kısmı açık, bir kısmı
+ * koyu kalır. Tam olarak bu yaşandı.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Tasarım jetonları.
+ *
+ * Katmanlı yüzey sistemi: canvas (en dip) → surface (kart) → raised (kart içi
+ * vurgu). Sınırlar gölge yerine kullanılıyor — koyu temada gölge görünmez,
+ * ince sınır her iki temada da çalışır.
+ *
+ * Aksan rengi bilinçli olarak AZ kullanılır: birincil eylem, aktif menü ve
+ * odak halkası. Her yerde kullanılırsa hiçbir yeri vurgulamaz.
+ */
+
+@theme {
+  /*
+   * Açık tema. Değerler ÖLÇÜLEREK seçildi, göz kararıyla değil — ilk hali
+   * yalnızca koyu temaya bakılarak yazılmıştı ve açık temada okunmuyordu:
+   * kart zemini sayfadan ayrılmıyordu (1,06:1), ikincil metin ve "başarılı"
+   * yeşili küçük punto için gereken 4,5:1'in altındaydı.
+   */
+
+  /* Yüzeyler — sayfa en koyu, kart beyaz, kart içi vurgu aralarında */
+  --color-canvas: #eef1f5;
+  --color-surface: #ffffff;
+  --color-raised: #f2f5f9;
+  --color-overlay: #ffffff;
+
+  /* Sınırlar — ikisi de SÜSLEMEDİR: kart kenarı, ayraç, düğüm çerçevesi. */
+  --color-line: #dbe1ea;
+  --color-line-strong: #b9c2cf;
+
+  /*
+   * Denetim sınırı — düğme ve girdi kenarı.
+   *
+   * Ayrı bir token, çünkü ayrı bir SORUMLULUĞU var: bir düğmenin nerede
+   * başlayıp bittiği yalnızca bu çizgiden anlaşılıyor, dolayısıyla WCAG 1.4.11
+   * gereği 3:1 olmak zorunda. Süsleme çizgileri için böyle bir zorunluluk yok
+   * ve onları da koyulaştırmak arayüzü gereksizce ağırlaştırırdı.
+   *
+   * Bu ayrım yokken bileşenler süsleme token'ını ödünç alıyordu: ikincil
+   * düğmenin kenarı beyaz kart üzerinde 1,8:1, girdi kenarı 1,31:1 ölçüldü —
+   * yani düğme ve kutu, sınırından tanınamıyordu.
+   */
+  --color-control-line: #7e8b9e;
+
+  /* Metin — üçü de kart, sayfa VE vurgu zemininde 4,5:1 üstü */
+  --color-ink: #0d1117;
+  --color-ink-2: #545d6b;
+  /* #6e7787 idi: kart üzerinde 4,51:1 geçiyordu ama sayfa zemininde 3,98:1
+     kalıyordu — ayarlar notu ve grafik ekseni orada duruyor. */
+  --color-ink-3: #646e7d;
+
+  /* Aksan */
+  --color-accent: #5b5bd6;
+  --color-accent-hover: #4f4fc4;
+  --color-accent-soft: #eeeeff;
+  --color-accent-ink: #ffffff;
+
+  /* Durum renkleri — yumuşak zemin + koyu metin */
+  --color-ok: #0a7350;
+  --color-ok-soft: #e6f6ef;
+  --color-warn: #8a5200;
+  --color-warn-soft: #fdf3e2;
+  --color-danger: #c62d42;
+  --color-danger-soft: #fdecef;
+  /* #1f6feb idi: kendi rozet zemininde (info-soft) 4,11:1 kalıyordu; aynı
+     rozet koyu temada 6,87:1 ile rahat geçiyordu — tipik tema eşliği hatası. */
+  --color-info: #175ac7;
+  --color-info-soft: #e9f2ff;
+
+  /*
+   * Grafik renkleri.
+   *
+   * Durum paleti KASITLI OLARAK temaya göre değişmez: "başarılı yeşil"
+   * açık ve koyu temada aynı renk olmalı, yoksa iki ekran görüntüsü
+   * karşılaştırıldığında aynı şey farklı görünür.
+   *
+   * Doğrulandı (dataviz validator): görme engeli benzetimi altında en yakın
+   * çift ΔE 11.3 (eşik 8), normal görüşte 27.6 (eşik 15).
+   * Sarı açık temada 3:1 kontrastın altında kalır — bu yüzden grafik ASLA
+   * yalnız renge dayanmaz: her seri etiketli göstergede ve tabloda da vardır.
+   */
+  --color-chart-good: #0ca30c;
+  --color-chart-other: #fab219;
+  --color-chart-bad: #d03b3b;
+
+  /* Yükseklik */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-pop: 0 8px 24px -6px rgb(16 24 40 / 0.12);
+
+  --radius-card: 10px;
+
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+/*
+ * Koyu tema.
+ *
+ * ÜÇ DURUM vardır: sistem (varsayılan), açık, koyu. Kullanıcının seçimi
+ * `<html data-theme="light|dark">` olarak yazılır; hiç seçim yoksa öznitelik
+ * bulunmaz ve işletim sisteminin tercihi geçerli olur.
+ *
+ * Jeton listesi BİLEREK iki kez yazılıyor. Birincisi öznitelik daha yazılmadan
+ * (sayfa ilk boyanırken veya JavaScript kapalıyken) işletim sistemi tercihini
+ * uygular; ikincisi kullanıcının açık seçimini uygular. Tek bir seçiciye
+ * indirilemez çünkü biri medya sorgusuna bağlı, diğeri değil.
+ *
+ * Sıra önemlidir: iki seçicinin özgüllüğü eşit, bu yüzden açık seçim
+ * (`[data-theme="dark"]`) sonda durur ve gerektiğinde kazanır.
+ *
+ * Grafik durum renkleri (--color-chart-*) burada YOK: onlar kasıtlı olarak
+ * temaya göre değişmez, iki ekran görüntüsü karşılaştırıldığında "başarılı
+ * yeşil" aynı renk olmalı.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --color-canvas: #0a0c10;
+    --color-surface: #121620;
+    --color-raised: #191e2a;
+    --color-overlay: #161b26;
+
+    --color-line: #232a37;
+    --color-line-strong: #333c4d;
+    --color-control-line: #606d86;
+
+    --color-ink: #e7eaf0;
+    --color-ink-2: #98a2b3;
+    /* #6b7686 idi: üç zeminde de 4,5:1'in altındaydı (3,62–4,25). Açık temada
+       aynı token geçiyordu — bileşenler değil, YALNIZCA tema kalıyordu. */
+    --color-ink-3: #7f8b9b;
+
+    --color-accent: #7b7bf0;
+    --color-accent-hover: #8f8ff5;
+    --color-accent-soft: #1c1e3d;
+    --color-accent-ink: #0a0c10;
+
+    --color-ok: #3ddc9a;
+    --color-ok-soft: #10281f;
+    --color-warn: #e8b04b;
+    --color-warn-soft: #2a2113;
+    --color-danger: #ff7085;
+    --color-danger-soft: #2e1419;
+    --color-info: #6aa9ff;
+    --color-info-soft: #101f36;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+
+    --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8b9b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-canvas: #0a0c10;
+  --color-surface: #121620;
+  --color-raised: #191e2a;
+  --color-overlay: #161b26;
+
+  --color-line: #232a37;
+  --color-line-strong: #333c4d;
+  --color-control-line: #606d86;
+
+  --color-ink: #e7eaf0;
+  --color-ink-2: #98a2b3;
+  --color-ink-3: #7f8b9b;
+
+  --color-accent: #7b7bf0;
+  --color-accent-hover: #8f8ff5;
+  --color-accent-soft: #1c1e3d;
+  --color-accent-ink: #0a0c10;
+
+  --color-ok: #3ddc9a;
+  --color-ok-soft: #10281f;
+  --color-warn: #e8b04b;
+  --color-warn-soft: #2a2113;
+  --color-danger: #ff7085;
+  --color-danger-soft: #2e1419;
+  --color-info: #6aa9ff;
+  --color-info-soft: #101f36;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+
+  --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8b9b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/*
+ * Varsayılan. color-scheme yalnızca renk jetonlarını değil, tarayıcının kendi
+ * çizdiklerini de (kaydırma çubuğu, form denetimleri, otomatik doldurma zemini)
+ * doğru tarafa çeker — jetonları değiştirip bunu unutmak, açık temada koyu
+ * kaydırma çubuğu bırakır.
+ */
+:root {
+  color-scheme: light;
+
+  --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7787' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/*
+ * Öğe düzeyindeki kurallar KATMAN İÇİNDE durur.
+ *
+ * CSS'te katmansız bir kural, katmanlı olanların HEPSİNİ yener. Tailwind
+ * utility'leri `@layer utilities` içindedir; bu blok katman dışında yazılsaydı
+ * buradaki her bildirim aynı özelliği veren utility'yi sessizce ezerdi.
+ *
+ * Bu bir kere yaşandı: burada katmansız bir `button { color: inherit }` vardı
+ * (Tailwind'in preflight'ı zaten aynısını yapıyor) ve düğmelerdeki BÜTÜN metin
+ * rengi utility'lerini eziyordu. Birincil düğmenin yazısı açık temada beyaz
+ * yerine siyaha yakın çıkıyordu (spec 006, Ölçüm 3).
+ */
+@layer base {
+  html,
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv02", "cv03", "cv04";
+  }
+}
+
+/*
+ * Odak halkası BİLEREK katman dışında: klavyeyle gezinen kullanıcı için her
+ * zaman görünür olmalı, hiçbir utility onu bastırmamalı.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+ * Açılır listenin oku.
+ *
+ * Veri URI'sinin içine `var()` yazılamaz, bu yüzden URI'nin TAMAMI bir jetonda
+ * durur ve tema bloklarında yeniden tanımlanır. Önceki hali sabit bir gri
+ * taşıyordu ve tema değişince yerinde kalıyordu.
+ */
+@layer base {
+  select {
+    appearance: none;
+    background-image: var(--select-arrow);
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    padding-right: 2rem;
+  }
+}
+
+/* İnce kaydırma çubuğu — panel içi listeler nefes alsın. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* "Çalışıyor" durumundaki nokta için nabız. */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-dot {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Tuval (React Flow) renkleri.
+ *
+ * Kütüphane kendi CSS değişkenlerini kullanıyor; hepsi projenin jetonlarına
+ * bağlanıyor ki tema anahtarı tuvali de çevirsin. Sabit renk bırakmak, açık
+ * temada koyu bir tuval demek olurdu — spec 006'da bir kez yaşandı.
+ *
+ * Katman içinde: kütüphanenin kendi kuralları da katmanlı olmadığı için burada
+ * özgüllük yeter, ama utility'leri ezmemek için yine base'de duruyor.
+ */
+@layer base {
+  .react-flow {
+    --xy-background-color: var(--color-canvas);
+    --xy-edge-stroke: var(--color-line-strong);
+    --xy-edge-stroke-selected: var(--color-accent);
+    --xy-connectionline-stroke: var(--color-accent);
+    --xy-handle-background-color: var(--color-line-strong);
+    --xy-handle-border-color: var(--color-surface);
+    --xy-selection-background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    --xy-selection-border: 1px solid var(--color-accent);
+
+    --xy-controls-button-background-color: var(--color-surface);
+    --xy-controls-button-background-color-hover: var(--color-raised);
+    --xy-controls-button-color: var(--color-ink-2);
+    --xy-controls-button-color-hover: var(--color-ink);
+    --xy-controls-button-border-color: var(--color-line);
+
+    --xy-attribution-background-color: transparent;
+  }
+
+  /* Nokta deseni: zeminden bir adım uzak, dikkat çekmemeli. */
+  .react-flow__background-pattern {
+    color: var(--color-line);
+  }
+
+  .react-flow__attribution {
+    font-size: 10px;
+  }
+  .react-flow__attribution a {
+    color: var(--color-ink-3);
+  }
+}

@@ -1,0 +1,19 @@
+# Runner imajının derleme bağlamı proje köküdür (docker build -f runner/Dockerfile .)
+# — bağlamı küçük tutalım. Backend ve frontend kendi dizinlerini bağlam olarak
+# kullandığından bu dosya onları etkilemez.
+#
+# DİKKAT: .opencode/agents/*.md runner imajına kopyalanır — hariç tutulmamalı.
+backend/
+frontend/
+deploy/
+plans/
+specs/
+.claude/
+.git/
+node_modules/
+.env
+.env.*
+README.md
+AGENTS.md
+CLAUDE.md
+.DS_Store

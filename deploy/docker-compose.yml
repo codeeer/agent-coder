@@ -1,0 +1,97 @@
+# agent-coder — üretim benzeri yerel stack.
+#
+# Çalıştırma: proje kökünden `make up`
+#
+# opencode-runner burada servis DEĞİLDİR. Backend her agent adımı için o imajdan
+# geçici bir container başlatır (sibling-container deseni) ve iş bitince siler.
+
+name: agent-coder
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agentcoder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentcoder_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-agentcoder}
+    ports:
+      # Yerel psql erişimi için. Üretimde kaldırılmalı.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-agentcoder} -d ${POSTGRES_DB:-agentcoder}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - internal
+
+  backend:
+    build:
+      # Yollar proje köküne göredir — Makefile compose'u
+      # --project-directory <repo kökü> ile çağırır, böylece kökteki .env okunur.
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BACKEND_PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-agentcoder}:${POSTGRES_PASSWORD:-agentcoder_dev}@postgres:5432/${POSTGRES_DB:-agentcoder}?sslmode=disable
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+      SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-}
+      RUNNER_IMAGE: ${RUNNER_IMAGE:-agent-coder/opencode-runner:latest}
+      RUNNER_NETWORK: agent-coder_internal
+      # Süre sınırı, eşzamanlılık, CPU ve bellek burada DEĞİL: davranış
+      # parametreleri arayüzden yönetilir ve veritabanında tutulur.
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # Runner container'larını başlatabilmek için (sibling-container deseni).
+      # Bu, host üzerinde root eşdeğeri yetki demektir — üretimde uzak bir
+      # Docker host'a veya kısıtlı bir sokete taşınmalı.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Soket container içinde root:root 660'dır. Süreci root ÇALIŞTIRMAK yerine
+    # yalnızca grup üyeliği veriyoruz: uid 10001 (appuser) olarak kalır ama
+    # soketin grup iznine erişebilir.
+    group_add:
+      - "0"
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* derleme anında gömülür; tarayıcıdan görünen adres olmalı.
+        NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8080}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - internal
+
+networks:
+  internal:
+    # Runner container'ları da bu ağa bağlanır; adı backend'e
+    # RUNNER_NETWORK olarak geçilir.
+    name: agent-coder_internal
+    driver: bridge
+
+volumes:
+  postgres-data:

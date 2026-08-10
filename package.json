@@ -1,0 +1,11 @@
+{
+  "name": "agent-coder-tools",
+  "private": true,
+  "description": "Yalnızca geliştirme araçları. Uygulama bağımlılıkları frontend/package.json ve backend/go.mod içindedir; buraya uygulama paketi eklenmez.",
+  "scripts": {
+    "screenshot": "node scripts/screenshot.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
