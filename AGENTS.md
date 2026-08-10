@@ -372,6 +372,11 @@ başarısız sayılmaz: araç olmadan da iş bitebilir. Bu kontrolü kaldırmay�
 (harf, rakam, `-`, `_`): motor izin verilmeyen karakterleri alt çizgiye çeviriyor ve
 kullanıcının yazdığı ad ile modelin gördüğü araç adı ayrışırdı.
 
+**MCP argümanları önce AYRIŞTIRILIR, sonra şablonlanır.** `mcp.call` düğümünün argümanları
+bir JSON nesnesi ve içinde şablon var. Ters sırayla (önce şablon, sonra JSON) yapılsaydı
+içinde tırnak olan bir agent çıktısı JSON'u bozardı — hem de yalnızca belirli çıktılarda.
+`renderDeep` iç içe nesne ve dizilerde de string değerleri tek tek çözer.
+
 **Yetki kuralı sıralaması DOĞRULANMADI.** Motorun kurallarında ilk mi son eşleşen mi kazanır
 bilinmiyor; bu yüzden toptan bir "geri kalan yasak" kuralı yazılmadı. Erişim yapılandırmayla
 sınırlanıyor. Ölçmeden beyaz liste kurmayın.
@@ -454,7 +459,11 @@ ve hepsi veritabanında **AES-256-GCM ile şifreli** saklanır. Uyulması gereke
 - **Sessiz başarısızlık kapatıldı** — bağlanamayan sunucu uyarı üretiyor
 - Gerçek bir MCP sunucusuyla uçtan uca doğrulandı (`deepwiki_read_wiki_structure` çağrıldı)
 
-Sırada: tuvale `mcp.call` düğümü (Aşama 2), Agent Coder'ın MCP sunucusu olması (Aşama 3).
+**MCP Aşama 2 tamamlandı:** tuvale `mcp.call` düğümü eklendi. Araç listeden seçilir,
+argümanlar şablonlanabilir, çıktı sonraki adıma geçer. Yanlış araç adı ve bozuk JSON
+**kaydetme anında** reddedilir.
+
+Sırada: Agent Coder'ın kendisinin MCP sunucusu olması (Aşama 3).
 
 **Arayüz denetimi tamamlandı** ([spec 010](specs/010-arayuz-denetimi/spec.md)):
 

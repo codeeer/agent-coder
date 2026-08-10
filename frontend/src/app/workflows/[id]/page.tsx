@@ -24,7 +24,7 @@ import {
   WorkflowRunBadge,
   isWorkflowActive,
 } from "@/components/workflows/WorkflowStatusBadge";
-import { IconAgent, IconComment, IconPullRequest } from "@/components/ui/icons";
+import { IconAgent, IconComment, IconPlug, IconPullRequest } from "@/components/ui/icons";
 import {
   Badge,
   Button,
@@ -242,6 +242,12 @@ export default function WorkflowEditorPage() {
               onClick={() => addStep("jira.comment", "Jira yorumu")}
             >
               Jira yorumu
+            </Button>
+            <Button
+              icon={<IconPlug className="size-3.5" />}
+              onClick={() => addStep("mcp.call", "MCP aracı")}
+            >
+              MCP aracı
             </Button>
             <Button
               disabled={toggleActive.isPending}

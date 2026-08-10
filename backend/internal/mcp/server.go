@@ -58,6 +58,8 @@ var (
 	ErrDuplicateName = errors.New("bu adda bir sunucu zaten var")
 	// ErrUnreachable, sunucuya bağlanılamadı.
 	ErrUnreachable = errors.New("MCP sunucusuna ulaşılamadı")
+	// ErrToolFailed, araç çağrısı başarısız.
+	ErrToolFailed = errors.New("araç çağrısı başarısız")
 )
 
 // Server, tanımlı bir MCP sunucusu.

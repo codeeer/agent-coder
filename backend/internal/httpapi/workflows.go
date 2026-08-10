@@ -3,8 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -199,6 +201,20 @@ func (h *Handler) saveVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Kayıt defteri veritabanına BAKAMAZ (bağımlılıksız olmak zorunda), bu yüzden
+	// "seçilen sunucu ve araç gerçekten var mı" kontrolü burada yapılır.
+	// Çalışma anına bırakılsaydı akışın yarısı koştuktan sonra durması demekti.
+	if problems := h.checkMCPNodes(r.Context(), req.Graph); len(problems) > 0 {
+		respondJSON(w, http.StatusBadRequest, validationResponse{
+			Error: validationDetail{
+				Code:     "invalid_graph",
+				Message:  "akış tanımı geçersiz",
+				Problems: problems,
+			},
+		})
+		return
+	}
+
 	version, err := h.deps.Workflows.SaveVersion(r.Context(), id, req.Graph)
 	if err != nil {
 		h.respondWorkflowError(w, r, err)
@@ -208,6 +224,54 @@ func (h *Handler) saveVersion(w http.ResponseWriter, r *http.Request) {
 	slog.InfoContext(r.Context(), "akış sürümü kaydedildi",
 		"workflow_id", id, "version", version.Version)
 	respondJSON(w, http.StatusCreated, version)
+}
+
+/*
+ * checkMCPNodes, MCP düğümlerinin seçtiği sunucu ve aracın var olduğunu sınar.
+ *
+ * Araç adı, sunucunun SON DOĞRULAMADA bildirdiği listeye göre kontrol edilir.
+ * Sunucuya her kaydetmede yeniden bağlanmak, tuvalde kaydet düğmesine basan
+ * kullanıcıyı ağ gecikmesi kadar bekletirdi.
+ *
+ * Bunun sonucu: sunucu araç listesini değiştirmişse kayıt geçer ama çalışma
+ * anında hata alınır. Kabul edilebilir — kullanıcı sunucuyu yeniden
+ * doğruladığında liste tazelenir.
+ */
+func (h *Handler) checkMCPNodes(ctx contextT, graph workflow.Graph) []workflow.Problem {
+	if h.deps.MCPServers == nil {
+		return nil
+	}
+
+	var problems []workflow.Problem
+	for _, n := range graph.Nodes {
+		if n.Kind != workflow.KindMCPCall {
+			continue
+		}
+
+		id, err := uuid.Parse(strings.TrimSpace(n.Config.MCPServerID))
+		if err != nil {
+			// Boş seçim zaten kayıt defterinde yakalanıyor; buraya yalnızca
+			// bozuk bir kimlik düşer.
+			continue
+		}
+
+		server, err := h.deps.MCPServers.Get(ctx, id)
+		if err != nil {
+			problems = append(problems, workflow.Problem{
+				NodeID: n.ID, Message: "seçilen MCP sunucusu bulunamadı — silinmiş olabilir",
+			})
+			continue
+		}
+
+		tool := strings.TrimSpace(n.Config.ToolName)
+		if tool != "" && !slices.Contains(server.Tools, tool) {
+			problems = append(problems, workflow.Problem{
+				NodeID:  n.ID,
+				Message: fmt.Sprintf("%q sunucusunda %q adında bir araç yok", server.Name, tool),
+			})
+		}
+	}
+	return problems
 }
 
 // getVersion, tek bir sürümün grafını döner.

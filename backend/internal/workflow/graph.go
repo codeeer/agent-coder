@@ -24,6 +24,7 @@ const (
 	KindAgent          NodeKind = "agent"
 	KindGitHubPR       NodeKind = "github.pr"
 	KindJiraComment    NodeKind = "jira.comment"
+	KindMCPCall        NodeKind = "mcp.call"
 )
 
 // IsTrigger, düğümün bir giriş noktası olup olmadığı.
@@ -70,6 +71,24 @@ type NodeConfig struct {
 	// ── Jira tetikleyici ────────────────────────────────────────────────────
 	// JQL, hangi task'ların akışı başlatacağını belirler.
 	JQL string `json:"jql,omitempty"`
+
+	// ── MCP araç çağrısı ────────────────────────────────────────────────────
+	// MCPServerID, hangi sunucudaki araç çağrılacak.
+	MCPServerID string `json:"mcpServerId,omitempty"`
+	// ToolName, sunucunun kendi adlandırmasıyla araç adı (`ask_question`).
+	ToolName string `json:"toolName,omitempty"`
+	/*
+	 * Arguments, aracın argümanları — JSON NESNESİ olarak.
+	 *
+	 * Şablonlar JSON'un İÇİNDE, string değerlerinde durur:
+	 *   {"repoName": "{{ trigger.key }}", "question": "{{ steps.analiz.output }}"}
+	 *
+	 * Çözümleme sırası önemlidir: önce JSON ayrıştırılır, SONRA her string değer
+	 * şablondan geçirilir. Ters sırayla yapılsaydı, içinde tırnak veya satır sonu
+	 * olan bir agent çıktısı JSON'u bozardı — ve bu, ancak belirli bir çıktı
+	 * geldiğinde patlayan türden bir hata olurdu.
+	 */
+	Arguments string `json:"arguments,omitempty"`
 }
 
 // Node, akıştaki bir adım veya tetikleyici.

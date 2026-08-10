@@ -63,6 +63,19 @@ export function NodeInspector({
     );
   }
 
+  if (node.data.kind === "mcp.call") {
+    return (
+      <MCPFields
+        node={node}
+        nodes={nodes}
+        edges={edges}
+        problems={problems}
+        onChange={onChange}
+        onDelete={onDelete}
+      />
+    );
+  }
+
   if (node.data.kind === "github.pr" || node.data.kind === "jira.comment") {
     return (
       <ActionFields
@@ -209,6 +222,147 @@ export function NodeInspector({
               label={`{{ steps.${r.id}.output }}`}
               title={`${r.data.name || r.id} adımının çıktısı`}
               onClick={() => insert(`{{ steps.${r.id}.output }}`)}
+            />
+          ))}
+          {refs.length === 0 && (
+            <span className="text-ink-3">— bu adımdan önce çalışan adım yok</span>
+          )}
+        </div>
+      </Well>
+    </Card>
+  );
+}
+
+/**
+ * MCP araç çağrısı düğümünün alanları.
+ *
+ * Araç ELLE YAZILMAZ, listeden seçilir: sunucunun bildirdiği araç adları zaten
+ * kayıtlı ve yanlış yazılmış bir ad ancak çalışma anında ortaya çıkardı.
+ * Sunucu seçilmeden araç listesi de gösterilmez — sırayı kullanıcıya bırakmak
+ * boş bir açılır liste göstermek olurdu.
+ */
+function MCPFields({
+  node,
+  nodes,
+  edges,
+  problems,
+  onChange,
+  onDelete,
+}: {
+  node: FlowNode;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  problems: string[];
+  onChange: (patch: Partial<FlowNode["data"]>) => void;
+  onDelete: () => void;
+}) {
+  const cfg = node.data.config;
+  const set = (patch: Partial<typeof cfg>) => onChange({ config: { ...cfg, ...patch } });
+
+  const servers = useQuery({ queryKey: ["mcp-servers"], queryFn: api.mcpServers.list });
+  const selected = servers.data?.find((s) => s.id === cfg.mcpServerId);
+
+  const ancestors = ancestorsOf(edges, node.id);
+  const refs = nodes.filter((n) => ancestors.has(n.id) && n.data.kind !== "trigger.manual");
+
+  const insert = (text: string) => set({ arguments: (cfg.arguments ?? "") + text });
+
+  return (
+    <Card>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <Badge title="Şablon referanslarında bu kimlik kullanılır">
+          <span className="font-mono">{node.id}</span>
+        </Badge>
+        <Button size="sm" variant="danger" icon={<IconTrash className="size-3.5" />} onClick={onDelete}>
+          Adımı sil
+        </Button>
+      </div>
+
+      {problems.length > 0 && (
+        <Notice tone="error">
+          <ul className="list-disc space-y-0.5 pl-4">
+            {problems.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        </Notice>
+      )}
+
+      <label className="mt-3 block">
+        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+        <Input
+          className="mt-1"
+          value={node.data.name}
+          placeholder="MCP aracı çağır"
+          onChange={(e) => onChange({ name: e.target.value })}
+        />
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Sunucu</span>
+        <Select
+          className="mt-1"
+          value={cfg.mcpServerId ?? ""}
+          onChange={(e) => set({ mcpServerId: e.target.value, toolName: "" })}
+        >
+          <option value="">Seçin…</option>
+          {servers.data?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+        {servers.data?.length === 0 && (
+          <span className="mt-1 block text-[11px] text-ink-3">
+            Tanımlı sunucu yok — Ayarlar → Dış araçlar bölümünden ekleyin.
+          </span>
+        )}
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Araç</span>
+        <Select
+          className="mt-1"
+          value={cfg.toolName ?? ""}
+          disabled={!selected}
+          onChange={(e) => set({ toolName: e.target.value })}
+        >
+          <option value="">{selected ? "Seçin…" : "önce sunucu seçin"}</option>
+          {selected?.tools.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </Select>
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+          Argümanlar (JSON)
+        </span>
+        <Textarea
+          className="mt-1 h-28 font-mono text-[12px]"
+          value={cfg.arguments ?? ""}
+          placeholder={'{\n  "soru": "{{ input }}"\n}'}
+          onChange={(e) => set({ arguments: e.target.value })}
+        />
+        <span className="mt-1 block text-[11px] text-ink-3">
+          Şablonlar tırnak içinde yazılır. Önce JSON okunur, sonra değerler
+          çözümlenir — böylece çıktıdaki tırnaklar JSON&apos;u bozmaz.
+        </span>
+      </label>
+
+      <Well className="mt-2 p-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
+          <span>Ekle:</span>
+          <RefButton label="{{ input }}" onClick={() => insert("{{ input }}")} />
+          {refs.map((r) => (
+            <RefButton
+              key={r.id}
+              label={`{{ steps.${r.id}.${r.data.kind === "github.pr" ? "url" : "output"} }}`}
+              onClick={() =>
+                insert(`{{ steps.${r.id}.${r.data.kind === "github.pr" ? "url" : "output"} }}`)
+              }
             />
           ))}
           {refs.length === 0 && (

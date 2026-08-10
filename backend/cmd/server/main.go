@@ -202,6 +202,7 @@ func run() error {
 				runBuilder, projectStore, github.New(cfg.GitHubAPIURL), graphOf,
 			),
 			workflow.KindJiraComment: runbuild.NewJiraHandler(credStore, jira.New(), workflowStore),
+			workflow.KindMCPCall:     runbuild.NewMCPHandler(mcpStore, mcpClient),
 		},
 		busPublisher{bus},
 	)

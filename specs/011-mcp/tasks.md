@@ -1,7 +1,7 @@
 # Görevler: MCP Desteği
 
 - **Spec no:** 011 — [spec.md](spec.md) · [plan.md](plan.md)
-- **Durum:** Aşama 1 uygulandı; Aşama 2–3 bekliyor
+- **Durum:** Aşama 1–2 uygulandı; Aşama 3 bekliyor
 
 ---
 
@@ -42,10 +42,10 @@
 
 ## Aşama 2 — `mcp.call` düğümü
 
-- [ ] T50 `KindMCPCall` + `NodeConfig` alanları + `KindSpec`
-- [ ] T51 `MCPHandler`
-- [ ] T52 Arayüz: palet, düğüm görseli, alan paneli (araç **listeden** seçilir)
-- [ ] T53 Doğrulama: çıktı sonraki adıma geçer; yanlış araç kaydetme anında reddedilir
+- [x] T50 `KindMCPCall` + `NodeConfig` alanları + `KindSpec`
+- [x] T51 `MCPHandler`
+- [x] T52 Arayüz: palet, düğüm görseli, alan paneli (araç **listeden** seçilir)
+- [x] T53 Doğrulama: çıktı sonraki adıma geçer; yanlış araç kaydetme anında reddedilir
 
 ## Aşama 3 — Agent Coder MCP sunucusu
 
@@ -117,3 +117,42 @@ beyaz liste kurulabilir; [spec.md](spec.md) açık uçlarda yazıyor.
 
 **Ders:** doğrulanmamış bir davranışa yaslanan güvenlik kuralı, güvenlik
 sağlamaz — yanlış bir güven duygusu verir.
+
+---
+
+### T53 — Aşama 2 doğrulama sonuçları
+
+| # | Adım | Sonuç |
+|---|------|-------|
+| 1 | Yanlış araç adı **kaydetme anında** reddedilir | ✓ `"deepwiki" sunucusunda "olmayan_arac" adında bir araç yok` |
+| 2 | Bozuk JSON argümanı reddedilir | ✓ `argümanlar geçerli bir JSON nesnesi değil` |
+| 3 | Araç listeden seçilir | ✓ sunucu seçilince 3 araç açılır listede |
+| 4 | MCP çıktısı sonraki adıma geçer | ✓ agent'ın talimatında DeepWiki metni göründü |
+| 5 | Uçtan uca akış | ✓ `mcp.call → agent`, $0,0027 |
+| 6 | Testler + tema | ✓ 19 paket, 100 kontrol 0 kalan |
+
+### Ölçüm 3 — argüman şablonu sırası
+
+Argümanlar bir JSON nesnesi ve içinde `{{ steps.x.output }}` gibi şablonlar var.
+Doğal olan sıra "önce şablonu çöz, sonra JSON'u ayrıştır" gibi görünüyor — ama
+o sırayla, içinde **tırnak veya satır sonu** olan bir agent çıktısı JSON'u
+bozardı. Üstelik her zaman değil: yalnızca belirli bir çıktı geldiğinde.
+
+Sıra tersine kuruldu: önce JSON ayrıştırılır, sonra her string DEĞER şablondan
+geçer (`renderDeep`, iç içe nesne ve dizilerde de). Böylece çıktının içeriği
+JSON'un yapısını etkileyemiyor.
+
+### Ölçüm 4 — kaydedilen anahtar geri alınamıyordu
+
+Herkese açık test sunucusuna denemek için bir anahtar yazmıştım. Sonra sunucu
+`Authentication is not allowed on the public endpoint` dedi ve anahtarı
+**kaldırmanın yolu olmadığını** fark ettim: boş bırakmak "değiştirme" anlamına
+geliyor, dolayısıyla kullanıcının tek seçeneği sunucuyu silip yeniden kurmak —
+agent atamalarını da kaybederek.
+
+`clearSecret` bayrağı eklendi (projede `clearProvider` ile aynı kalıp).
+
+Not: o sunucu hatayı **normal bir metin sonucu** olarak döndürdü, protokol
+düzeyinde hata olarak değil. Yani "araç hata döndürdü" kontrolü (`IsError`) bu
+durumu yakalayamaz; akış hata metnini veri sanıp bir sonraki adıma taşır. Bunun
+genel bir çözümü yok — araçların hatayı nasıl bildireceği kendilerine kalmış.

@@ -2,9 +2,11 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -58,6 +60,63 @@ func (c *Client) ListTools(ctx context.Context, s Server, secret string) ([]stri
 	// sorusunu sırasız bir listeye bakarak sormasın.
 	sort.Strings(names)
 	return names, nil
+}
+
+/*
+ * CallTool, bir aracı çağırır ve metin sonucunu döner.
+ *
+ * Akış düğümü (spec 011 Aşama 2) bunu kullanır: agent'ın kararına bırakmadan,
+ * akışın belirlediği aracı belirlediği argümanlarla çağırmak.
+ *
+ * Sonuç METİN olarak döner çünkü akıştaki bir sonraki adım agent ise girdisi
+ * zaten metindir. Yapılandırılmış sonuç varsa JSON'a çevrilir — bilgi kaybı
+ * olmaz ama tek bir tip taşınır.
+ */
+func (c *Client) CallTool(ctx context.Context, s Server, secret, tool string, args map[string]any) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout())
+	defer cancel()
+
+	session, err := c.connect(ctx, s, secret)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = session.Close() }()
+
+	res, err := session.CallTool(ctx, &sdk.CallToolParams{Name: tool, Arguments: args})
+	if err != nil {
+		return "", fmt.Errorf("%w: %q aracı çağrılamadı: %v", ErrToolFailed, tool, err)
+	}
+
+	text := resultText(res)
+
+	// Aracın KENDİSİ hata bildirdiyse (protokol düzeyinde başarı, iş düzeyinde
+	// hata) adım başarısız olmalı: yoksa akış hata metnini bir sonraki adıma
+	// veri diye taşırdı.
+	if res.IsError {
+		return "", fmt.Errorf("%w: %q aracı hata döndürdü: %s", ErrToolFailed, tool, text)
+	}
+	return text, nil
+}
+
+// resultText, araç sonucunu tek bir metne indirger.
+func resultText(res *sdk.CallToolResult) string {
+	var parts []string
+	for _, c := range res.Content {
+		if t, ok := c.(*sdk.TextContent); ok && t.Text != "" {
+			parts = append(parts, t.Text)
+		}
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, "\n")
+	}
+
+	// Metin içerik yoksa yapılandırılmış sonuç JSON olarak taşınır.
+	if res.StructuredContent != nil {
+		if b, err := json.Marshal(res.StructuredContent); err == nil {
+			return string(b)
+		}
+	}
+	return ""
 }
 
 func (c *Client) connect(ctx context.Context, s Server, secret string) (*sdk.ClientSession, error) {

@@ -189,6 +189,8 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
   const [transport, setTransport] = useState<McpTransport>(server?.transport ?? "http");
   const [url, setUrl] = useState(server?.url ?? "");
   const [secret, setSecret] = useState("");
+  // Anahtarı silmek ayrı bir niyet: boş bırakmak "değiştirme" demek.
+  const [clearSecret, setClearSecret] = useState(false);
 
   const save = useMutation({
     mutationFn: () =>
@@ -198,6 +200,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
             transport,
             url: url.trim(),
             secret: secret.trim() || undefined,
+            clearSecret,
           })
         : api.mcpServers.create({
             name: name.trim(),
@@ -279,6 +282,27 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
           <span className="font-mono"> Authorization: Bearer</span> başlığıyla gönderilir.
         </span>
       </label>
+
+      {editing && server.hasSecret && (
+        <label className="mt-3 flex items-start gap-2">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-3.5 accent-accent"
+            checked={clearSecret}
+            onChange={(e) => {
+              setClearSecret(e.target.checked);
+              if (e.target.checked) setSecret("");
+            }}
+          />
+          <span className="text-[12px]">
+            Anahtarı kaldır
+            <span className="mt-0.5 block text-[11px] text-ink-3">
+              Anahtarsız çalışan sunucular var; bazıları anahtar gönderildiğinde
+              isteği reddeder.
+            </span>
+          </span>
+        </label>
+      )}
 
       {save.isError && (
         <Notice tone="error">{describeError(save.error).message}</Notice>

@@ -2,14 +2,18 @@ package runbuild
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/agent-coder/backend/internal/credentials"
 	"github.com/agent-coder/backend/internal/integrations/github"
 	"github.com/agent-coder/backend/internal/integrations/jira"
+	"github.com/agent-coder/backend/internal/mcp"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/workflow"
 )
@@ -213,5 +217,120 @@ func (h *JiraHandler) claimOwnUpdate(ctx context.Context, in workflow.ExecInput,
 	if _, err := h.flows.MarkProcessed(ctx, in.Run.WorkflowID, issue.Key, issue.UpdatedAt); err != nil {
 		slog.WarnContext(ctx, "kendi güncellememiz işaretlenemedi",
 			"issue", cred.IssueKey, "error", err)
+	}
+}
+
+/* ── MCP araç çağrısı ────────────────────────────────────────────────────── */
+
+// MCPHandler, `mcp.call` düğümünü çalıştırır.
+//
+// Agent düğümünden farkı: aracı MODEL değil AKIŞ seçer. Aynı akış her
+// çalıştığında aynı araç aynı biçimde çağrılır.
+type MCPHandler struct {
+	servers *mcp.Store
+	client  *mcp.Client
+}
+
+// NewMCPHandler yeni MCP düğümü çalıştırıcısı üretir.
+func NewMCPHandler(s *mcp.Store, c *mcp.Client) *MCPHandler {
+	return &MCPHandler{servers: s, client: c}
+}
+
+// Execute, aracı çağırır ve metin sonucunu adıma yazar.
+func (h *MCPHandler) Execute(ctx context.Context, in workflow.ExecInput) (
+	workflow.StepOutcome, error,
+) {
+	id, err := uuid.Parse(strings.TrimSpace(in.Node.Config.MCPServerID))
+	if err != nil {
+		return workflow.StepOutcome{}, errors.New("MCP sunucusu seçilmemiş")
+	}
+
+	server, err := h.servers.Get(ctx, id)
+	if err != nil {
+		// Sunucu silinmiş olabilir: akış kaydedildikten sonra Ayarlar'dan
+		// kaldırmak mümkün.
+		return workflow.StepOutcome{}, fmt.Errorf("MCP sunucusu okunamadı: %w", err)
+	}
+
+	secret := ""
+	if server.HasSecret {
+		if secret, err = h.servers.Reveal(ctx, id); err != nil {
+			return workflow.StepOutcome{}, err
+		}
+	}
+
+	args, err := h.renderArguments(in)
+	if err != nil {
+		return workflow.StepOutcome{}, err
+	}
+
+	tool := strings.TrimSpace(in.Node.Config.ToolName)
+	out, err := h.client.CallTool(ctx, server, secret, tool, args)
+	if err != nil {
+		return workflow.StepOutcome{}, err
+	}
+
+	return workflow.StepOutcome{
+		Output: out,
+		URL:    server.URL,
+	}, nil
+}
+
+/*
+ * renderArguments, argüman JSON'unu çözer ve şablonları uygular.
+ *
+ * SIRA ÖNEMLİ: önce JSON ayrıştırılır, sonra her string değer şablondan geçer.
+ *
+ * Ters sırayla (önce şablon, sonra JSON) yapılsaydı, içinde tırnak veya satır
+ * sonu olan bir agent çıktısı JSON'u bozardı. Bu, ancak belirli bir çıktı
+ * geldiğinde patlayan ve sebebi geç anlaşılan türden bir hata olurdu.
+ */
+func (h *MCPHandler) renderArguments(in workflow.ExecInput) (map[string]any, error) {
+	raw := strings.TrimSpace(in.Node.Config.Arguments)
+	if raw == "" {
+		return map[string]any{}, nil
+	}
+
+	var args map[string]any
+	if err := json.Unmarshal([]byte(raw), &args); err != nil {
+		return nil, fmt.Errorf("argümanlar geçerli bir JSON nesnesi değil: %w", err)
+	}
+
+	for key, value := range args {
+		rendered, err := renderDeep(in, value)
+		if err != nil {
+			return nil, fmt.Errorf("%q argümanı çözümlenemedi: %w", key, err)
+		}
+		args[key] = rendered
+	}
+	return args, nil
+}
+
+// renderDeep, iç içe yapılardaki tüm string değerleri şablondan geçirir.
+func renderDeep(in workflow.ExecInput, value any) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return in.Render(v)
+	case map[string]any:
+		for key, item := range v {
+			rendered, err := renderDeep(in, item)
+			if err != nil {
+				return nil, err
+			}
+			v[key] = rendered
+		}
+		return v, nil
+	case []any:
+		for i, item := range v {
+			rendered, err := renderDeep(in, item)
+			if err != nil {
+				return nil, err
+			}
+			v[i] = rendered
+		}
+		return v, nil
+	default:
+		// Sayı, bool, null — şablon içeremezler.
+		return v, nil
 	}
 }

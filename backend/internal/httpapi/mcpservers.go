@@ -21,6 +21,9 @@ type updateMCPServerRequest struct {
 	Transport *mcp.Transport `json:"transport"`
 	URL       *string        `json:"url"`
 	Secret    *string        `json:"secret"`
+	// ClearSecret, kayıtlı anahtarı siler. Boş `secret` "değiştirme" demek
+	// olduğu için ayrı bir bayrak gerekiyor.
+	ClearSecret bool `json:"clearSecret"`
 }
 
 func (h *Handler) listMCPServers(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +134,7 @@ func (h *Handler) updateMCPServer(w http.ResponseWriter, r *http.Request) {
 	secret := ""
 	if req.Secret != nil && *req.Secret != "" {
 		secret = *req.Secret
-	} else if current.HasSecret {
+	} else if current.HasSecret && !req.ClearSecret {
 		if secret, err = h.deps.MCPServers.Reveal(ctx, id); err != nil {
 			h.respondMCPError(w, ctx, err)
 			return
@@ -146,7 +149,7 @@ func (h *Handler) updateMCPServer(w http.ResponseWriter, r *http.Request) {
 
 	server, err := h.deps.MCPServers.Update(ctx, id, mcp.UpdateInput{
 		Name: req.Name, Transport: req.Transport, URL: req.URL,
-		Secret: req.Secret, Tools: tools,
+		Secret: req.Secret, ClearSecret: req.ClearSecret, Tools: tools,
 	})
 	if err != nil {
 		h.respondMCPError(w, ctx, err)

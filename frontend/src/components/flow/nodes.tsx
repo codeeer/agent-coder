@@ -8,6 +8,7 @@ import {
   IconAgent,
   IconComment,
   IconPlay,
+  IconPlug,
   IconPullRequest,
 } from "@/components/ui/icons";
 
@@ -112,11 +113,39 @@ function AgentNodeBase({ data, selected }: NodeProps) {
 }
 
 /**
- * Eylem düğümü — PR açma, Jira yorumu.
+ * Eylem düğümü — PR açma, Jira yorumu, MCP aracı.
  *
  * Agent düğümünden AYRI çiziliyor: kullanıcı akışın neresinin model çağırdığını
  * (para harcadığını), neresinin dış servise dokunduğunu bir bakışta ayırmalı.
  */
+
+/** Eylem düğümlerinin simgeleri. */
+const ACTION_ICONS: Partial<Record<NodeKind, (p: { className?: string }) => React.ReactElement>> = {
+  "github.pr": IconPullRequest,
+  "jira.comment": IconComment,
+  "mcp.call": IconPlug,
+};
+
+const ACTION_LABELS: Partial<Record<NodeKind, string>> = {
+  "github.pr": "PR aç",
+  "jira.comment": "Jira'ya yorum yaz",
+  "mcp.call": "MCP aracı çağır",
+};
+
+/** Düğümün altındaki tek satırlık özet — türe göre en ayırt edici alan. */
+function actionDetail(d: NodeExtras): string {
+  switch (d.kind) {
+    case "github.pr":
+      return d.config.title || "başlık yok";
+    case "jira.comment":
+      return d.config.issueKey || "issue seçilmedi";
+    case "mcp.call":
+      return d.config.toolName || "araç seçilmedi";
+    default:
+      return "";
+  }
+}
+
 function ActionNodeBase({ data, selected }: NodeProps) {
   const d = data as unknown as NodeExtras;
   const hasProblem = (d.problems?.length ?? 0) > 0;
@@ -129,8 +158,9 @@ function ActionNodeBase({ data, selected }: NodeProps) {
         ? "border-accent"
         : "border-line";
 
-  const isPR = d.kind === "github.pr";
-  const Icon = isPR ? IconPullRequest : IconComment;
+  // Üç eylem türü tek bileşende: ikisi için ternary yeterliydi, üçüncüsünde
+  // haritaya geçildi — dördüncüsü eklenirken yine dallanma yazılmasın.
+  const Icon = ACTION_ICONS[d.kind] ?? IconComment;
 
   return (
     <div
@@ -144,12 +174,10 @@ function ActionNodeBase({ data, selected }: NodeProps) {
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-3" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium">
-            {d.name || (isPR ? "PR aç" : "Jira'ya yorum yaz")}
+            {d.name || ACTION_LABELS[d.kind] || "Adım"}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-ink-3">
-            {isPR
-              ? d.config.title || "başlık yok"
-              : d.config.issueKey || "issue seçilmedi"}
+            {actionDetail(d)}
           </div>
         </div>
       </div>

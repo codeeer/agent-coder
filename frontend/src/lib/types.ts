@@ -172,6 +172,8 @@ export interface UpdateMcpServerRequest {
   url?: string;
   /** Boş bırakılırsa mevcut anahtar korunur. */
   secret?: string;
+  /** Kayıtlı anahtarı siler — boş `secret` "değiştirme" anlamına geldiği için ayrı. */
+  clearSecret?: boolean;
 }
 
 // ─── Jira (credentials) ─────────────────────────────────────────────────────
@@ -531,7 +533,8 @@ export type NodeKind =
   | "trigger.jira"
   | "agent"
   | "github.pr"
-  | "jira.comment";
+  | "jira.comment"
+  | "mcp.call";
 
 export interface WorkflowNodeConfig {
   // Agent adımı
@@ -556,6 +559,19 @@ export interface WorkflowNodeConfig {
   // Jira tetikleyici
   /** Hangi task'ların akışı başlatacağını belirleyen JQL sorgusu. */
   jql?: string;
+
+  // MCP araç çağrısı
+  mcpServerId?: string;
+  /** Sunucunun kendi adlandırmasıyla araç adı (`ask_question`). */
+  toolName?: string;
+  /**
+   * Argümanlar — JSON nesnesi.
+   *
+   * Şablonlar JSON'un İÇİNDE, string değerlerinde durur. Backend önce JSON'u
+   * ayrıştırır, sonra değerleri şablondan geçirir; böylece içinde tırnak olan
+   * bir agent çıktısı JSON'u bozmaz.
+   */
+  arguments?: string;
 }
 
 /** Bir akışın son Jira taramasının sonucu. */

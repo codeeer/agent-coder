@@ -206,7 +206,14 @@ type UpdateInput struct {
 	// Secret nil veya boşsa mevcut anahtar KORUNUR — kullanıcı adı değiştirmek
 	// için anahtarı yeniden yazmak zorunda kalmasın.
 	Secret *string
-	Tools  []string
+	// ClearSecret, kayıtlı anahtarı siler.
+	//
+	// Ayrı bir bayrak gerekiyor çünkü boş dize "değiştirme" anlamına geliyor.
+	// Bu olmadan, herkese açık bir sunucuya yanlışlıkla anahtar yazan kullanıcı
+	// sunucuyu silip yeniden kurmak zorunda kalır — agent atamalarını da
+	// kaybederek.
+	ClearSecret bool
+	Tools       []string
 }
 
 // Update, mevcut sunucuyu günceller.
@@ -238,7 +245,13 @@ func (s *Store) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (Serve
 		return Server{}, err
 	}
 
-	if in.Secret != nil && *in.Secret != "" {
+	switch {
+	case in.ClearSecret:
+		if _, err := tx.Exec(ctx,
+			`UPDATE mcp_servers SET secret_enc = NULL, hint = '' WHERE id = $1`, id); err != nil {
+			return Server{}, fmt.Errorf("erişim bilgisi silinemedi: %w", err)
+		}
+	case in.Secret != nil && *in.Secret != "":
 		blob, hint, err := s.encrypt(*in.Secret)
 		if err != nil {
 			return Server{}, err

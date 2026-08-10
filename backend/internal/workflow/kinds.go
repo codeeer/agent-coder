@@ -1,6 +1,9 @@
 package workflow
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 /*
  * Düğüm türü kayıt defteri.
@@ -47,6 +50,33 @@ var kindSpecs = map[NodeKind]KindSpec{
 				return []string{"JQL sorgusu boş — hangi task'lar akışı başlatacak?"}
 			}
 			return nil
+		},
+	},
+	KindMCPCall: {
+		Label:      "MCP aracı çağır",
+		Executable: true,
+		Fields: func(n Node) []string {
+			var out []string
+			if strings.TrimSpace(n.Config.MCPServerID) == "" {
+				out = append(out, "MCP sunucusu seçilmedi")
+			}
+			if strings.TrimSpace(n.Config.ToolName) == "" {
+				out = append(out, "araç seçilmedi")
+			}
+			// Argümanlar bir JSON NESNESİ olmalı. Bozuk JSON'un çalışma anında
+			// ortaya çıkması, akışın yarısı koştuktan sonra durması demekti.
+			if raw := strings.TrimSpace(n.Config.Arguments); raw != "" {
+				var probe map[string]any
+				if err := json.Unmarshal([]byte(raw), &probe); err != nil {
+					out = append(out, "argümanlar geçerli bir JSON nesnesi değil")
+				}
+			}
+			return out
+		},
+		Templates: func(n Node) []string {
+			// Şablonlar argüman JSON'unun içindeki string değerlerde; ham metni
+			// vermek referans doğrulaması için yeterli.
+			return []string{n.Config.Arguments}
 		},
 	},
 	KindAgent: {
