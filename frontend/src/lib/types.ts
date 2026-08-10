@@ -134,6 +134,46 @@ export interface UpdateGitProviderRequest {
   secret?: string;
 }
 
+// ─── MCP sunucuları (spec 011) ──────────────────────────────────────────────
+
+/** Yalnızca uzak sunucular; yerel (stdio) sunucular bu fazda desteklenmiyor. */
+export type McpTransport = "http" | "sse";
+
+/**
+ * Tanımlı bir MCP sunucusu.
+ *
+ * Gizli değeri BİLİNÇLİ OLARAK içermez — backend hiçbir yanıtta göndermez.
+ */
+export interface McpServer {
+  id: string;
+  /** Araç adlarının önekidir: `sentry` → `sentry_issue`. */
+  name: string;
+  transport: McpTransport;
+  url: string;
+  hint: string;
+  hasSecret: boolean;
+  /** Son doğrulamada sunucunun bildirdiği araçlar. */
+  tools: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMcpServerRequest {
+  name: string;
+  transport: McpTransport;
+  url: string;
+  /** Anahtarsız çalışan sunucular için boş bırakılabilir. */
+  secret?: string;
+}
+
+export interface UpdateMcpServerRequest {
+  name?: string;
+  transport?: McpTransport;
+  url?: string;
+  /** Boş bırakılırsa mevcut anahtar korunur. */
+  secret?: string;
+}
+
 // ─── Jira (credentials) ─────────────────────────────────────────────────────
 
 /** Spec 002'den sonra bu uç yalnızca Jira ile ilgilenir. */
@@ -283,6 +323,8 @@ export interface Agent {
   allowEdit: boolean;
   allowBash: boolean;
   allowWebfetch: boolean;
+  /** Bu agent'ın erişebileceği MCP sunucuları. */
+  mcpServerIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +351,8 @@ export interface UpdateAgentRequest {
   allowEdit?: boolean;
   allowBash?: boolean;
   allowWebfetch?: boolean;
+  /** nil ise dokunulmaz; boş dizi "hiçbiri" demektir. */
+  mcpServerIds?: string[];
 }
 
 // ─── Çalıştırmalar ──────────────────────────────────────────────────────────

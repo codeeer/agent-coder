@@ -33,6 +33,41 @@ type updateAgentRequest struct {
 	AllowEdit         *bool      `json:"allowEdit"`
 	AllowBash         *bool      `json:"allowBash"`
 	AllowWebfetch     *bool      `json:"allowWebfetch"`
+	// MCPServerIDs, agent'ın erişebileceği dış araç sunucuları.
+	// nil ise dokunulmaz; boş dizi "hiçbiri" demektir.
+	MCPServerIDs *[]uuid.UUID `json:"mcpServerIds"`
+}
+
+/*
+ * agentResponse, agent kaydı + erişebildiği MCP sunucuları.
+ *
+ * Sunucular ayrı bir uçtan istenseydi arayüz her agent için bir istek daha
+ * atardı; liste ekranında beş agent = beş fazladan istek.
+ */
+type agentResponse struct {
+	agentreg.Agent
+	MCPServerIDs []uuid.UUID `json:"mcpServerIds"`
+}
+
+// withMCP, agent kaydına erişebildiği MCP sunucularını ekler.
+//
+// Okuma hatası agent'ı gizlemez: liste boş görünür ve log'a düşer. Bir MCP
+// sorunu yüzünden agent ekranının hiç açılmaması orantısız olurdu.
+func (h *Handler) withMCP(ctx contextT, a agentreg.Agent) agentResponse {
+	out := agentResponse{Agent: a, MCPServerIDs: []uuid.UUID{}}
+	if h.deps.MCPServers == nil {
+		return out
+	}
+
+	servers, err := h.deps.MCPServers.ForAgent(ctx, a.ID)
+	if err != nil {
+		slog.WarnContext(ctx, "agent'ın MCP sunucuları okunamadı", "agent_id", a.ID, "error", err)
+		return out
+	}
+	for _, s := range servers {
+		out.MCPServerIDs = append(out.MCPServerIDs, s.ID)
+	}
+	return out
 }
 
 func (h *Handler) listAgents(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +83,11 @@ func (h *Handler) listAgents(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "internal_error", "agent'lar okunamadı")
 		return
 	}
-	respondJSON(w, http.StatusOK, paged(list, total, page))
+	out := make([]agentResponse, 0, len(list))
+	for _, a := range list {
+		out = append(out, h.withMCP(r.Context(), a))
+	}
+	respondJSON(w, http.StatusOK, paged(out, total, page))
 }
 
 func (h *Handler) createAgent(w http.ResponseWriter, r *http.Request) {
@@ -105,8 +144,15 @@ func (h *Handler) updateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.MCPServerIDs != nil && h.deps.MCPServers != nil {
+		if err := h.deps.MCPServers.SetAgentServers(r.Context(), a.ID, *req.MCPServerIDs); err != nil {
+			h.respondMCPError(w, r.Context(), err)
+			return
+		}
+	}
+
 	slog.InfoContext(r.Context(), "agent güncellendi", "id", a.ID, "değiştirilmiş", a.IsModified)
-	respondJSON(w, http.StatusOK, a)
+	respondJSON(w, http.StatusOK, h.withMCP(r.Context(), a))
 }
 
 // resetAgent, hazır bir agent'ı özgün haline döndürür.

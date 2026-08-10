@@ -357,6 +357,25 @@ Jira'ya anında yüklenmek istemiyoruz.
 ile sayfalama) kullanılır; eski `/rest/api/3/search` Ağustos 2025'ten beri 410 döner. Data
 Center farklı kimlik doğrulama ve API yüzeyi kullanır, desteklenmiyor.
 
+**MCP yapılandırması çalışma anında üretilir.** `runner.BuildConfigFiles` her çalıştırmada
+`opencode.json`'a bir `mcp` bloğu yazıyor; imaja gömülü değil. Erişim anahtarı dosyaya
+YAZILMAZ — `{env:AGENT_CODER_MCP_<AD>}` referansı yazılır, değer container ortamından gelir.
+Sağlayıcı anahtarındaki desenin aynısı; iki sızıntı testi bunu koruyor.
+
+**MCP sunucusu bağlanamazsa çalıştırma motoru SESSİZ KALIR.** Araçları modele hiç sunmuyor,
+hata da vermiyor (ölçüldü — spec 011). Bu yüzden mesaj gönderilmeden önce motorun `GET /mcp`
+ucu sorgulanıyor ve bağlanamayan sunucu olay akışına **uyarı** olarak düşüyor. Çalıştırma
+başarısız sayılmaz: araç olmadan da iş bitebilir. Bu kontrolü kaldırmayın — arıza aksi halde
+"agent neden aptallaştı" sorusuyla, günler sonra fark edilir.
+
+**Araç adı `{sunucu}_{araç}`.** Sunucu adı bu yüzden dar bir karakter kümesiyle sınırlı
+(harf, rakam, `-`, `_`): motor izin verilmeyen karakterleri alt çizgiye çeviriyor ve
+kullanıcının yazdığı ad ile modelin gördüğü araç adı ayrışırdı.
+
+**Yetki kuralı sıralaması DOĞRULANMADI.** Motorun kurallarında ilk mi son eşleşen mi kazanır
+bilinmiyor; bu yüzden toptan bir "geri kalan yasak" kuralı yazılmadı. Erişim yapılandırmayla
+sınırlanıyor. Ölçmeden beyaz liste kurmayın.
+
 **compose `--project-directory` zorunlu.** Compose dosyaları `deploy/` altında ama `.env`
 proje kökünde. Bu bayrak olmadan compose `.env`'i `deploy/` altında arar, bulamaz ve tüm
 port ayarları **sessizce** varsayılana düşer. Makefile bunu zaten geçiriyor; compose'u elle
@@ -425,6 +444,17 @@ ve hepsi veritabanında **AES-256-GCM ile şifreli** saklanır. Uyulması gereke
   geri gelir — istemeyen değişkeni boşaltır.
 
 ## Durum
+
+**MCP Aşama 1 tamamlandı** ([spec 011](specs/011-mcp/spec.md)):
+
+- **Agent'lar dış araçlara erişiyor** — Ayarlar'dan uzak MCP sunucusu tanımlanır,
+  Agent'lar ekranından hangi agent'ın kullanacağı seçilir
+- **Kaydetmeden önce doğrulama** — sunucuya bağlanılır, araç listesi çekilip gösterilir
+- **Yalıtım ölçüldü** — atanmamış agent aracı göremiyor
+- **Sessiz başarısızlık kapatıldı** — bağlanamayan sunucu uyarı üretiyor
+- Gerçek bir MCP sunucusuyla uçtan uca doğrulandı (`deepwiki_read_wiki_structure` çağrıldı)
+
+Sırada: tuvale `mcp.call` düğümü (Aşama 2), Agent Coder'ın MCP sunucusu olması (Aşama 3).
 
 **Arayüz denetimi tamamlandı** ([spec 010](specs/010-arayuz-denetimi/spec.md)):
 

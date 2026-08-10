@@ -40,7 +40,7 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec) ([]ConfigFile, error) {
 		return nil, fmt.Errorf("sağlayıcı slug boş olamaz")
 	}
 
-	providerCfg, err := buildProviderConfig(p)
+	providerCfg, err := buildConfig(p, a)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +51,15 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec) ([]ConfigFile, error) {
 	}, nil
 }
 
-// buildProviderConfig, sağlayıcıya göre çalıştırma motoru yapılandırmasını üretir.
-func buildProviderConfig(p ProviderSpec) ([]byte, error) {
+// mcpTimeoutMS, MCP sunucusuna bağlanma ve araç çağırma süre sınırı.
+//
+// Her sunucuda AÇIKÇA yazılır: çalıştırma motorunun belgeleri 5 saniye,
+// kaynağı 30 saniye diyor. Varsayılana güvenmek, hangi değerin geçerli
+// olduğunu sürüme bırakmak olurdu.
+var mcpTimeoutMS = 30_000
+
+// buildConfig, sağlayıcı ve MCP sunucularıyla motor yapılandırmasını üretir.
+func buildConfig(p ProviderSpec, a AgentSpec) ([]byte, error) {
 	// Anahtar yerine ortam değişkeni referansı yazılır.
 	options := map[string]any{
 		"apiKey":  "{env:" + APIKeyEnvVar + "}",
@@ -84,7 +91,60 @@ func buildProviderConfig(p ProviderSpec) ([]byte, error) {
 		"provider": map[string]any{p.Slug: provider},
 	}
 
+	if mcp := buildMCPConfig(a.MCPServers); len(mcp) > 0 {
+		cfg["mcp"] = mcp
+	}
+
 	return json.MarshalIndent(cfg, "", "  ")
+}
+
+/*
+ * MCP sunucuları.
+ *
+ * Yalnızca UZAK sunucular (spec 011 K2). Erişim anahtarı dosyaya YAZILMAZ:
+ * sağlayıcı anahtarındaki desenin aynısıyla ortam değişkenine referans verilir.
+ * Agent kendi container'ında bu dosyayı okuyabilir; okusa bile anahtarı göremez.
+ */
+func buildMCPConfig(servers []MCPServerSpec) map[string]any {
+	if len(servers) == 0 {
+		return nil
+	}
+
+	out := make(map[string]any, len(servers))
+	for _, s := range servers {
+		entry := map[string]any{
+			"type":    "remote",
+			"url":     s.URL,
+			"enabled": true,
+			"timeout": mcpTimeoutMS,
+			// OAuth otomatik algılaması kapalı: tarayıcı akışı gerektiriyor ve
+			// kimsenin izlemediği bir sandbox'ta sonsuza kadar beklerdi.
+			"oauth": false,
+		}
+		if s.Secret != "" {
+			entry["headers"] = map[string]any{
+				"Authorization": "Bearer {env:" + MCPEnvVar(s.Name) + "}",
+			}
+		}
+		out[s.Name] = entry
+	}
+	return out
+}
+
+// MCPEnvVar, bir MCP sunucusunun anahtarını taşıyan ortam değişkeni.
+func MCPEnvVar(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r - 32)
+		case (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('_')
+		}
+	}
+	return "AGENT_CODER_MCP_" + b.String()
 }
 
 // buildAgentFile, agent tanımını çalıştırma motorunun okuduğu markdown biçimine çevirir.
@@ -151,8 +211,35 @@ func BuildPermissions(a AgentSpec) []PermissionRule {
 		rules = append(rules, PermissionRule{Permission: "webfetch", Pattern: "*", Action: "deny"})
 	}
 
+	/*
+	 * MCP araçları.
+	 *
+	 * Atanmış sunucuların araçları AÇIKÇA izinli yazılır.
+	 *
+	 * Toptan bir "geri kalan her şey yasak" kuralı BİLİNÇLİ OLARAK yok: kural
+	 * sıralamasında ilk eşleşenin mi son eşleşenin mi kazandığı doğrulanmadı ve
+	 * yanlış tahmin, ya tüm araçları kapatır ya da hiçbirini. Erişim zaten
+	 * yapılandırmayla sınırlı — o dosyayı biz üretiyoruz ve yalnızca atanmış
+	 * sunucular içinde.
+	 *
+	 * Bilinen açık uç: klonlanan deponun içindeki bir `.opencode/` yapılandırması
+	 * kendi MCP sunucusunu tanımlayabilir. Bu, kullanıcının kendi deposu olduğu
+	 * için bugün kabul edilebilir; çok kullanıcılı kuruluma geçilirken
+	 * kapatılmalı (spec 011, açık uçlar).
+	 */
+	for _, s := range a.MCPServers {
+		rules = append(rules, PermissionRule{
+			Permission: mcpToolPattern(s.Name), Pattern: "*", Action: "allow",
+		})
+	}
+
 	return rules
 }
+
+// mcpToolPattern, bir sunucunun tüm araçlarını kapsayan desen.
+//
+// Motor araçları `{sunucu}_{araç}` biçiminde adlandırıyor.
+func mcpToolPattern(name string) string { return name + "_*" }
 
 func defaultIfEmpty(v, def string) string {
 	if strings.TrimSpace(v) == "" {

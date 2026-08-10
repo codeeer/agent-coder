@@ -9,6 +9,7 @@ package runbuild
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 	"github.com/agent-coder/backend/internal/agentreg"
 	"github.com/agent-coder/backend/internal/gitprovider"
 	"github.com/agent-coder/backend/internal/llm"
+	"github.com/agent-coder/backend/internal/mcp"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runs"
@@ -30,11 +32,50 @@ type Builder struct {
 	agents   *agentreg.Store
 	llm      *llm.Store
 	git      *gitprovider.Store
+	mcp      *mcp.Store
 }
 
 // New yeni bir Builder üretir.
-func New(p *projects.Store, a *agentreg.Store, l *llm.Store, g *gitprovider.Store) *Builder {
-	return &Builder{projects: p, agents: a, llm: l, git: g}
+func New(p *projects.Store, a *agentreg.Store, l *llm.Store, g *gitprovider.Store,
+	m *mcp.Store,
+) *Builder {
+	return &Builder{projects: p, agents: a, llm: l, git: g, mcp: m}
+}
+
+/*
+ * mcpServers, agent'a atanmış MCP sunucularını erişim anahtarlarıyla çözer.
+ *
+ * Anahtar burada, çalıştırma anında çözülür ve yalnızca container'ın ortam
+ * değişkenine geçer. Hiçbir kayda, hiçbir dosyaya yazılmaz.
+ *
+ * Bir sunucunun anahtarı çözülemezse (şifreleme anahtarı değişmiş olabilir)
+ * çalıştırma BAŞLATILMAZ: yarısı çalışan bir araç kümesiyle koşmak, agent'ın
+ * neden yetersiz kaldığını gizlerdi.
+ */
+func (b *Builder) mcpServers(ctx context.Context, agentID uuid.UUID) ([]runner.MCPServerSpec, error) {
+	if b.mcp == nil {
+		return nil, nil
+	}
+
+	servers, err := b.mcp.ForAgent(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]runner.MCPServerSpec, 0, len(servers))
+	for _, s := range servers {
+		secret := ""
+		if s.HasSecret {
+			secret, err = b.mcp.Reveal(ctx, s.ID)
+			if err != nil {
+				return nil, fmt.Errorf("MCP sunucusu %q erişimi çözülemedi: %w", s.Name, err)
+			}
+		}
+		out = append(out, runner.MCPServerSpec{
+			Name: s.Name, Transport: string(s.Transport), URL: s.URL, Secret: secret,
+		})
+	}
+	return out, nil
 }
 
 // RepoAccess, bir projenin depo adresini ve erişim bilgisini çözer.
@@ -150,6 +191,11 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 		repo.Secret = secret
 	}
 
+	mcpServers, err := b.mcpServers(ctx, agent.ID)
+	if err != nil {
+		return runs.StartInput{}, err
+	}
+
 	return runs.StartInput{
 		Create: runs.CreateInput{
 			ProjectID: project.ID, AgentID: agent.ID, ProviderID: &provider.ID,
@@ -162,6 +208,7 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 			Slug: agent.Slug, Description: agent.Description, Prompt: agent.Prompt,
 			AllowEdit: agent.AllowEdit, AllowBash: agent.AllowBash,
 			AllowWebfetch: agent.AllowWebfetch,
+			MCPServers:    mcpServers,
 		},
 		Provider: runner.ProviderSpec{
 			Slug: provider.Slug, Kind: string(provider.Type),

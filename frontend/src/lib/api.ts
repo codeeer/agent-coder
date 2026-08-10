@@ -18,6 +18,9 @@ import type {
   LLMProvider,
   Agent,
   CreateAgentRequest,
+  McpServer,
+  CreateMcpServerRequest,
+  UpdateMcpServerRequest,
   ModelList,
   Paged,
   ModelQuery,
@@ -229,6 +232,28 @@ export const api = {
 
     remove: (id: string) =>
       apiFetch<null>(`/api/git-providers/${id}`, { method: "DELETE" }),
+  },
+
+  mcpServers: {
+    list: () => apiFetch<McpServer[]>("/api/mcp-servers"),
+
+    /** Backend, kaydetmeden ÖNCE sunucuya bağlanır ve araçlarını okur. */
+    create: (body: CreateMcpServerRequest) =>
+      apiFetch<McpServer>("/api/mcp-servers", {
+        method: "POST",
+        body,
+        timeoutMs: VALIDATE_TIMEOUT_MS,
+      }),
+
+    update: (id: string, body: UpdateMcpServerRequest) =>
+      apiFetch<McpServer>(`/api/mcp-servers/${id}`, {
+        method: "PUT",
+        body,
+        timeoutMs: VALIDATE_TIMEOUT_MS,
+      }),
+
+    remove: (id: string) =>
+      apiFetch<null>(`/api/mcp-servers/${id}`, { method: "DELETE" }),
   },
 
   credentials: {

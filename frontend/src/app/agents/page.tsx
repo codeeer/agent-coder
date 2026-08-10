@@ -255,8 +255,15 @@ function PermissionLine({ agent }: { agent: Agent }) {
     agent.allowWebfetch && "ağa çıkabilir",
   ].filter(Boolean) as string[];
 
+  const mcp = agent.mcpServerIds.length;
+
   return (
     <p className="mt-2 text-xs text-ink-2">
+      {mcp > 0 && (
+        <>
+          {mcp} dış araç sunucusuna erişebilir ·{" "}
+        </>
+      )}
       {izinli.length === 0 ? (
         <>Yalnızca okur — hiçbir şeyi değiştiremez.</>
       ) : (
@@ -294,6 +301,9 @@ function AgentForm({
   const [allowEdit, setAllowEdit] = useState(agent?.allowEdit ?? true);
   const [allowBash, setAllowBash] = useState(agent?.allowBash ?? true);
   const [allowWebfetch, setAllowWebfetch] = useState(agent?.allowWebfetch ?? false);
+  const [mcpIds, setMcpIds] = useState<string[]>(agent?.mcpServerIds ?? []);
+
+  const mcpServers = useQuery({ queryKey: ["mcp-servers"], queryFn: api.mcpServers.list });
 
   const save = useMutation({
     mutationFn: () =>
@@ -308,6 +318,7 @@ function AgentForm({
             allowEdit,
             allowBash,
             allowWebfetch,
+            mcpServerIds: mcpIds,
           })
         : api.agents.create({
             name: name.trim(),
@@ -319,7 +330,13 @@ function AgentForm({
             allowBash,
             allowWebfetch,
           }),
-    onSuccess: () => {
+    onSuccess: async (saved) => {
+      // Oluşturma ucu MCP atamasını almıyor; yeni agent kaydedildikten sonra
+      // atama ikinci bir çağrıyla yazılır. Aksi halde kullanıcı formda seçim
+      // yapar, kaydeder ve seçimi kaybolurdu.
+      if (!editing && mcpIds.length > 0) {
+        await api.agents.update(saved.id, { mcpServerIds: mcpIds });
+      }
       void queryClient.invalidateQueries({ queryKey: ["agents"] });
       onDone();
     },
@@ -419,6 +436,37 @@ function AgentForm({
             onChange={setAllowWebfetch}
           />
         </div>
+      </fieldset>
+
+      {/* Dış araçlar da bir YETKİDİR: bu agent'ın neye erişebildiğinin parçası.
+          Ayrı bir kutuda çünkü listesi değişken ve her kurulumda farklı. */}
+      <fieldset className="mt-3 rounded border border-line p-3">
+        <legend className="px-1 text-xs text-ink-2">Dış araçlar (MCP)</legend>
+        {mcpServers.data === undefined ? (
+          <p className="text-[12px] text-ink-3">Yükleniyor…</p>
+        ) : mcpServers.data.length === 0 ? (
+          <p className="text-[12px] text-ink-3">
+            Tanımlı sunucu yok. Ayarlar → Dış araçlar bölümünden ekleyebilirsiniz.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {mcpServers.data.map((srv) => (
+              <Checkbox
+                key={srv.id}
+                label={`${srv.name} — ${srv.tools.length} araç`}
+                checked={mcpIds.includes(srv.id)}
+                onChange={(on) =>
+                  setMcpIds((prev) =>
+                    on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
+                  )
+                }
+              />
+            ))}
+            <p className="text-[11px] text-ink-3">
+              Seçilmeyen sunucuların araçları bu agent&apos;a hiç sunulmaz.
+            </p>
+          </div>
+        )}
       </fieldset>
 
       {save.isError && (

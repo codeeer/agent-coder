@@ -86,6 +86,26 @@ type AgentSpec struct {
 	AllowEdit     bool
 	AllowBash     bool
 	AllowWebfetch bool
+
+	// MCPServers, bu agent'ın erişebileceği dış araç sunucuları.
+	//
+	// Yetkiler gibi AGENT'A bağlıdır (spec 011 K1): "bu agent neler yapabilir"
+	// sorusunun parçası. Boş liste, hiçbir dış araca erişim yok demektir.
+	MCPServers []MCPServerSpec
+}
+
+// MCPServerSpec, tek bir MCP sunucusuna bağlanmak için gerekenler.
+//
+// `internal/mcp` tipini doğrudan taşımıyoruz: `runner` paketi bilinçli olarak
+// depolama katmanını tanımıyor, yalnızca çalıştırmak için gerekeni alıyor.
+type MCPServerSpec struct {
+	// Name, araç adlarının önekidir: `sentry` → `sentry_issue`.
+	Name string
+	// Transport, "http" veya "sse".
+	Transport string
+	URL       string
+	// Secret boş olabilir: anahtarsız çalışan sunucular var.
+	Secret string
 }
 
 // ProviderSpec, modele erişim için gereken sağlayıcı bilgisi.

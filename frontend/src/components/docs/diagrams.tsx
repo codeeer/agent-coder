@@ -244,12 +244,16 @@ export function Architecture() {
       <text x={790} y={276} textAnchor="middle" fontSize={11} fill="var(--color-ink-3)">
         DIŞ SERVİSLER
       </text>
-      <Box x={580} y={290} w={125} h={54} title="LLM" subtitle="OpenRouter…" />
-      <Box x={727} y={290} w={125} h={54} title="Git" subtitle="push + PR" />
-      <Box x={874} y={290} w={125} h={54} title="Jira" subtitle="task + yorum" />
+      <Box x={556} y={290} w={110} h={54} title="LLM" subtitle="OpenRouter…" />
+      <Box x={676} y={290} w={110} h={54} title="Git" subtitle="push + PR" />
+      <Box x={796} y={290} w={110} h={54} title="Jira" subtitle="task + yorum" />
+      <Box x={916} y={290} w={84} h={54} title="MCP" subtitle="dış araçlar" tone="accent" />
 
-      <Arrow x1={680} y1={196} x2={648} y2={284} />
-      <text x={600} y={250} fontSize={10.5} fill="var(--color-ink-3)">model çağrısı</text>
+      <Arrow x1={680} y1={196} x2={624} y2={284} />
+      <text x={578} y={250} fontSize={10.5} fill="var(--color-ink-3)">model çağrısı</text>
+      {/* MCP oku RUNNER'dan çıkar: aracı agent çağırıyor, backend değil. */}
+      <Arrow x1={900} y1={196} x2={950} y2={284} />
+      <text x={905} y={250} fontSize={10.5} fill="var(--color-ink-3)">araç çağrısı</text>
       <Arrow x1={520} y1={200} x2={720} y2={286} dashed />
       <Arrow x1={520} y1={215} x2={870} y2={286} dashed />
 
@@ -257,7 +261,7 @@ export function Architecture() {
         Kesikli oklar backend&apos;den çıkar: PR açmak ve Jira&apos;ya yazmak agent&apos;ın değil, akışın işidir.
       </text>
       <text x={510} y={406} textAnchor="middle" fontSize={11.5} fill="var(--color-ink-2)">
-        Agent yalnızca kendi container&apos;ında kod ile uğraşır; kimlik bilgisi ona hiç geçmez.
+        Agent kendi container&apos;ında kodla ve kendisine açılan dış araçlarla uğraşır.
       </text>
     </Frame>
   );

@@ -29,6 +29,7 @@ import (
 	"github.com/agent-coder/backend/internal/integrations/jira"
 	"github.com/agent-coder/backend/internal/jiratrigger"
 	"github.com/agent-coder/backend/internal/llm"
+	"github.com/agent-coder/backend/internal/mcp"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
@@ -101,6 +102,10 @@ func run() error {
 	llmStore := llm.NewStore(database.Pool, cipher)
 	gitStore := gitprovider.NewStore(database.Pool, cipher)
 	credStore := credentials.NewStore(database.Pool, cipher)
+	mcpStore := mcp.NewStore(database.Pool, cipher)
+	mcpClient := mcp.NewClient(func() time.Duration {
+		return time.Duration(settingsSvc.Int(settings.KeyMCPTimeoutSeconds)) * time.Second
+	})
 
 	// Hiç sağlayıcı yoksa .env'deki OpenRouter anahtarından biri oluşturulur;
 	// mevcut kurulumlar hiçbir şey yapmadan çalışmaya devam eder.
@@ -169,7 +174,7 @@ func run() error {
 
 	// ── Akış motoru ─────────────────────────────────────────────────────────
 
-	runBuilder := runbuild.New(projectStore, agentStore, llmStore, gitStore)
+	runBuilder := runbuild.New(projectStore, agentStore, llmStore, gitStore, mcpStore)
 	runPusher := runs.NewPusher(runStore)
 	workflowStore := workflow.NewStore(database.Pool)
 
@@ -226,6 +231,8 @@ func run() error {
 		Catalog:       catalogStore,
 		Syncer:        syncer,
 		GitProviders:  gitStore,
+		MCPServers:    mcpStore,
+		MCPClient:     mcpClient,
 		GitValidator:  gitprovider.NewValidator(),
 		Credentials:   credStore,
 		JiraValidator: credentials.NewValidator(),

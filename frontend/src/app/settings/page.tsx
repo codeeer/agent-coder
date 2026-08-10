@@ -8,6 +8,7 @@ import {
   type CredentialSpec,
 } from "@/components/settings/CredentialCard";
 import { GitProviderSection } from "@/components/settings/GitProviderSection";
+import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
 import { Notice, PageHeader, Section } from "@/components/ui/primitives";
@@ -50,6 +51,8 @@ export default function SettingsPage() {
         <LLMProviderSection />
 
         <GitProviderSection />
+
+        <McpServerSection />
 
         <Section
           title="Çalışma ayarları"

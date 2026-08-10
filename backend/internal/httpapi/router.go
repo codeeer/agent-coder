@@ -25,6 +25,7 @@ import (
 	"github.com/agent-coder/backend/internal/gitprovider"
 	"github.com/agent-coder/backend/internal/jiratrigger"
 	"github.com/agent-coder/backend/internal/llm"
+	"github.com/agent-coder/backend/internal/mcp"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
@@ -55,6 +56,10 @@ type Deps struct {
 	// Kod deposu erişimleri
 	GitProviders *gitprovider.Store
 	GitValidator *gitprovider.Validator
+
+	// Agent'ların erişebileceği dış araç sunucuları
+	MCPServers *mcp.Store
+	MCPClient  *mcp.Client
 
 	// Jira (spec 002'den sonra credentials paketinin ilgilendiği tek şey)
 	Credentials   *credentials.Store
@@ -147,6 +152,13 @@ func (h *Handler) Routes() http.Handler {
 			r.Post("/", h.createGitProvider)
 			r.Put("/{id}", h.updateGitProvider)
 			r.Delete("/{id}", h.deleteGitProvider)
+		})
+
+		r.Route("/mcp-servers", func(r chi.Router) {
+			r.Get("/", h.listMCPServers)
+			r.Post("/", h.createMCPServer)
+			r.Put("/{id}", h.updateMCPServer)
+			r.Delete("/{id}", h.deleteMCPServer)
 		})
 
 		r.Route("/settings", func(r chi.Router) {

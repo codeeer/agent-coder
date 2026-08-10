@@ -84,6 +84,16 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	}
 	emit(runner.Event{Level: runner.LevelInfo, Message: "depo hazır, agent başlatılıyor"})
 
+	// MCP sunucuları bağlanabildi mi?
+	//
+	// Motor bağlanamayan bir sunucuyu SESSİZCE yok sayıyor: araçlarını modele
+	// hiç sunmuyor, hata da vermiyor (ölçüldü — spec 011). Kontrol edilmezse
+	// arıza "agent neden aptallaştı" sorusuyla, günler sonra fark edilir.
+	//
+	// Çalıştırma başarısız SAYILMAZ: araç olmadan da iş bitebilir. Ama sessiz
+	// kalmaz.
+	r.warnFailedMCP(runCtx, cli, req, emit)
+
 	// Olay akışı arka planda dinlenir; kopması çalıştırmayı düşürmez.
 	streamCtx, stopStream := context.WithCancel(runCtx)
 	defer stopStream()
@@ -193,6 +203,43 @@ func stripControl(s string) string {
 	}, s)
 }
 
+// warnFailedMCP, bağlanamayan MCP sunucularını kullanıcıya bildirir.
+func (r *Runner) warnFailedMCP(ctx context.Context, cli *client, req runner.Request, emit runner.EventFunc) {
+	if len(req.Agent.MCPServers) == 0 {
+		return
+	}
+
+	status, err := cli.mcpStatus(ctx)
+	if err != nil {
+		// Durum ucu okunamadıysa çalıştırmayı düşürmüyoruz; yalnızca
+		// doğrulayamadığımızı söylüyoruz.
+		emit(runner.Event{
+			Level:   runner.LevelWarn,
+			Message: "MCP sunucularının durumu doğrulanamadı: " + err.Error(),
+		})
+		return
+	}
+
+	for _, m := range req.Agent.MCPServers {
+		st, ok := status[m.Name]
+		switch {
+		case !ok:
+			emit(runner.Event{Level: runner.LevelWarn,
+				Message: fmt.Sprintf("MCP sunucusu %q motorda görünmüyor — araçları kullanılamayacak", m.Name)})
+		case st.Status == "connected":
+			emit(runner.Event{Level: runner.LevelInfo,
+				Message: fmt.Sprintf("MCP sunucusu %q bağlandı", m.Name)})
+		default:
+			msg := fmt.Sprintf("MCP sunucusu %q bağlanamadı (%s) — araçları kullanılamayacak",
+				m.Name, st.Status)
+			if st.Error != "" {
+				msg += ": " + st.Error
+			}
+			emit(runner.Event{Level: runner.LevelWarn, Message: msg})
+		}
+	}
+}
+
 // buildEnv, container'a geçilecek ortam değişkenleri.
 //
 // Sağlayıcı anahtarı buradan geçer; yapılandırma dosyası ona referans verir.
@@ -213,6 +260,14 @@ func buildEnv(req runner.Request) map[string]string {
 	if req.Repo.HasCredentials() {
 		env["GIT_USERNAME"] = req.Repo.Username
 		env["GIT_TOKEN"] = req.Repo.Secret
+	}
+
+	// MCP sunucularının erişim anahtarları: yapılandırma dosyası bunlara
+	// `{env:...}` ile referans verir, değeri içermez (spec 011 K5).
+	for _, m := range req.Agent.MCPServers {
+		if m.Secret != "" {
+			env[runner.MCPEnvVar(m.Name)] = m.Secret
+		}
 	}
 	return env
 }

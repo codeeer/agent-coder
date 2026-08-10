@@ -238,3 +238,99 @@ func TestBuildPermissions(t *testing.T) {
 		}
 	})
 }
+
+/* ── MCP (spec 011) ──────────────────────────────────────────────────────── */
+
+func mcpAgent(servers ...MCPServerSpec) AgentSpec {
+	return AgentSpec{
+		Slug: "coder", Description: "kod yazar", Prompt: "yaz",
+		AllowEdit: true, AllowBash: true, AllowWebfetch: true,
+		MCPServers: servers,
+	}
+}
+
+func configJSON(t *testing.T, a AgentSpec) map[string]any {
+	t.Helper()
+	files, err := BuildConfigFiles(
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a)
+	require.NoError(t, err)
+
+	var cfg map[string]any
+	require.NoError(t, json.Unmarshal(files[0].Content, &cfg))
+	return cfg
+}
+
+func TestBuildConfigFiles_MCPSunucusuYokkaBlokYazilmaz(t *testing.T) {
+	cfg := configJSON(t, mcpAgent())
+	_, has := cfg["mcp"]
+	require.False(t, has, "sunucu yoksa boş bir mcp bloğu yazılmamalı")
+}
+
+func TestBuildConfigFiles_MCPSunucusuYazilir(t *testing.T) {
+	cfg := configJSON(t, mcpAgent(MCPServerSpec{
+		Name: "sentry", Transport: "http", URL: "https://mcp.sentry.dev/mcp", Secret: "gizli",
+	}))
+
+	mcp, ok := cfg["mcp"].(map[string]any)
+	require.True(t, ok, "mcp bloğu yazılmalı")
+
+	entry, ok := mcp["sentry"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "remote", entry["type"])
+	require.Equal(t, "https://mcp.sentry.dev/mcp", entry["url"])
+	require.Equal(t, true, entry["enabled"])
+	// Süre sınırı AÇIKÇA yazılmalı: motorun varsayılanı sürüme göre değişiyor.
+	require.NotNil(t, entry["timeout"], "her sunucuda süre sınırı yazılmalı")
+	// Tarayıcı akışı kimsenin izlemediği bir sandbox'ta sonsuza kadar beklerdi.
+	require.Equal(t, false, entry["oauth"])
+}
+
+// TestBuildConfigFiles_MCPAnahtariDosyayaYazilmaz — sızıntı testi.
+//
+// Agent kendi container'ında bu dosyayı okuyabilir; okusa bile anahtarı
+// görmemeli (spec 011 K5).
+func TestBuildConfigFiles_MCPAnahtariDosyayaYazilmaz(t *testing.T) {
+	const secret = "sk-cok-gizli-anahtar-9876"
+
+	files, err := BuildConfigFiles(
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
+		mcpAgent(MCPServerSpec{
+			Name: "sentry", Transport: "http", URL: "https://x.dev/mcp", Secret: secret,
+		}))
+	require.NoError(t, err)
+
+	for _, f := range files {
+		require.NotContains(t, string(f.Content), secret,
+			"anahtar %s dosyasında düz metin görünmemeli", f.Path)
+	}
+	require.Contains(t, string(files[0].Content), "{env:AGENT_CODER_MCP_SENTRY}",
+		"dosya anahtara ortam değişkeniyle referans vermeli")
+}
+
+func TestBuildConfigFiles_AnahtarsizSunucudaBaslikYok(t *testing.T) {
+	cfg := configJSON(t, mcpAgent(MCPServerSpec{
+		Name: "acik", Transport: "http", URL: "https://x.dev/mcp",
+	}))
+
+	entry := cfg["mcp"].(map[string]any)["acik"].(map[string]any)
+	_, has := entry["headers"]
+	require.False(t, has, "anahtarsız sunucuda erişim başlığı yazılmamalı")
+}
+
+// TestBuildPermissions_MCPAraclariAcikcaIzinli — atanmış sunucunun araçları
+// açıkça izinli olmalı; atanmamış bir sunucunun deseni hiç görünmemeli.
+func TestBuildPermissions_MCPAraclariAcikcaIzinli(t *testing.T) {
+	rules := BuildPermissions(mcpAgent(
+		MCPServerSpec{Name: "sentry", Transport: "http", URL: "https://x.dev"},
+	))
+
+	var found bool
+	for _, r := range rules {
+		require.NotEqual(t, "notion_*", r.Permission, "atanmamış sunucu kuralda görünmemeli")
+		if r.Permission == "sentry_*" {
+			found = true
+			require.Equal(t, "allow", r.Action)
+		}
+	}
+	require.True(t, found, "atanmış sunucunun araçları izinli yazılmalı")
+}

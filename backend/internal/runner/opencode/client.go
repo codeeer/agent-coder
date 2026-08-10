@@ -81,6 +81,42 @@ func (c *client) ping(ctx context.Context) error {
 	return nil
 }
 
+// mcpState, tek bir MCP sunucusunun motordaki durumu.
+type mcpState struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+// mcpStatus, tanımlı MCP sunucularının bağlantı durumunu okur.
+//
+// Motor bağlanamayan sunucuyu sessizce yok saydığı için bu tek görünürlük
+// noktası: `connected` dışındaki her durum kullanıcıya bildirilmeli.
+func (c *client) mcpStatus(ctx context.Context) (map[string]mcpState, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/mcp", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("MCP durumu %d döndü", resp.StatusCode)
+	}
+
+	var out map[string]mcpState
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("MCP durumu okunamadı: %w", err)
+	}
+	return out, nil
+}
+
 // createSession, yetki kurallarıyla yeni bir oturum açar.
 //
 // Yetkiler burada gönderilir; agent dosyasına yazılmaz (ölçüldü: bu yol çalışıyor

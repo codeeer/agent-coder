@@ -553,3 +553,29 @@ Ayrıca token modeline tek bir rol eklendi: `--color-control-line`. Bir düğmen
 sınırı ile bir kartın ayracı aynı şey değil — ilki erişilebilirlik gereği 3:1
 olmak zorunda, ikincisi değil. Bu ayrım yokken bileşenler en yakın süsleme
 token'ını ödünç alıyordu.
+
+## Revizyon — MCP desteği, Aşama 1 (2026-08-10)
+
+Planda hiç yoktu: agent'ların dış araçlara **standart bir protokolle** erişmesi.
+Faz 5'e kadar her kaynak için ayrı istemci yazdık (Jira, GitHub); üçüncü ve
+dördüncü kaynak aynı işi tekrar yazmak olurdu.
+
+Beklenmedik şekilde ucuz çıktı ve sebebi Faz 2'de verilmiş bir karardı:
+`opencode.json` imaja gömülmüyor, **her çalıştırmada Go tarafında üretilip**
+container'a kopyalanıyor. MCP eklemek üretilen haritaya bir anahtar eklemek
+oldu — imaj, entrypoint ve motor istemcisi hiç değişmedi.
+
+Pahalı olan kısım beklediğim yerde değildi: **MCP'nin kendisi değil, etrafındaki
+tesisat**. Şifreli, çok kayıtlı, doğrulamalı bir bağlantı yönetimi + arayüz
+bölümü + agent ataması.
+
+İki not:
+
+1. **Sessiz başarısızlık.** Motor, bağlanamayan bir MCP sunucusunu uyarmadan yok
+   sayıyor. Bu, hata ayıklaması en zor sınıftan bir arıza: agent araçsız kalıyor
+   ama kimse sebebini görmüyor. Mesaj göndermeden önce durum sorgulaması eklendi.
+
+2. **Doğrulanmamış davranışa yaslanan güvenlik kuralı yazmadım.** Yetki
+   sıralamasının semantiğini bilmediğim için toptan bir "geri kalan yasak"
+   kuralını kaldırdım. Ölçülmeden konsaydı, güvenlik sağlamak yerine yanlış bir
+   güven duygusu verirdi.

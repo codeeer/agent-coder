@@ -148,11 +148,17 @@ export default function HowItWorksPage() {
             yalnızca son dört karakter gösteriliyor.
           </Decision>
           <Decision title="Agent'a token geçmez">
-            PR açmak ve Jira&apos;ya yazmak <b>akışın</b> işi, agent&apos;ın değil. Agent yalnızca kendi
-            container&apos;ında kodla uğraşır; git kimlik bilgisi ona hiç ulaşmaz.
+            PR açmak ve Jira&apos;ya yazmak <b>akışın</b> işi, agent&apos;ın değil; git kimlik bilgisi
+            agent&apos;a hiç ulaşmaz. Dış araçlarda (MCP) anahtar container&apos;ın ortam
+            değişkeninde durur ve isteğe başlık olarak eklenir — <b>modele hiç gösterilmez</b>.
           </Decision>
           <Decision title="Container'lar izole">
             Runner&apos;lar ayrı bir ağda çalışır, dışarıya port açmaz, CPU ve bellek sınırlıdır.
+          </Decision>
+          <Decision title="Dış araçlar agent başına açılır">
+            Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi agent&apos;ın
+            kullanabileceği ayrı seçilir; seçilmeyenlere araçlar <b>hiç sunulmaz</b>.
+            Bağlanamayan bir sunucu sessiz kalmaz, uyarı üretir.
           </Decision>
           <Decision title="Kimlik doğrulama henüz yok" tone="warn">
             v1 tek kullanıcılıktır ve <b>internete açık bir sunucuda çalıştırılmamalıdır</b>. Şema

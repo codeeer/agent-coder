@@ -51,6 +51,7 @@ const (
 	KeyReportTimezone     = "reports.timezone"
 	KeyJiraPollMinutes    = "jira.poll_interval_minutes"
 	KeyJiraScanLimit      = "jira.scan_limit"
+	KeyMCPTimeoutSeconds  = "mcp.timeout_seconds"
 )
 
 // Gruplar — arayüzde başlık olarak kullanılır.
@@ -59,6 +60,7 @@ const (
 	GroupCatalog = "catalog"
 	GroupReports = "reports"
 	GroupJira    = "jira"
+	GroupMCP     = "mcp"
 )
 
 // GroupLabels, grup kimliklerinin insan okunur karşılıkları.
@@ -67,6 +69,7 @@ var GroupLabels = map[string]string{
 	GroupCatalog: "Model kataloğu",
 	GroupReports: "Rapor",
 	GroupJira:    "Jira tetikleyici",
+	GroupMCP:     "Dış araçlar (MCP)",
 }
 
 func p(v int) *int { return &v }
@@ -149,6 +152,14 @@ var Registry = []Definition{
 		Help: "Bir taramada en fazla kaç task işleneceği. Geniş bir JQL'in " +
 			"yüzlerce akış başlatmasını engeller.",
 		Default: "20", Min: p(1), Max: p(200),
+	},
+	{
+		Key: KeyMCPTimeoutSeconds, Group: GroupMCP, Kind: KindInt,
+		Label: "MCP sunucu süre sınırı", Unit: "saniye",
+		Help: "Bir dış araç sunucusuna bağlanma ve araç çağırma süresi. " +
+			"Değer her sunucuya AÇIKÇA yazılır; çalıştırma motorunun kendi " +
+			"varsayılanı sürümden sürüme değişebiliyor.",
+		Default: "30", Min: p(5), Max: p(300),
 	},
 }
 
