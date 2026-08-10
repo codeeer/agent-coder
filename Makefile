@@ -11,7 +11,15 @@ SHELL := /bin/bash
 # varsayılana düşer.
 COMPOSE      := docker compose --project-directory "$(CURDIR)" -f deploy/docker-compose.yml
 COMPOSE_DEV  := $(COMPOSE) -f deploy/docker-compose.dev.yml
+COMPOSE_GHCR := $(COMPOSE) -f deploy/docker-compose.ghcr.yml
 RUNNER_IMAGE := agent-coder/opencode-runner:latest
+
+# Yayınlanan imajlar (make quickstart). Kendi çatalınızda GHCR_OWNER'ı
+# değiştirin; IMAGE_TAG ile belirli bir sürüme sabitleyebilirsiniz.
+GHCR_OWNER   ?= codeeer
+IMAGE_TAG    ?= latest
+GHCR_RUNNER  := ghcr.io/$(GHCR_OWNER)/agent-coder-runner:$(IMAGE_TAG)
+GHCR_BACKEND := ghcr.io/$(GHCR_OWNER)/agent-coder-backend:$(IMAGE_TAG)
 
 # Yalnızca ekrana yazdırmak için .env'den okunur. Servislerin gerçek port
 # yapılandırması compose tarafından yapılır.
@@ -74,6 +82,26 @@ check-env:
 .PHONY: up
 up: check-env ## Tüm servisleri build edip başlat
 	$(COMPOSE) up -d --build
+	@echo
+	@echo "  Arayüz : http://localhost:$(FRONTEND_PORT)"
+	@echo "  API    : http://localhost:$(BACKEND_PORT)/health"
+
+# quickstart, `up`ın hazır imajlı kardeşi: runner ve backend çekilir, yalnızca
+# frontend derlenir. `make runner` adımına gerek kalmaz — kurulumun en uzun ve
+# en sık atlanan adımı oydu.
+.PHONY: quickstart
+quickstart: check-env ## Hazır imajlarla başlat (runner derlenmez — en hızlı yol)
+	@echo "Hazır imajlar çekiliyor…"
+	docker pull $(GHCR_RUNNER)
+	@RUNNER_IMAGE=$(GHCR_RUNNER) BACKEND_IMAGE=$(GHCR_BACKEND) \
+		$(COMPOSE_GHCR) pull backend postgres
+	@# RUNNER_IMAGE .env'e YAZILIR, yalnızca bu komuta özel bırakılmaz.
+	@# Aksi halde kullanıcı quickstart'tan sonra `make restart` çalıştırdığında
+	@# hiç derlemediği yerel imaja geri döner ve kurulum sessizce bozulur.
+	@sed -i.bak "s|^RUNNER_IMAGE=.*|RUNNER_IMAGE=$(GHCR_RUNNER)|" .env && rm -f .env.bak
+	@echo "  .env → RUNNER_IMAGE=$(GHCR_RUNNER)"
+	@RUNNER_IMAGE=$(GHCR_RUNNER) BACKEND_IMAGE=$(GHCR_BACKEND) \
+		$(COMPOSE_GHCR) up -d
 	@echo
 	@echo "  Arayüz : http://localhost:$(FRONTEND_PORT)"
 	@echo "  API    : http://localhost:$(BACKEND_PORT)/health"

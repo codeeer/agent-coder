@@ -153,20 +153,39 @@ CORS_ORIGINS=https://agent.sirket.com
 > ⚠️ **Kimlik doğrulama yok.** Sunucuya kuruyorsanız yalnızca özel ağa açın —
 > internete açık bırakmayın. Ayrıntı: [Güvenlik notları](#güvenlik-notları).
 
-## 4. Agent çalıştırma imajını derleyin
+## 4. Başlatın
+
+İki yol var. **Yalnızca denemek istiyorsanız hızlı olanı seçin.**
+
+### ⚡ Hızlı yol — hazır imajlarla
 
 ```bash
-make runner
+make quickstart
 ```
 
-Bu, agent'ların içinde çalışacağı opencode imajını üretir. Bir kez yapılır;
-ilk seferde birkaç dakika sürebilir.
+Agent çalıştırma ortamı ve sunucu, yayınlanmış imajlardan **çekilir**; yalnızca
+arayüz yerelde derlenir (~1-2 dakika). En uzun adım olan runner imajını
+derlemezsiniz.
 
-## 5. Başlatın
+> İmajlar `ghcr.io/codeeer/...` altında, **amd64 ve arm64** için yayınlanır.
+> Intel/AMD sunucu da Apple Silicon da doğru imajı kendiliğinden çeker.
+
+Belirli bir sürüme sabitlemek isterseniz:
 
 ```bash
+IMAGE_TAG=v0.1.0 make quickstart
+```
+
+### 🔨 Kaynaktan derleme yolu
+
+Kodda değişiklik yapacaksanız veya hazır imaja güvenmek istemiyorsanız:
+
+```bash
+make runner     # agent çalıştırma imajı — bir kez, birkaç dakika
 make up
 ```
+
+### İkisinde de sonuç aynı
 
 Üç servis ayağa kalkar ve veritabanı şeması kendiliğinden uygulanır:
 
@@ -175,7 +194,7 @@ make up
   API    : http://localhost:8080/health
 ```
 
-(Portları değiştirdiyseniz `make up` sizin adreslerinizi yazdırır.)
+(Portları değiştirdiyseniz komut sizin adreslerinizi yazdırır.)
 
 Doğrulayın:
 
@@ -411,7 +430,8 @@ tıkla özgün haline döndürebilirsiniz.
 ```bash
 make help              # tüm komutları listeler
 
-make up                # başlat
+make quickstart        # hazır imajlarla başlat (runner derlenmez)
+make up                # kaynaktan derleyip başlat
 make down              # durdur (veri korunur)
 make clean             # durdur ve TÜM veriyi sil
 make restart           # yeniden başlat
@@ -501,11 +521,32 @@ openssl rand -base64 32
 <details>
 <summary><b>Agent çalıştırınca "runner imajı bulunamadı"</b></summary>
 
+Bu imaj agent'ların içinde koştuğu ortamdır ve elinizde yok. İkisinden biri:
+
 ```bash
-make runner
+make quickstart        # hazır imajı çeker
+make runner            # ya da kaynaktan derler
 ```
 
-komutunu çalıştırmayı atlamışsınız. Bu imaj agent'ların içinde koştuğu ortamdır.
+`make quickstart` kullandıysanız `.env` içindeki `RUNNER_IMAGE` ile çekilen
+imajın adı aynı olmalı — elle değiştirdiyseniz kontrol edin.
+</details>
+
+<details>
+<summary><b>"no matching manifest" / "exec format error"</b></summary>
+
+Çektiğiniz imaj makinenizin mimarisine uymuyor. Yayınlanan imajlar hem `amd64`
+hem `arm64` içerir; bu hatayı alıyorsanız muhtemelen **kendi derlediğiniz** bir
+imajı başka mimarideki bir makineye taşımışsınız.
+
+Ne olduğunu görmek için:
+
+```bash
+docker buildx imagetools inspect ghcr.io/codeeer/agent-coder-runner:latest
+```
+
+Çözüm: o makinede `make quickstart` çalıştırın (doğru mimariyi kendisi çeker)
+veya `make runner` ile yerinde derleyin.
 </details>
 
 <details>
@@ -552,6 +593,18 @@ docker volume ls | grep run-           # boş olmalı
   sunucuda çalıştırılmamalıdır. Şema `user_id` taşır; auth sonradan eklenecek.
 - **Dış tetikleme adresleri** anahtar niteliğindedir — paylaşırken dikkat edin,
   gerekirse arayüzden yenileyin.
+- **Yayınlanan imajlarda gizli değer yoktur.** `.env` üç derleme bağlamında da
+  hariç tutulur; imajlar yayından önce hem katman katman hem de ortam
+  değişkenleri üzerinden taranır. Kendiniz doğrulamak isterseniz:
+
+  ```bash
+  # İmajın hangi iş akışından çıktığını kanıtlar
+  gh attestation verify oci://ghcr.io/codeeer/agent-coder-runner:latest \
+     --repo codeeer/agent-coder
+  ```
+
+  Hazır imaja güvenmek istemiyorsanız [kaynaktan derleme
+  yolu](#-kaynaktan-derleme-yolu) her zaman açık.
 
 ---
 
