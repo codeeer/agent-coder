@@ -17,7 +17,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-agentcoder}
     ports:
       # Yerel psql erişimi için. Üretimde kaldırılmalı.
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -47,7 +47,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       BACKEND_PORT: 8080
       DATABASE_URL: postgres://${POSTGRES_USER:-agentcoder}:${POSTGRES_PASSWORD:-agentcoder_dev}@postgres:5432/${POSTGRES_DB:-agentcoder}?sslmode=disable
-      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000}
+      # Tarayıcının arayüzü açtığı adres. PUBLIC_HOST ile birlikte değişir ki
+      # sunucuya kurulumda CORS elle düzeltilmek zorunda kalmasın.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-3002}}
       SECRET_ENCRYPTION_KEY: ${SECRET_ENCRYPTION_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-}
@@ -75,14 +77,20 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* derleme anında gömülür; tarayıcıdan görünen adres olmalı.
-        NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8080}
+        # NEXT_PUBLIC_* derleme anında gömülür ve TARAYICIDAN görünen adres
+        # olmalı — container adı değil.
+        #
+        # Bu yüzden `localhost` sabit yazılamaz: sunucuya kurulup başka bir
+        # makineden açıldığında tarayıcı KENDİ localhost'una gider ve arayüz
+        # "sunucuya ulaşılamıyor" der. PUBLIC_HOST sunucunun adresine ayarlanır;
+        # ters vekil arkasında ise NEXT_PUBLIC_API_URL tümüyle yazılır.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}}
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3002}:3000"
     networks:
       - internal
 

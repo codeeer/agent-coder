@@ -36,7 +36,8 @@ modeliyle, her çalıştırma kayıtlı ve maliyeti ölçülü.
 | 🔒 **İzole sandbox** | Her adım kendi geçici Docker container'ında, kendi repo klonuyla |
 | 📡 **Canlı izleme** | Adım adım log akışı (SSE), diff görüntüleme, iptal |
 | 💰 **Maliyet takibi** | Adım başına token ve USD; yönetici raporu |
-| 🔗 **Entegrasyonlar** | Jira (tetikleyici + yorum), GitHub / Bitbucket / genel Git (push + PR) |
+| 📜 **Hazır betikler** | Prosedür işlerinde LLM doğaçlaması yerine sabit `.sh` çalıştırma |
+| 🔗 **Entegrasyonlar** | Jira (tetikleyici + yorum), GitHub / Bitbucket / genel Git (push + PR), MCP (iki yönlü) |
 | 🌗 **Açık / koyu tema** | İkisi de ölçülerek WCAG AA'ya getirildi |
 
 ## Teknoloji
@@ -78,36 +79,79 @@ container'ları varsayılan olarak iş başına 4 GB'a kadar kullanabilir.
 ## 2. Projeyi indirin
 
 ```bash
-git clone https://github.com/<kullanici>/agent-coder.git
+git clone https://github.com/codeeer/agent-coder.git
 cd agent-coder
 ```
 
 ## 3. Ayar dosyasını oluşturun
 
 ```bash
-make env        # .env.example dosyasını .env olarak kopyalar
+make env
 ```
 
-Şimdi `.env` dosyasını bir editörle açıp **tek bir zorunlu değeri** üretin:
+Bu komut `.env` dosyasını oluşturur **ve gereken gizli değerleri kendisi üretir**:
 
-```bash
-# Şifreleme anahtarı — API anahtarlarınız veritabanında bununla şifrelenir.
-openssl rand -base64 32
+```
+.env oluşturuldu.
+  ✓ SECRET_ENCRYPTION_KEY üretildi
+  ✓ OPENCODE_SERVER_PASSWORD üretildi
 ```
 
-Çıkan değeri `.env` içindeki `SECRET_ENCRYPTION_KEY=` satırına yapıştırın:
+**Elle düzenlemeniz gereken hiçbir zorunlu alan yok.** Model API anahtarınızı da
+buraya yazmayacaksınız — arayüzden gireceksiniz.
+
+> **`SECRET_ENCRYPTION_KEY`'i yedekleyin.** Kaydedeceğiniz tüm API anahtarları
+> onunla şifrelenir; kaybederseniz veya değiştirirseniz eskiler çözülemez ve
+> hepsini yeniden girmeniz gerekir.
+
+İki durumda `.env`'e dokunmanız gerekir — ikisi de aşağıda anlatıldı:
+**[portlar doluysa](#portlar-doluysa)** ve
+**[sunucuya kuruyorsanız](#sunucuya-kurulum)**.
+
+### Portlar doluysa
+
+Varsayılanlar: arayüz **3002**, API **8080**, PostgreSQL **5434**. Makinenizde
+biri kullanılıyorsa `.env` içinden değiştirin:
 
 ```env
-SECRET_ENCRYPTION_KEY=çıktıyı+buraya+yapıştırın=
+FRONTEND_PORT=3005
+BACKEND_PORT=8085
+POSTGRES_PORT=5440
 ```
 
-> **Bu anahtarı kaybetmeyin.** Kaydedilmiş tüm API anahtarları onunla şifrelenir;
-> değiştirirseniz eskiler çözülemez ve yeniden girilmesi gerekir.
+Sonra `make restart`. Başka hiçbir yeri elle düzeltmeniz gerekmez: arayüzün
+API adresi ve sunucunun CORS ayarı bu değerlerden **kendiliğinden** üretilir.
 
-Geri kalan her şeyin makul bir varsayılanı var. Portlar sizde doluysa yine `.env`
-üzerinden değiştirebilirsiniz (`FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`).
+> Portu kullanan şeyi merak ederseniz: `lsof -i :3002` (macOS/Linux),
+> `netstat -ano | findstr :3002` (Windows).
 
-**Model API anahtarınızı .env'e yazmanıza gerek yok** — arayüzden gireceksiniz.
+### Sunucuya kurulum
+
+Kendi bilgisayarınızda çalıştıracaksanız **bu bölümü atlayın.**
+
+Bir sunucuya kurup **başka bir makineden** tarayıcıyla açacaksanız, sunucunun
+adresini yazmanız gerekir:
+
+```env
+PUBLIC_HOST=192.168.1.40        # ya da agent.sirket.local
+```
+
+Sonra `make restart`.
+
+Sebebi şu: arayüzün API adresi **derleme anında** içine gömülür. `localhost`
+kalırsa, siz uzaktan açtığınızda tarayıcı **kendi bilgisayarınıza** bağlanmaya
+çalışır ve ekran boş gelir. `PUBLIC_HOST` hem arayüzün API adresini hem de
+sunucunun CORS ayarını birlikte düzeltir.
+
+Ters vekil (nginx, Traefik) arkasındaysanız iki adresi de tam yazın:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.sirket.com
+CORS_ORIGINS=https://agent.sirket.com
+```
+
+> ⚠️ **Kimlik doğrulama yok.** Sunucuya kuruyorsanız yalnızca özel ağa açın —
+> internete açık bırakmayın. Ayrıntı: [Güvenlik notları](#güvenlik-notları).
 
 ## 4. Agent çalıştırma imajını derleyin
 
@@ -130,6 +174,8 @@ make up
   Arayüz : http://localhost:3002
   API    : http://localhost:8080/health
 ```
+
+(Portları değiştirdiyseniz `make up` sizin adreslerinizi yazdırır.)
 
 Doğrulayın:
 
@@ -300,6 +346,49 @@ Cursor yapılandırmanıza ekleyin. Üç araç sunulur: `akislari_listele`,
 
 ---
 
+# Betikler — standart işte standart sonuç
+
+Bir agent her seferinde yeniden karar verir. Keşifte (hatayı bul, özelliği yaz)
+doğru olan bu davranış, **prosedürde** risktir: aynı iş bugün `npm update`,
+yarın `npm install paket@latest` olarak koşabilir.
+
+**Ayarlar → Betikler → Betik ekle** ile hazır bir kabuk betiği tanımlayın:
+
+| Alan | Örnek |
+|---|---|
+| Ad | `upgrade-deps` → `/home/agent/scripts/upgrade-deps.sh` |
+| Ne işe yarar | `Bağımlılıkları güvenli sürümlere yükseltir` |
+| İçerik | `.sh` dosyanızın metni |
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+npm ci
+npm update --save
+npm test
+```
+
+Sonra **Agent'lar** ekranından hangi agent'ın kullanacağını seçin. Betik o
+agent'ın ortamına konur ve talimatına yol + açıklamayla yazılır.
+
+> Sınır şu: **model ne zaman çağıracağına karar verir, betik ne yapılacağına.**
+> "Ne işe yarar" alanı bu yüzden önemli — agent'ın betiği ne zaman çağıracağını
+> anladığı tek ipucu odur.
+
+Betiği tek yerden güncellersiniz; **bir sonraki çalıştırma** yeni sürümü kullanır,
+imaj yeniden derlenmez.
+
+**Betikler yalnızca "komut çalıştırabilir" yetkisi açık agent'lara verilir.**
+Yetkisi kapalı bir agent'ın ortamına hiç kopyalanmazlar. Yeni bir yetki
+açılmıyor: o agent betiği bugün de kendisi yazıp çalıştırabiliyordu — değişen
+tek şey, çalıştırdığı metnin sizin gözden geçirdiğiniz metin olması.
+
+> ⚠️ **Betiğe token yazmayın.** Betikler şifrelenmez ve agent onları okuyabilir.
+> Gizli değer gerekiyorsa ortam değişkeninden okuyun: `"$GIT_TOKEN"`.
+
+---
+
 # Hazır agent'lar
 
 Beş agent kurulu gelir ve talimatları **Agent'lar** ekranından düzenlenebilir:
@@ -353,7 +442,48 @@ BACKEND_PORT=8085
 POSTGRES_PORT=5440
 ```
 
-Sonra `make down && make up`.
+Sonra `make restart`. Arayüzün API adresi ve CORS ayarı bu değerlerden
+kendiliğinden üretilir — başka bir yeri elle düzeltmeniz gerekmez.
+
+Portu kimin tuttuğunu bulmak için: `lsof -i :3002` (macOS/Linux) veya
+`netstat -ano | findstr :3002` (Windows).
+</details>
+
+<details>
+<summary><b>Arayüz açılıyor ama hiç veri gelmiyor / "sunucuya ulaşılamıyor"</b></summary>
+
+Arayüz ayakta ama API'ye ulaşamıyor. Sırayla:
+
+**1. API gerçekten ayakta mı?**
+
+```bash
+curl localhost:8080/health     # {"status":"ok",...}
+make ps                        # üçü de "healthy" olmalı
+```
+
+**2. Sunucuya kurup uzaktan mı açıyorsunuz?**
+
+En sık neden bu. `.env` içindeki `PUBLIC_HOST` hâlâ `localhost` ise tarayıcınız
+**kendi bilgisayarınıza** bağlanmaya çalışıyor. Sunucunun adresini yazın ve
+`make restart` yapın:
+
+```env
+PUBLIC_HOST=192.168.1.40
+```
+
+**3. `.env`'de eski bir `NEXT_PUBLIC_API_URL` satırı var mı?**
+
+Varsa `PUBLIC_HOST`'u **sessizce ezer**. Ters vekil kullanmıyorsanız o satırı
+silin. (`make up` bu durumu fark ederse zaten uyarır.)
+
+**4. Tarayıcı konsolunda CORS hatası mı yazıyor?**
+
+`CORS_ORIGINS`, arayüzü açtığınız adresle birebir aynı olmalı — protokol ve port
+dahil. Elle yazdıysanız kontrol edin; yazmadıysanız `PUBLIC_HOST` +
+`FRONTEND_PORT` doğru olmalı.
+
+Değişiklikten sonra **`make restart` şart**: arayüzün API adresi derleme anında
+gömülür, yalnızca yeniden başlatmak yetmez.
 </details>
 
 <details>
@@ -457,7 +587,8 @@ Mimari, konvansiyonlar ve tüm kurallar: **[AGENTS.md](AGENTS.md)**
 Çalışır durumda. Jira task'ından PR'a kadar tüm zincir gerçek bir Jira sitesi ve
 gerçek bir GitHub deposu üzerinde uçtan uca doğrulandı.
 
-Sırada: kimlik doğrulama, `condition` ve `http.request` düğümleri, Bitbucket PR.
+Sırada: kimlik doğrulama, `condition` ve `http.request` düğümleri, betikleri
+deterministik bir akış düğümü olarak çalıştırma, Bitbucket PR.
 
 ## Lisans
 

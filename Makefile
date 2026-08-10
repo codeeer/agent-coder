@@ -59,6 +59,15 @@ check-env:
 		echo "  Üretin ve .env içine yazın:  openssl rand -base64 32"; \
 		exit 1; \
 	} || true
+	@# PUBLIC_HOST değiştirilmiş ama eski NEXT_PUBLIC_API_URL satırı duruyorsa,
+	@# ikincisi birinciyi SESSİZCE ezer ve arayüz yanlış adrese bağlanır. Eski
+	@# kurulumlardan gelen bir tuzak: o değişken bir zamanlar etkisizdi.
+	@if grep -qE '^PUBLIC_HOST=' .env && ! grep -qE '^PUBLIC_HOST=(localhost|127\.0\.0\.1)\s*$$' .env \
+		&& grep -qE '^NEXT_PUBLIC_API_URL=.+' .env; then \
+		echo "UYARI: .env içinde hem PUBLIC_HOST hem NEXT_PUBLIC_API_URL dolu."; \
+		echo "  NEXT_PUBLIC_API_URL önceliklidir; PUBLIC_HOST dikkate ALINMAZ."; \
+		echo "  Ters vekil kullanmıyorsanız NEXT_PUBLIC_API_URL satırını silin."; \
+	fi
 
 # ─── Stack ──────────────────────────────────────────────────────────────────
 
