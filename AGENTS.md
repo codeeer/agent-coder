@@ -150,6 +150,28 @@ Go veya Node host'a kurulu olmak zorunda değil — her şey container içinde d
 - **Tailwind'in preflight'ı zaten yaptığı şeyi tekrar yazmayın.** Aynı sıfırlama
   ikinci kez yazıldığında faydası yok, katman dışına düşme riski var.
 
+**Açık tema, koyu temanın tersi DEĞİLDİR.**
+
+Koyu tema referans olarak iyi görünüyor diye açık temayı onun renklerini ters
+çevirerek üretmeyin. Her bileşenin açık temadaki **kontrastı, görsel hiyerarşisi
+ve anlamı** bağımsız olarak değerlendirilir.
+
+Sebep basit: aynı renk çifti iki zeminde aynı işi yapmaz.
+
+- Koyu zeminde ayırt edilen soluk bir gri, beyaz kart üzerinde kaybolur —
+  `ink-3` koyu temada geçerken açık temada sayfa zemininde 3,98:1 kalıyordu.
+- Ters yön de olur: `info` rengi rozet zemininde koyu temada 6,87:1 ile rahat
+  geçerken açık temada 4,11:1 kalıyordu.
+- Hiyerarşi de taşınmaz. Koyu zeminde "daha parlak = daha önemli"dir; açık
+  zeminde "daha koyu = daha önemli". Değerleri ters çevirmek vurguyu ters çevirir.
+- Anlam da taşınmaz. Koyu zeminde yumuşak duran bir uyarı sarısı, beyaz üzerinde
+  hem okunmaz hem de uyarı gibi durmaz.
+
+Uyulacak sıra: her tema için değeri **ayrı seç**, sonra `scripts/theme-audit.mjs`
+ile **ölç**. Aracın "tema eşliği" bölümü tam olarak bu hatayı arar — bir
+bileşenin bir temada geçip diğerinde kalması. Göz bu hatayı bulamaz: iki tema
+aynı anda görülemiyor ve 4,1 ile 4,6 arası bakışla ayırt edilmiyor.
+
 ### Görsel doğrulama
 
 Tip kontrolü, linter ve birim testler **rengin ve yerleşimin doğru olduğunu
