@@ -463,6 +463,19 @@ export interface ReportTotals {
   deletions: number;
 
   pushedBranches: number;
+
+  /** Gerçekten kod değiştiren çalıştırmalar — "çalıştı" ile "üretti" aynı şey değil. */
+  runsWithCode: number;
+  /**
+   * Açılan pull request sayısı — BİRLEŞTİRİLEN değil.
+   *
+   * Bu sayı `runs` tablosunda yoktur; PR açan düğüm model çağırmadığı için
+   * çalıştırma kaydı üretmiyor. Arayüz, birleştirme takibi yapılmadığını
+   * açıkça yazmak zorunda (spec 012 K4).
+   */
+  prsOpened: number;
+  /** İnsan dokunmadan işlenen Jira task'ı sayısı. */
+  jiraTasks: number;
   /** Yalnızca başlayıp bitmiş kayıtların ortalaması (saniye). */
   avgDurationSec: number;
 }
@@ -478,6 +491,8 @@ export interface ReportDay {
   interrupted: number;
   active: number;
   costUsd: number;
+  /** O gün açılan pull request sayısı. */
+  prsOpened: number;
 }
 
 /** Agent, model veya proje kırılımının bir satırı. */

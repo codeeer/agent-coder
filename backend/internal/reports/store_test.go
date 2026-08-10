@@ -324,3 +324,128 @@ func TestLocationFallsBackToUTC(t *testing.T) {
 		t.Fatalf("geçersiz saat diliminde rapor üretilemedi: %v", err)
 	}
 }
+
+/* ── Akış tarafındaki ölçüler (spec 012) ─────────────────────────────────── */
+
+// insertPRStep, bir akış çalışması ve içinde bir PR adımı ekler.
+//
+// PR adımının `runs` kaydı YOKTUR (spec 003): PR açan düğüm model çağırmıyor.
+// Test bu yüzden doğrudan akış tablolarına yazıyor — raporun ikinci kaynağa
+// baktığını doğrulamanın tek yolu bu.
+func insertPRStep(t *testing.T, pool *pgxpool.Pool, projectID uuid.UUID,
+	status string, ageDays int,
+) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	created := time.Now().AddDate(0, 0, -ageDays)
+
+	var workflowID uuid.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO workflows (project_id, name)
+		VALUES ($1, 'Akış') RETURNING id`,
+		projectID).Scan(&workflowID); err != nil {
+		t.Fatalf("akış eklenemedi: %v", err)
+	}
+
+	var versionID uuid.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO workflow_versions (workflow_id, version, graph)
+		VALUES ($1, 1, '{"nodes":[],"edges":[]}'::jsonb) RETURNING id`,
+		workflowID).Scan(&versionID); err != nil {
+		t.Fatalf("sürüm eklenemedi: %v", err)
+	}
+
+	var runID uuid.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO workflow_runs (workflow_id, version_id, version, status, trigger_kind, created_at)
+		VALUES ($1, $2, 1, 'succeeded', 'manual', $3) RETURNING id`,
+		workflowID, versionID, created).Scan(&runID); err != nil {
+		t.Fatalf("akış çalışması eklenemedi: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO workflow_steps (workflow_run_id, node_id, node_kind, level, status)
+		VALUES ($1, 'pr', 'github.pr', 0, $2)`, runID, status); err != nil {
+		t.Fatalf("adım eklenemedi: %v", err)
+	}
+	return runID
+}
+
+// TestSummaryPRsOpened — raporun en somut çıktısı `runs` tablosunda YOK;
+// ikinci kaynaktan gelmesi gerekiyor (spec 012).
+func TestSummaryPRsOpened(t *testing.T) {
+	pool, store, projectID, _ := setup(t)
+	testutil.Truncate(t, pool, "workflow_steps", "workflow_runs", "workflow_versions", "workflows")
+
+	insertPRStep(t, pool, projectID, "succeeded", 1)
+	insertPRStep(t, pool, projectID, "succeeded", 2)
+	// Başarısız adım PR AÇMAMIŞTIR; sayılmamalı.
+	insertPRStep(t, pool, projectID, "failed", 1)
+
+	s, err := store.Summary(context.Background(), reports.Query{Days: 30})
+	if err != nil {
+		t.Fatalf("özet alınamadı: %v", err)
+	}
+
+	if s.Totals.PRsOpened != 2 {
+		t.Fatalf("açılan PR sayısı 2 olmalı, %d geldi", s.Totals.PRsOpened)
+	}
+
+	// Günlük seri toplamı genel toplamla tutmalı: iki farklı sorgudan geliyorlar
+	// ve ayrışırlarsa kullanıcı grafikle rakamın çeliştiğini görür.
+	var günlük int
+	for _, d := range s.Daily {
+		günlük += d.PRsOpened
+	}
+	if günlük != s.Totals.PRsOpened {
+		t.Fatalf("günlük PR toplamı (%d) genel toplamla (%d) tutmuyor", günlük, s.Totals.PRsOpened)
+	}
+}
+
+// TestSummaryPRsOpenedProjeSuzgeci — PR sayımı proje süzgecine uymalı; akış
+// tarafında proje bir seviye yukarıda duruyor (`workflows.project_id`).
+func TestSummaryPRsOpenedProjeSuzgeci(t *testing.T) {
+	pool, store, projectID, _ := setup(t)
+	testutil.Truncate(t, pool, "workflow_steps", "workflow_runs", "workflow_versions", "workflows")
+
+	insertPRStep(t, pool, projectID, "succeeded", 1)
+
+	var digerProje uuid.UUID
+	if err := pool.QueryRow(context.Background(), `
+		INSERT INTO projects (name, repo_url) VALUES ('Diğer', 'https://example.com/o.git')
+		RETURNING id`).Scan(&digerProje); err != nil {
+		t.Fatalf("ikinci proje eklenemedi: %v", err)
+	}
+	insertPRStep(t, pool, digerProje, "succeeded", 1)
+
+	s, err := store.Summary(context.Background(), reports.Query{Days: 30, ProjectID: &projectID})
+	if err != nil {
+		t.Fatalf("özet alınamadı: %v", err)
+	}
+	if s.Totals.PRsOpened != 1 {
+		t.Fatalf("süzgeçli PR sayısı 1 olmalı, %d geldi", s.Totals.PRsOpened)
+	}
+}
+
+// TestSummaryRunsWithCode — "çalıştı" ile "bir şey üretti" aynı şey değil.
+func TestSummaryRunsWithCode(t *testing.T) {
+	pool, store, projectID, agentID := setup(t)
+
+	insertRun(t, pool, projectID, agentID, runSpec{status: "succeeded", ageDays: 1})
+	insertRun(t, pool, projectID, agentID, runSpec{status: "succeeded", ageDays: 1})
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE runs SET diff = 'diff --git a/x b/x' WHERE id = (SELECT id FROM runs LIMIT 1)`); err != nil {
+		t.Fatalf("diff yazılamadı: %v", err)
+	}
+
+	s, err := store.Summary(context.Background(), reports.Query{Days: 30})
+	if err != nil {
+		t.Fatalf("özet alınamadı: %v", err)
+	}
+	if s.Totals.Runs != 2 {
+		t.Fatalf("çalıştırma sayısı 2 olmalı, %d", s.Totals.Runs)
+	}
+	if s.Totals.RunsWithCode != 1 {
+		t.Fatalf("kod üreten çalıştırma 1 olmalı, %d geldi", s.Totals.RunsWithCode)
+	}
+}

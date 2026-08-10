@@ -241,6 +241,28 @@ girdininki 1,31:1 ölçüldü — yani düğme ve kutu sınırından tanınamıy
 
 Süsleme çizgilerini koyulaştırmak yanlış cevaptı: arayüz gereksizce ağırlaşırdı.
 
+### Yönetici rakamları
+
+Rapor ekranı bir yöneticinin ekranıdır; iki kural onu yanlış bir şey söylemekten
+korur.
+
+**Hız metriği asla yalnız gösterilmez.** Yanında onu dengeleyen bir kalite ya da
+risk metriği durur. PR sayısının arttığı ama değişiklik boyutunun da büyüdüğü
+bir dönem ilerleme değil, biriken risktir — sektör ölçümlerinde PR sayısı
+katlanırken PR başına olay sayısının çok daha hızlı arttığı örnekler var. Tek
+başına bir hız rakamı, gerilemeyi ilerleme gibi gösterebilir.
+
+**Ölçmediğimiz şey ekranda ima edilmez.** "Açılan PR" ile "işe yarayan PR" aynı
+şey değil; bu sistem PR'ın sonrasını (birleşti mi, incelemeden geçti mi) takip
+etmiyor ve ekran bunu açıkça yazıyor. O satır süs değil, tasarımın parçası —
+kaldırılırsa ekran yanlış bir iddiada bulunmaya başlar.
+
+**Maliyet bir paydayla gösterilir.** Toplam harcama ölçekle birlikte zaten büyür
+ve büyümesi kötü haber değildir; yönetilebilir olan birim maliyettir ("PR başına
+$0,004"). Kahraman rakam sonuç olur, maliyet onun altında durur.
+
+Gerekçe ve ölçümler: [spec 012](specs/012-rapor-yonetici/spec.md).
+
 ### Diyagramlar
 
 `/nasil-calisir` sayfasındaki mimari ve akış diyagramları elle yazılmış SVG

@@ -64,3 +64,20 @@ için rapor eksik kalamaz. Rapor **hiçbir yeni veri toplamaz**, var olanı topl
 
 Yok. Dönem varsayılanı (30 gün) ve saat dilimi (Europe/Istanbul) ayar olarak
 değiştirilebilir tutuldu — parametre kodda kalmasın diye.
+
+---
+
+## Sonradan değişen karar (2026-08-11)
+
+Bu spec'in çerçevesi **maliyet-önce**ydi: amaç bölümü *"bu ay agent'lara ne kadar
+para harcadık"* diye başlıyordu ve kahraman rakam toplam maliyet olarak seçildi.
+
+**Yanlış çıktı.** Maliyet bir girdidir; bir yöneticinin ilk sorusu "ne kadar
+harcadık" değil "karşılığında ne aldık"tır. Üstelik küçük bir maliyet rakamı
+(`$0,03`) sistemi değersiz gösteriyordu.
+
+Kahraman rakam [spec 012](../012-rapor-yonetici/spec.md) ile **üretilen işe**
+geçti; maliyet ekranda kaldı ama bir paydaya bölünmüş halde ("PR başına").
+
+Bu spec silinmedi: burada alınan karar o günkü bilgiyle tutarlıydı ve neyin
+neden değiştiği, kararın kendisi kadar kayda değer.

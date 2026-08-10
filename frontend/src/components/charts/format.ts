@@ -112,3 +112,17 @@ export function changeRatio(current: number, previous: number): number | null {
   if (previous <= 0) return null;
   return (current - previous) / previous;
 }
+
+/**
+ * Birim başına maliyet — "PR başına $0,004" gibi.
+ *
+ * Toplam maliyet ölçekle birlikte zaten büyür ve büyümesi kötü haber değildir;
+ * yönetilebilir olan birim maliyettir (spec 012 K2).
+ *
+ * Payda sıfırsa oran UYDURULMAZ: sıfıra bölmek yerine "—" döner. Raporun
+ * kuralı bu — olmayan bir oranı hesaplamış gibi göstermek yanlış olurdu.
+ */
+export function formatPerUnit(total: number, count: number, unit: string): string {
+  if (count <= 0) return "—";
+  return `${formatMoney(total / count)} / ${unit}`;
+}

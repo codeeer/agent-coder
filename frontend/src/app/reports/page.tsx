@@ -8,6 +8,7 @@ import { readableFailure } from "@/lib/failure";
 import { describeError } from "@/lib/errors";
 import type { ReportGroup, ReportSummary, ReportTotals } from "@/lib/types";
 import { BarList } from "@/components/charts/BarList";
+import { Sparkline } from "@/components/charts/Sparkline";
 import { CostTrendChart } from "@/components/charts/CostTrendChart";
 import {
   RunsByDayChart,
@@ -20,6 +21,7 @@ import {
   formatDuration,
   formatMoney,
   formatPercent,
+  formatPerUnit,
 } from "@/components/charts/format";
 import { IconAgent } from "@/components/ui/icons";
 import {
@@ -146,66 +148,125 @@ export default function ReportsPage() {
 
 /* ── Başlık rakamları ────────────────────────────────────────────────────── */
 
-/**
+/*
  * Kahraman rakam + destekleyici kutucuklar.
  *
- * Sayfada TEK bir kahraman rakam vardır; hepsi büyük yazılırsa hiçbiri
- * vurgulanmamış olur. Yöneticinin ilk sorusu maliyet olduğu için o seçildi.
+ * ÖNCEKİ HALİ TOPLAM MALİYETTİ ve yanlıştı (spec 012). Maliyet bir girdidir;
+ * bir yöneticinin ilk sorusu "ne kadar harcadık" değil "karşılığında ne aldık"
+ * olur. Üstelik küçük bir maliyet rakamı sistemi değersiz gösteriyordu.
+ *
+ * Şimdi kahraman rakam ÜRETİLEN İŞ, maliyet ise onun paydası: "PR başına
+ * $0,004". Toplam maliyet ekranda duruyor ama küçük puntoda.
+ *
+ * Dört destek rakamı rastgele seçilmedi — biri sonuç, biri güvenilirlik, biri
+ * RİSK, biri birim maliyet. Hız gösteren bir rakam asla yalnız durmaz
+ * (spec 012 K3): PR sayısının arttığı ama değişiklik boyutunun da büyüdüğü bir
+ * dönem ilerleme değil, biriken risktir.
  */
 function Headline({ data }: { data: ReportSummary }) {
   const t = data.totals;
   const p = data.previous;
 
+  // PR açmayan kurulumlarda (akışında PR düğümü olmayan) dev bir sıfır,
+  // sistemin çalışmadığı izlenimi verirdi; kahraman rakam tamamlanan işe düşer.
+  const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
+
+  const hero = usePRs
+    ? {
+        label: "Açılan pull request",
+        value: formatCount(t.prsOpened),
+        current: t.prsOpened,
+        previous: p.prsOpened,
+        spark: data.daily.map((d) => d.prsOpened),
+        sparkLabel: "Günlük açılan PR",
+      }
+    : {
+        label: "Tamamlanan iş",
+        value: formatCount(t.succeeded),
+        current: t.succeeded,
+        previous: p.succeeded,
+        spark: data.daily.map((d) => d.succeeded),
+        sparkLabel: "Günlük tamamlanan iş",
+      };
+
+  // Değişiklik boyutu PR başına hesaplanır; PR yoksa çalıştırma başına.
+  const changeUnits = usePRs ? t.prsOpened : t.runsWithCode;
+  const linesPerUnit =
+    changeUnits > 0 ? Math.round((t.additions + t.deletions) / changeUnits) : 0;
+
   return (
     <Card>
-      <div className="flex flex-wrap items-start justify-between gap-6">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
+        <div className="min-w-[220px]">
           <div className="text-[12px] tracking-wide text-ink-3 uppercase">
-            Toplam maliyet
+            {hero.label}
           </div>
-          <div className="mt-1.5 text-[48px] leading-none font-semibold tracking-[-0.02em]">
-            {formatMoney(t.costUsd)}
+          <div className="mt-1.5 text-[44px] leading-none font-semibold tracking-[-0.02em]">
+            {hero.value}
           </div>
           <Delta
-            current={t.costUsd}
-            previous={p.costUsd}
+            current={hero.current}
+            previous={hero.previous}
             days={data.days}
-            upIsGood={false}
+            upIsGood
           />
         </div>
 
-        <dl className="grid flex-1 grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-          <Stat
-            label="Çalıştırma"
-            value={formatCount(t.runs)}
-            note={t.active > 0 ? `${t.active} tanesi sürüyor` : undefined}
-          />
-          <Stat
-            label="Başarı oranı"
-            value={formatPercent(t.succeeded, t.runs)}
-            note={`${formatCount(t.succeeded)} / ${formatCount(t.runs)}`}
-          />
-          <Stat
-            label="Değişen dosya"
-            value={formatCompact(t.filesChanged)}
-            note={`+${formatCompact(t.additions)} −${formatCompact(t.deletions)} satır`}
-          />
-          <Stat
-            label="Ortalama süre"
-            value={formatDuration(t.avgDurationSec)}
-            note={`${formatCompact(t.promptTokens + t.completionTokens)} token`}
-          />
-        </dl>
+        {/* Kıvılcım tek soruya cevap verir: artıyor mu? Eksen ve etiket
+            bilinçli olarak yok — onlar aşağıdaki tam grafiklerin işi. */}
+        {/* Genişlik sınırlı: kıvılcım kartın tamamına yayılınca kahraman
+            rakamla yarışıyor ve boş alanı grafik sanılıyor. */}
+        <div className="min-w-[160px] flex-1 sm:max-w-[300px]">
+          <div className="text-[11px] text-ink-3">{data.days} günlük seyir</div>
+          <div className="mt-2">
+            <Sparkline values={hero.spark} label={hero.sparkLabel} />
+          </div>
+        </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-[12px] text-ink-2">
+      <dl className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-line pt-5 sm:grid-cols-4">
+        <Stat
+          label="Jira'dan otomatik"
+          value={formatCount(t.jiraTasks)}
+          note={t.jiraTasks > 0 ? "task, insan başlatmadan" : "Jira tetikleyici yok"}
+        />
+        <Stat
+          label="Başarı oranı"
+          value={formatPercent(t.succeeded, t.runs)}
+          note={`${formatCount(t.succeeded)} / ${formatCount(t.runs)} çalıştırma`}
+        />
+        <Stat
+          label={usePRs ? "PR başına değişiklik" : "İş başına değişiklik"}
+          value={linesPerUnit > 0 ? `${formatCount(linesPerUnit)} satır` : "—"}
+          note={`+${formatCompact(t.additions)} −${formatCompact(t.deletions)} toplam`}
+        />
+        <Stat
+          label={usePRs ? "PR başına maliyet" : "İş başına maliyet"}
+          value={formatPerUnit(t.costUsd, usePRs ? t.prsOpened : t.succeeded, usePRs ? "PR" : "iş")}
+          note={`toplam ${formatMoney(t.costUsd)}`}
+        />
+      </dl>
+
+      {/* Bu satır SÜS DEĞİL (spec 012 K4). "Açılan PR" ile "işe yarayan PR"
+          aynı şey değil ve sistem aradaki farkı bilmiyor; bilmediğini söylemek
+          tasarımın parçası. */}
+      {usePRs && (
+        <p className="mt-4 border-t border-line pt-3 text-[12px] text-ink-3">
+          Açılan PR sayısıdır — birleştirilip birleştirilmediğini, incelemeden
+          geçip geçmediğini bu sistem takip etmiyor.
+        </p>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-[12px] text-ink-2">
+        <SubStat label="Çalıştırma" value={formatCount(t.runs)} />
+        <SubStat label="Kod üreten" value={formatCount(t.runsWithCode)} />
         <SubStat label="Gönderilen branch" value={formatCount(t.pushedBranches)} />
+        <SubStat label="Ortalama süre" value={formatDuration(t.avgDurationSec)} />
+        <SubStat label="Token" value={formatCompact(t.promptTokens + t.completionTokens)} />
         <SubStat label="Başarısız" value={formatCount(t.failed)} />
-        <SubStat label="Zaman aşımı" value={formatCount(t.timeout)} />
-        <SubStat label="İptal" value={formatCount(t.cancelled)} />
-        {t.interrupted > 0 && (
-          <SubStat label="Kesildi" value={formatCount(t.interrupted)} />
-        )}
+        {t.timeout > 0 && <SubStat label="Zaman aşımı" value={formatCount(t.timeout)} />}
+        {t.cancelled > 0 && <SubStat label="İptal" value={formatCount(t.cancelled)} />}
+        {t.interrupted > 0 && <SubStat label="Kesildi" value={formatCount(t.interrupted)} />}
       </div>
     </Card>
   );
