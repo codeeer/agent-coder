@@ -9,11 +9,11 @@ import { IconPlus } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/Pagination";
 import {
   Button,
-  Card,
+  PanelCard,
   Input,
   Mono,
   Notice,
-  Section,
+  Panel,
   Skeleton,
   Textarea,
   Well,
@@ -42,10 +42,10 @@ export function ScriptSection() {
   });
 
   return (
-    <Section
+    <Panel
       title="Betikler"
       description="Agent'ların çalıştırabileceği hazır kabuk betikleri. Hangi agent'ın hangi betiği kullanabileceğini Agent'lar ekranından seçersiniz."
-      actions={
+      action={
         !adding && (
           <Button
             variant="primary"
@@ -66,7 +66,7 @@ export function ScriptSection() {
         )}
 
         {scripts.data?.total === 0 && !adding && (
-          <Card>
+          <PanelCard>
             <p className="text-sm text-ink-2">
               Henüz betik yok. Bir agent standart bir işi &mdash; bağımlılık
               yükseltme, geçiş uygulama, kontrol listesi &mdash; her seferinde
@@ -74,7 +74,7 @@ export function ScriptSection() {
               <strong>model ne zaman çağıracağına karar verir, ne yapacağına
               betik karar verir.</strong>
             </p>
-          </Card>
+          </PanelCard>
         )}
 
         {scripts.data?.items.map((s) => (
@@ -99,7 +99,7 @@ export function ScriptSection() {
           kopyalanmazlar.
         </p>
       </div>
-    </Section>
+    </Panel>
   );
 }
 
@@ -121,7 +121,7 @@ function ScriptCard({ script }: { script: Script }) {
   }
 
   return (
-    <Card>
+    <PanelCard>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="font-medium">{script.name}</span>
@@ -170,7 +170,7 @@ function ScriptCard({ script }: { script: Script }) {
       {remove.isError && (
         <Notice tone="error">{describeError(remove.error).message}</Notice>
       )}
-    </Card>
+    </PanelCard>
   );
 }
 
@@ -202,7 +202,7 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
   });
 
   return (
-    <Card>
+    <PanelCard>
       <p className="text-sm font-medium">
         {editing ? "Betiği düzenle" : "Yeni betik"}
       </p>
@@ -285,6 +285,6 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
           Değişiklik bir sonraki çalıştırmada geçerli olur.
         </span>
       </div>
-    </Card>
+    </PanelCard>
   );
 }

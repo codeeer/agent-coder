@@ -9,12 +9,12 @@ import { FormError } from "./LLMProviderSection";
 import {
   Badge,
   Button,
-  Card,
+  PanelCard,
   Field,
   Input,
   Notice,
   Select,
-  Section,
+  Panel,
   formatDate,
 } from "@/components/ui/primitives";
 
@@ -74,10 +74,10 @@ export function GitProviderSection() {
   });
 
   return (
-    <Section
+    <Panel
       title="Git erişimleri"
       description="Agent'ın ürettiği kodu branch'e göndermek ve PR açmak için kullanılır."
-      actions={
+      action={
         !adding && (
           <Button variant="primary" onClick={() => setAdding(true)}>
             Git erişimi ekle
@@ -97,7 +97,7 @@ export function GitProviderSection() {
 
         {data?.map((p) => <GitProviderCard key={p.id} provider={p} />)}
       </div>
-    </Section>
+    </Panel>
   );
 }
 
@@ -119,7 +119,7 @@ function GitProviderCard({ provider }: { provider: GitProvider }) {
   });
 
   return (
-    <Card>
+    <PanelCard>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -177,7 +177,7 @@ function GitProviderCard({ provider }: { provider: GitProvider }) {
       {editing && (
         <GitProviderForm provider={provider} onDone={() => setEditing(false)} />
       )}
-    </Card>
+    </PanelCard>
   );
 }
 
@@ -336,6 +336,6 @@ function GitProviderForm({
     </form>
   );
 
-  return editing ? <div className="mt-4">{body}</div> : <Card>{body}</Card>;
+  return editing ? <div className="mt-4">{body}</div> : <PanelCard>{body}</PanelCard>;
 }
 

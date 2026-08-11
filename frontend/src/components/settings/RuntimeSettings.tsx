@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { SettingValue } from "@/lib/types";
-import { Badge, Button, Card, Input, Notice } from "@/components/ui/primitives";
+import { Badge, Button, Input, Notice } from "@/components/ui/primitives";
 
 /**
  * Çalışma ayarları bölümü.
@@ -49,20 +49,28 @@ export function RuntimeSettings({
 
   if (groups.size === 0) return null;
 
+  /*
+   * Ayarlar AYRI KUTULAR DEĞİL, AYRAÇLI SATIRLAR.
+   *
+   * Her ayar kendi kenarlıklı kutusundaydı ve bu kutular zaten kenarlıklı
+   * bir panonun içinde duruyordu: beş ayarlık bir bölümde altı kenarlık,
+   * altı köşe yarıçapı ve aralarında beş boşluk. Bir ayar listesi TEK bir
+   * şeydir; her satırı bağımsız bir yüzey yapmak aralarındaki ilişkiyi
+   * koparıyor ve ekranı gereksizce uzatıyordu. Aynı karar liste
+   * ekranlarında da verildi (bkz. `List`).
+   */
   return (
-    <div className="space-y-6">
+    <div className="divide-y divide-line">
       {[...groups.entries()].map(([group, items]) => (
-        <div key={group}>
+        <div key={group} className="divide-y divide-line">
           {showHeadings && (
-            <h3 className="text-sm font-medium text-ink-2">
+            <h3 className="px-4 py-2 text-2xs font-medium tracking-wide text-ink-3 uppercase">
               {data.groups[group] ?? group}
             </h3>
           )}
-          <div className={showHeadings ? "mt-2 space-y-2" : "space-y-2"}>
-            {items.map((item) => (
-              <SettingRow key={item.key} setting={item} />
-            ))}
-          </div>
+          {items.map((item) => (
+            <SettingRow key={item.key} setting={item} />
+          ))}
         </div>
       ))}
     </div>
@@ -94,18 +102,18 @@ function SettingRow({ setting }: { setting: SettingValue }) {
   const busy = save.isPending || reset.isPending;
 
   return (
-    <Card>
+    <div className="px-4 py-3.5 transition-colors hover:bg-raised/50">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{setting.label}</span>
+            <span className="text-sm font-medium">{setting.label}</span>
             {setting.isCustom && <Badge tone="info">değiştirilmiş</Badge>}
           </div>
           {/* Ham anahtar (`runner.timeout_minutes`) ekrandan kaldırıldı:
               kullanıcının işine yaramıyor, on ayarın yanında tekrar edince
               sayfayı geliştirici ekranına çeviriyordu. Destek için başlıkta
               duruyor. */}
-          <p className="mt-1 max-w-prose text-sm text-ink-2" title={setting.key}>
+          <p className="mt-0.5 max-w-prose text-xs text-ink-2" title={setting.key}>
             {setting.help}
           </p>
         </div>
@@ -149,7 +157,7 @@ function SettingRow({ setting }: { setting: SettingValue }) {
         </div>
       </div>
 
-      <p className="mt-2 text-xs text-ink-3">
+      <p className="mt-1.5 text-2xs text-ink-3">
         Varsayılan: {setting.default}
         {setting.min !== undefined && setting.max !== undefined && (
           <> · İzin verilen aralık: {setting.min}–{setting.max}</>
@@ -161,6 +169,6 @@ function SettingRow({ setting }: { setting: SettingValue }) {
           {describeError(save.error ?? reset.error).message}
         </p>
       )}
-    </Card>
+    </div>
   );
 }

@@ -23,7 +23,7 @@ import {
   IconReport,
   IconTerminal,
 } from "@/components/ui/icons";
-import { Notice, PageHeader, Section } from "@/components/ui/primitives";
+import { Notice, PageHeader, Panel } from "@/components/ui/primitives";
 
 /** Jira, spec 002'den sonra credentials ucunun ilgilendiği tek tür. */
 const JIRA_SPEC: CredentialSpec = {
@@ -74,16 +74,25 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabID>("models");
 
   return (
-    <div>
+    /*
+      Üç bölgeli düzen — arayüzün geri kalanıyla aynı: başlık üstte sabit,
+      altında YAN MENÜ VE İÇERİK yan yana. Kaydırma yalnızca içerik
+      sütununa ait; menü sabit kalıyor.
+
+      Öncesinde sayfanın tamamı kayıyordu ve uzun bir bölümde (örneğin
+      Betikler) menü ekranın dışına çıkıyordu: bölüm değiştirmek için önce
+      yukarı kaydırmak gerekiyordu.
+    */
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="Ayarlar"
         description="Kaydedilen gizli değerler veritabanında şifreli saklanır ve bir daha tam haliyle gösterilmez."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[188px_1fr]">
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[212px_1fr]">
         <SettingsNav active={tab} onSelect={setTab} />
         {/* min-w-0: içerideki uzun adresler yan menüyü ezmesin. */}
-        <div className="min-w-0">
+        <div className="-mx-1 min-h-0 min-w-0 overflow-y-auto px-1 pb-1">
           <TabContent tab={tab} />
         </div>
       </div>
@@ -95,14 +104,15 @@ function TabContent({ tab }: { tab: TabID }) {
   switch (tab) {
     case "models":
       return (
-        <div className="space-y-8">
+        <div className="space-y-4">
           <LLMProviderSection />
-          <Section
+          <Panel
             title="Model kataloğu"
             description="Model listesinin ve fiyatların ne sıklıkla tazeleneceği."
+            padded={false}
           >
             <RuntimeSettings groups={["catalog"]} showHeadings={false} />
-          </Section>
+          </Panel>
           <p className="text-xs leading-relaxed text-ink-3">
             Not: <code>.env</code> dosyasında <code>OPENROUTER_API_KEY</code>{" "}
             tanımlıysa ve hiç LLM sağlayıcı yoksa, açılışta otomatik olarak bir
@@ -119,14 +129,15 @@ function TabContent({ tab }: { tab: TabID }) {
 
     case "mcp":
       return (
-        <div className="space-y-8">
+        <div className="space-y-4">
           <McpServerSection />
-          <Section
+          <Panel
             title="Süre sınırı"
             description="Dış araç sunucularına bağlanma ve araç çağırma süresi."
+            padded={false}
           >
             <RuntimeSettings groups={["mcp"]} showHeadings={false} />
-          </Section>
+          </Panel>
           <McpAccessSection />
         </div>
       );
@@ -136,22 +147,24 @@ function TabContent({ tab }: { tab: TabID }) {
 
     case "runner":
       return (
-        <Section
+        <Panel
           title="Çalıştırma"
           description="Süre sınırı, eşzamanlılık ve kaynak limitleri. Değişiklik sunucu yeniden başlatılmadan geçerli olur."
+          padded={false}
         >
           <RuntimeSettings groups={["runner"]} showHeadings={false} />
-        </Section>
+        </Panel>
       );
 
     case "reports":
       return (
-        <Section
+        <Panel
           title="Rapor"
           description="Rapor ekranının varsayılan dönemi ve günlük kırılımın saat dilimi."
+          padded={false}
         >
           <RuntimeSettings groups={["reports"]} showHeadings={false} />
-        </Section>
+        </Panel>
       );
   }
 }
@@ -161,6 +174,12 @@ function TabContent({ tab }: { tab: TabID }) {
  *
  * Geniş ekranda dikey, dar ekranda yatay kaydırılabilir şerit. Dar ekranda da
  * dikey bırakılsaydı içeriğe sıra gelmeden yarım ekranı menü kaplardı.
+ *
+ * KENDİ YÜZEYİ VAR. Öncesinde düğmeler sayfa zemininde serbest duruyordu ve
+ * yanlarındaki içerik kartlıydı: menü, sayfanın bir parçası değil de üstüne
+ * unutulmuş bir şey gibi görünüyordu. Arayüzün geri kalanında gezinme her
+ * zaman bir yüzeyin üstünde duruyor (kenar çubuğu, araç çubuğu) — bu da
+ * öyle.
  */
 function SettingsNav({
   active,
@@ -172,7 +191,7 @@ function SettingsNav({
   return (
     <nav
       aria-label="Ayar bölümleri"
-      className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0"
+      className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:h-fit lg:flex-col lg:overflow-visible lg:rounded-card lg:border lg:border-line lg:bg-surface lg:p-2 lg:px-2 lg:pb-2 lg:shadow-(--shadow-card)"
     >
       {TABS.map(({ id, label, Icon }) => {
         const on = id === active;
@@ -182,12 +201,18 @@ function SettingsNav({
             type="button"
             onClick={() => onSelect(id)}
             aria-current={on ? "page" : undefined}
-            className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.75 text-sm whitespace-nowrap transition-colors ${
+            className={`group relative flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm whitespace-nowrap transition-colors duration-150 ${
               on
                 ? "bg-accent-soft font-medium text-accent"
                 : "text-ink-2 hover:bg-raised hover:text-ink"
             }`}
           >
+            {/* Etkin bölümü soldaki şerit de işaretler — kenar çubuğundaki
+                kalıbın aynısı, renk körlüğünde de okunur. Yalnızca dikey
+                düzende: yatay şeritte "sol kenar" bir sıra değil, bir sınır. */}
+            {on && (
+              <span className="absolute top-1/2 left-0 hidden h-4 w-0.75 -translate-y-1/2 rounded-r-full bg-accent lg:block" />
+            )}
             <Icon className="size-4 shrink-0" />
             {label}
           </button>
@@ -204,8 +229,8 @@ function JiraTab() {
   });
 
   return (
-    <div className="space-y-8">
-      <Section
+    <div className="space-y-4">
+      <Panel
         title="Jira erişimi"
         description="Akışları Jira task'larıyla tetiklemek ve sonucu issue'ya yorum olarak yazmak için."
       >
@@ -217,14 +242,15 @@ function JiraTab() {
             credential={data?.find((c) => c.kind === "jira")}
           />
         )}
-      </Section>
+      </Panel>
 
-      <Section
+      <Panel
         title="Tetikleyici"
         description="Jira tetikleyicisi olan akışların ne sıklıkla taranacağı. Tarama, akış ekranındaki başlangıç düğümünden açılır."
+        padded={false}
       >
         <RuntimeSettings groups={["jira"]} showHeadings={false} />
-      </Section>
+      </Panel>
     </div>
   );
 }

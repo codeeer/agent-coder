@@ -79,6 +79,7 @@ export function List({
  */
 export function Panel({
   title,
+  description,
   action,
   children,
   /** Gövde kendi dolgusunu yönetsin — tablo ve tam genişlikli listeler için. */
@@ -86,6 +87,15 @@ export function Panel({
   className = "",
 }: {
   title: React.ReactNode;
+  /**
+   * Başlığın altındaki açıklama.
+   *
+   * Panoda genellikle YOKTUR: bir panonun her kutusuna ne işe yaradığını
+   * anlatan bir paragraf koymak panoyu belgeye çevirir. Ayarlar ekranında
+   * ise gerekli — orada her bölüm bir KARAR istiyor ve kararın sonucunu
+   * ancak açıklama söylüyor.
+   */
+  description?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
   padded?: boolean;
@@ -95,10 +105,24 @@ export function Panel({
     <section
       className={`flex flex-col overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card) ${className}`}
     >
-      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
-        <h2 className="truncate text-sm font-semibold tracking-[-0.01em]">
-          {title}
-        </h2>
+      {/* Açıklama yoksa şerit sabit 48px: yan yana dizilen panoların
+          başlıkları aynı hizada dursun. Açıklama varsa yüksekliği
+          içeriği belirler. */}
+      <header
+        className={`flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 ${
+          description ? "py-3" : "h-12 items-center"
+        }`}
+      >
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold tracking-[-0.01em]">
+            {title}
+          </h2>
+          {description && (
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-ink-2">
+              {description}
+            </p>
+          )}
+        </div>
         {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
       </header>
       <div className={`min-w-0 flex-1 ${padded ? "p-4" : ""}`}>{children}</div>
@@ -115,6 +139,32 @@ export function Panel({
  */
 export const panelLinkClass =
   "rounded text-xs font-medium text-ink-3 transition-colors hover:text-accent";
+
+/**
+ * Pano içindeki kayıt kutusu.
+ *
+ * KART İÇİNDE KART OLMASIN diye var. Ayarlar ekranında her bölüm bir pano
+ * (`bg-surface`) ve içindeki her kayıt — sağlayıcı, MCP sunucusu, betik —
+ * bir `Card`'dı, yani AYNI zeminden ikinci bir kutu. İki yüzey aynı renkte
+ * olunca aralarındaki ilişkiyi yalnızca ince bir kenarlık taşıyordu ve
+ * ekran, iç içe geçmiş kutulardan oluşan bir yığın gibi okunuyordu.
+ *
+ * Bir kademe yukarı (`raised`) çıkınca hiyerarşi görünür oluyor: pano
+ * kaptır, içindekiler onun elemanları.
+ */
+export function PanelCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-lg border border-line bg-raised p-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
 
 /** Kart içinde ikinci düzey yüzey — kod, diff, ayar satırı gibi bloklar. */
 export function Well({
@@ -467,7 +517,7 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-flex items-center rounded-md border px-1.5 py-[1px] text-2xs font-medium whitespace-nowrap ${badgeTones[tone]}`}
+      className={`inline-flex items-center rounded-md border px-1.5 py-px text-2xs font-medium whitespace-nowrap ${badgeTones[tone]}`}
     >
       {children}
     </span>
@@ -649,7 +699,7 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}
-          className="h-[72px] animate-pulse rounded-card border border-line bg-surface"
+          className="h-18 animate-pulse rounded-card border border-line bg-surface"
         />
       ))}
     </div>

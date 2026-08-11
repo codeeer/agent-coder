@@ -34,6 +34,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  CircleDollarSign,
   CirclePlay,
   CodeXml,
   Cpu,
@@ -53,12 +54,15 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Shield,
+  Sparkles,
   Star,
   Sun,
   Terminal,
   Trash2,
   TriangleAlert,
   Undo2,
+  Zap,
   Workflow,
   X,
   type LucideIcon,
@@ -123,6 +127,13 @@ export const IconEyeOff = icon(EyeOff);
 export const IconMonitor = icon(Monitor);
 export const IconSun = icon(Sun);
 export const IconMoon = icon(Moon);
+
+// ─── Anlatım (Nasıl çalışır ekranı) ─────────────────────────────────────────
+
+export const IconShield = icon(Shield);
+export const IconCost = icon(CircleDollarSign);
+export const IconBolt = icon(Zap);
+export const IconSparkle = icon(Sparkles);
 
 // ─── Alan adı ───────────────────────────────────────────────────────────────
 

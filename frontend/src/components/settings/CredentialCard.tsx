@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import type { Credential, CredentialKind } from "@/lib/types";
-import { Badge, Button, Card, Input, formatDate } from "@/components/ui/primitives";
+import { Badge, Button, Input, PanelCard, formatDate } from "@/components/ui/primitives";
 
 /** Bir kimlik bilgisi türünün arayüzde nasıl görüneceği. */
 export interface CredentialSpec {
@@ -31,7 +31,7 @@ export function CredentialCard({
   const [editing, setEditing] = useState(false);
 
   return (
-    <Card>
+    <PanelCard>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export function CredentialCard({
           onDone={() => setEditing(false)}
         />
       )}
-    </Card>
+    </PanelCard>
   );
 }
 

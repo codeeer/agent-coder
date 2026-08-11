@@ -8,12 +8,12 @@ import type { LLMProvider, LLMProviderType } from "@/lib/types";
 import {
   Badge,
   Button,
-  Card,
+  PanelCard,
   Field,
   Input,
   Notice,
   Select,
-  Section,
+  Panel,
   formatDate,
 } from "@/components/ui/primitives";
 
@@ -53,10 +53,10 @@ export function LLMProviderSection() {
   });
 
   return (
-    <Section
+    <Panel
       title="LLM sağlayıcılar"
       description="Birden fazla sağlayıcı aynı anda tanımlı olabilir. Her agent adımı hangi sağlayıcının hangi modelini kullanacağını ayrı seçer."
-      actions={
+      action={
         !adding && (
           <Button variant="primary" onClick={() => setAdding(true)}>
             Sağlayıcı ekle
@@ -82,7 +82,7 @@ export function LLMProviderSection() {
 
         {data?.map((p) => <LLMProviderCard key={p.id} provider={p} />)}
       </div>
-    </Section>
+    </Panel>
   );
 }
 
@@ -108,7 +108,7 @@ function LLMProviderCard({ provider }: { provider: LLMProvider }) {
   });
 
   return (
-    <Card>
+    <PanelCard>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -167,7 +167,7 @@ function LLMProviderCard({ provider }: { provider: LLMProvider }) {
       {editing && (
         <LLMProviderForm provider={provider} onDone={() => setEditing(false)} />
       )}
-    </Card>
+    </PanelCard>
   );
 }
 
@@ -297,7 +297,7 @@ function LLMProviderForm({
     </form>
   );
 
-  return editing ? <div className="mt-4">{body}</div> : <Card>{body}</Card>;
+  return editing ? <div className="mt-4">{body}</div> : <PanelCard>{body}</PanelCard>;
 }
 
 function DeleteButton({

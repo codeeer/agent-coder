@@ -109,7 +109,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     {/* Aktif menüyü soldaki şerit de işaretler — renk körlüğünde de okunur. */}
                     {active && (
-                      <span className="absolute top-1/2 left-0 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                      <span className="absolute top-1/2 left-0 h-4 w-0.75 -translate-y-1/2 rounded-r-full bg-accent" />
                     )}
                     <Icon className="size-4 shrink-0" />
                     {label}

@@ -9,7 +9,20 @@ import {
   StepLifecycle,
   TriggerPaths,
 } from "@/components/docs/diagrams";
-import { Card, PageHeader } from "@/components/ui/primitives";
+import {
+  IconBolt,
+  IconCost,
+  IconEye,
+  IconShield,
+  IconSparkle,
+  IconTrash,
+} from "@/components/ui/icons";
+import {
+  Card,
+  IconTile,
+  PageHeader,
+  type TileTone,
+} from "@/components/ui/primitives";
 
 export const metadata: Metadata = {
   title: "Nasıl çalışır · Agent Coder",
@@ -64,6 +77,33 @@ export default function HowItWorksPage() {
           </Mini>
         </div>
       </Step>
+
+      {/*
+        Beş sıfat şeridi — mimarinin hemen ardında, bilerek.
+
+        Her biri YUKARIDAKİ DİYAGRAMIN bir sonucu, yeni bir iddia değil:
+        izole ağ → güvenli, üç servis → ekonomik, seviye seviye paralellik →
+        hızlı, adım kayıtları → şeffaf, iş sonunda silme → temiz. Sayfanın
+        geri kalanı bunların her birini ayrıntısıyla açıyor; bu şerit
+        anlatana bir duraklama noktası veriyor.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Trait icon={<IconShield className="size-4" />} tone="success" title="Güvenli">
+          İzole ağ, dışarıya port açmaz.
+        </Trait>
+        <Trait icon={<IconCost className="size-4" />} tone="info" title="Ekonomik">
+          Ek altyapı yok, sadece üç servis.
+        </Trait>
+        <Trait icon={<IconBolt className="size-4" />} tone="accent" title="Hızlı">
+          Bağımsız adımlar aynı anda koşar.
+        </Trait>
+        <Trait icon={<IconEye className="size-4" />} tone="series" title="Şeffaf">
+          Her adımın girdisi, çıktısı ve maliyeti kayıtlı.
+        </Trait>
+        <Trait icon={<IconTrash className="size-4" />} tone="warning" title="Temiz">
+          İş bitince container ve volume silinir.
+        </Trait>
+      </div>
 
       <Step
         no={3}
@@ -210,6 +250,63 @@ export default function HowItWorksPage() {
           </Decision>
         </div>
       </Step>
+
+      {/*
+        Kapanış.
+
+        Sunum için yazılmış bir sayfanın son ekranı, anlatanın bıraktığı
+        cümle olmalı. Numaralı bir adım DEĞİL: on adımın ardından on birinci
+        bir adım gibi durursa özet olmaktan çıkar, sıradan bir bölüm olur.
+      */}
+      <section className="rounded-card border border-accent/30 bg-accent-soft p-5">
+        <div className="flex items-start gap-3">
+          {/* Karo DOLU aksan: kartın zemini zaten `accent-soft` ve `IconTile`
+              da aynı yumuşak zemini kullanıyor — ikisi üst üste gelince karo
+              görünmez oluyordu. */}
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-ink">
+            <IconSparkle className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-[-0.01em]">Sonuç</h2>
+            <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-ink-2">
+              Koddan pull request&apos;e kadar tüm yol otomatik, izlenebilir ve
+              tekrarlanabilir. Siz akışı tasarlarsınız; sırayı, paralelliği,
+              yeniden denemeyi ve temizliği sistem çalıştırır.
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Sıfat kutusu — mimarinin ardındaki beşli şerit.
+ *
+ * Renk BURADA anlamlı: her sıfat sistemin ayrı bir niteliğini işaret
+ * ediyor ve karo o niteliği ayırt edilebilir kılıyor. Durum rengi değil —
+ * "güvenli" yeşili bir başarı bildirimi değil, bir kimlik.
+ */
+function Trait({
+  icon,
+  tone,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  tone: TileTone;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-card border border-line bg-surface p-3.5 shadow-(--shadow-card)">
+      <div className="flex items-center gap-2.5">
+        <IconTile tone={tone} size="sm">
+          {icon}
+        </IconTile>
+        <p className="text-sm font-medium">{title}</p>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-ink-2">{children}</p>
     </div>
   );
 }

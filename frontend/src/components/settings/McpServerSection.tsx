@@ -9,10 +9,10 @@ import { IconPlus } from "@/components/ui/icons";
 import {
   Badge,
   Button,
-  Card,
+  PanelCard,
   Input,
   Notice,
-  Section,
+  Panel,
   Select,
   Skeleton,
   formatDate,
@@ -33,10 +33,10 @@ export function McpServerSection() {
   const servers = useQuery({ queryKey: ["mcp-servers"], queryFn: api.mcpServers.list });
 
   return (
-    <Section
+    <Panel
       title="Dış araçlar (MCP)"
       description="Agent'ların erişebileceği dış araç sunucuları. Bir sunucu tanımladıktan sonra hangi agent'ların kullanabileceğini Agent'lar ekranından seçersiniz."
-      actions={
+      action={
         !adding && (
           <Button
             variant="primary"
@@ -57,14 +57,14 @@ export function McpServerSection() {
         )}
 
         {servers.data?.length === 0 && !adding && (
-          <Card>
+          <PanelCard>
             <p className="text-sm text-ink-2">
               Henüz sunucu yok. MCP, bir agent&apos;ın hata takip sistemi, dokümantasyon
               veya veritabanı şeması gibi dış kaynaklara <strong>standart bir
               protokolle</strong> erişmesini sağlar — her kaynak için ayrı kod
               yazmadan.
             </p>
-          </Card>
+          </PanelCard>
         )}
 
         {servers.data?.map((s) => (
@@ -78,7 +78,7 @@ export function McpServerSection() {
           çalışan (stdio) sunucular için henüz destek yok.
         </p>
       </div>
-    </Section>
+    </Panel>
   );
 }
 
@@ -100,7 +100,7 @@ function ServerCard({ server }: { server: McpServer }) {
   }
 
   return (
-    <Card>
+    <PanelCard>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -150,7 +150,7 @@ function ServerCard({ server }: { server: McpServer }) {
       )}
 
       <ToolList tools={server.tools} />
-    </Card>
+    </PanelCard>
   );
 }
 
@@ -215,7 +215,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
   });
 
   return (
-    <Card>
+    <PanelCard>
       <p className="text-sm font-medium">
         {editing ? "Sunucuyu düzenle" : "Yeni MCP sunucusu"}
       </p>
@@ -323,6 +323,6 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
           Kaydetmeden önce sunucuya bağlanılır ve araçları okunur.
         </span>
       </div>
-    </Card>
+    </PanelCard>
   );
 }

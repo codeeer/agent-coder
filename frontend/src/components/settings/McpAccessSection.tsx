@@ -6,10 +6,10 @@ import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import {
   Button,
-  Card,
+  PanelCard,
   Mono,
   Notice,
-  Section,
+  Panel,
   Skeleton,
   Well,
 } from "@/components/ui/primitives";
@@ -40,11 +40,11 @@ export function McpAccessSection() {
   const url = access.data?.url ?? "";
 
   return (
-    <Section
+    <Panel
       title="Agent Coder'ı dışarıya aç"
       description="Claude Desktop, Cursor veya başka bir MCP istemcisi buradaki akışları listeleyip başlatabilir."
     >
-      <Card>
+      <PanelCard>
         {access.isPending && <Skeleton rows={1} />}
         {access.isError && (
           <Notice tone="error">{describeError(access.error).message}</Notice>
@@ -124,7 +124,7 @@ export function McpAccessSection() {
         {rotate.isError && (
           <Notice tone="error">{describeError(rotate.error).message}</Notice>
         )}
-      </Card>
-    </Section>
+      </PanelCard>
+    </Panel>
   );
 }
