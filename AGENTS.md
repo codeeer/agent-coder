@@ -131,142 +131,8 @@ Go veya Node host'a kurulu olmak zorunda değil — her şey container içinde d
   render doğrudan React elemanı üretir. Bağlantı şemaları beyaz listeyle sınırlıdır
   (`http`, `https`, `mailto`, göreli yollar).
 
-### Tema
 
-Üç durum: sistem (varsayılan), açık, koyu. Seçim `<html data-theme="light|dark">`
-özniteliğinde durur; öznitelik yoksa işletim sistemi tercihi geçerlidir.
 
-- Yeni bir renk jetonu eklerken **koyu karşılığı da yazılır** — hem
-  `@media (prefers-color-scheme: dark) { :root:not([data-theme]) }` hem de
-  `:root[data-theme="dark"]` bloğuna. Liste bilerek iki yerdedir; biri seçim
-  yapılmadan önceki, diğeri açık seçim durumunu karşılar, tek seçiciye indirilemez.
-- Jetonla birlikte `color-scheme` de verilir; tarayıcının kendi çizdikleri
-  (kaydırma çubuğu, form denetimleri) ancak onunla doğru tarafa geçer.
-- Tema **veritabanına yazılmaz.** Davranış parametresi değil, bakan kişinin
-  tercihidir; sunucuda tutulsaydı bir kullanıcı diğerinin ekranını değiştirirdi.
-- Renk sabiti CSS'e gömülmez, jetondan gelir — bir veri URI'sinin içine bile
-  (`--select-arrow` örneği).
-- **`globals.css`'e yazılan öğe kuralları `@layer base` içinde durur.** CSS'te
-  katmansız bir kural, katmanlı olanların hepsini yener; Tailwind utility'leri
-  `@layer utilities` içindedir. Katman dışına yazılan bir bildirim aynı özelliği
-  veren her utility'yi sessizce ezer. (Spec 006, Ölçüm 3: katmansız bir
-  `button { color: inherit }` düğmelerdeki bütün metin renklerini eziyordu.)
-  Tek bilinçli istisna odak halkasıdır — o her zaman kazanmalı.
-- **Tailwind'in preflight'ı zaten yaptığı şeyi tekrar yazmayın.** Aynı sıfırlama
-  ikinci kez yazıldığında faydası yok, katman dışına düşme riski var.
-
-**Açık tema, koyu temanın tersi DEĞİLDİR.**
-
-Koyu tema referans olarak iyi görünüyor diye açık temayı onun renklerini ters
-çevirerek üretmeyin. Her bileşenin açık temadaki **kontrastı, görsel hiyerarşisi
-ve anlamı** bağımsız olarak değerlendirilir.
-
-Sebep basit: aynı renk çifti iki zeminde aynı işi yapmaz.
-
-- Koyu zeminde ayırt edilen soluk bir gri, beyaz kart üzerinde kaybolur —
-  `ink-3` koyu temada geçerken açık temada sayfa zemininde 3,98:1 kalıyordu.
-- Ters yön de olur: `info` rengi rozet zemininde koyu temada 6,87:1 ile rahat
-  geçerken açık temada 4,11:1 kalıyordu.
-- Hiyerarşi de taşınmaz. Koyu zeminde "daha parlak = daha önemli"dir; açık
-  zeminde "daha koyu = daha önemli". Değerleri ters çevirmek vurguyu ters çevirir.
-- Anlam da taşınmaz. Koyu zeminde yumuşak duran bir uyarı sarısı, beyaz üzerinde
-  hem okunmaz hem de uyarı gibi durmaz.
-
-Uyulacak sıra: her tema için değeri **ayrı seç**, sonra `scripts/theme-audit.mjs`
-ile **ölç**. Aracın "tema eşliği" bölümü tam olarak bu hatayı arar — bir
-bileşenin bir temada geçip diğerinde kalması. Göz bu hatayı bulamaz: iki tema
-aynı anda görülemiyor ve 4,1 ile 4,6 arası bakışla ayırt edilmiyor.
-
-> Buradaki "sonra ölç", ölçümün **nasıl** yapılacağını anlatır, ne zaman
-> tetikleneceğini değil. Denetim kendiliğinden çalıştırılmaz — bkz.
-> [Tema denetimi](#tema-denetimi).
-
-### Görsel doğrulama
-
-Tip kontrolü, linter ve birim testler **rengin ve yerleşimin doğru olduğunu
-söyleyemez.** Bu projede iki hata yalnızca ekrana bakılarak yakalandı: kilitlenen
-bir sayfa (spec 005) ve düğme yazılarının yanlış renkte çıkması (spec 006).
-
-- Playwright MCP `.mcp.json` içinde tanımlı.
-- Betikle: `node scripts/screenshot.mjs <yol> <light|dark> <çıktı.png>`
-- Kurulum kök `package.json`'da (`npm install`). Orada **yalnızca geliştirme
-  araçları** durur; uygulama bağımlılıkları `frontend/package.json` ve
-  `backend/go.mod` içindedir. Araç elle kurulmak zorunda olsaydı bir sonraki
-  oturumda yine yok olurdu — bir kez oldu.
-- Renk şikâyetlerinde ekran görüntüsü yerine `--probe`: hesaplanmış
-  `background-color` / `color` / `border-color` değerlerini yazdırır, tartışmayı
-  bitirir.
-- Tema `colorScheme` **ve** `localStorage` ile birlikte zorlanır; geliştirme
-  makinesi koyu temada olsa bile açık tema görülebilir.
-
-### Tema denetimi
-
-Renk için **bakmak yetmez, ölçmek gerekir**: göz 4,4:1 ile 4,6:1 arasını ayırt
-edemez ve iki temayı aynı anda tutamaz. `node scripts/theme-audit.mjs` her sayfayı
-iki temada açıp hesaplanmış renkleri okur, WCAG oranını hesaplar ve **iki temanın
-sonucunu karşılaştırır**.
-
-- Eşikler: metin 4,5:1 (iri 3:1), **denetim sınırı 3:1** (WCAG 1.4.11).
-- Çıktıdaki "tema eşliği" bölümü asıl değerli kısım: bir bileşenin bir temada
-  geçip diğerinde kalması gözle bulunamayan tek hata sınıfıdır.
-- Renk **tarayıcıya çözdürülür** (tuval üzerinden). Tailwind v4 `/35` ekini
-  `oklab(... / 0.35)` olarak üretiyor; elle yazılmış bir `rgba()` ayrıştırıcısı
-  bunları sessizce atlar — bir kez atladı, bütün rozet kenarları ölçüsüz kaldı.
-- "0 kalan" sonucunu sorgulayın: aracın gerçekten baktığını doğrulamadan
-  temiz raporlamayın.
-
-**Denetim KENDİLİĞİNDEN çalıştırılmaz — kullanıcıya sorulur.** (kullanıcı kararı)
-
-Tasarım işi verildiğinde sıra şudur:
-
-1. İstenen tasarım **olduğu gibi** yapılır. Denetim kaygısıyla önden
-   yumuşatılmaz, "bu geçmez" diye kısılmaz.
-2. Kullanıcı **gözüyle bakar**. İlk hakem odur.
-3. `theme-audit` çalıştırılsın mı diye **sorulur**; kararı kullanıcı verir.
-
-Gerekçe: ölçüm, tasarımın *sonrasında* gelen bir kontroldür — *öncesinde* gelen
-bir kısıt değil. Denetimi baştan dayatmak, henüz görülmemiş bir tasarımı
-kendiliğinden törpüler ve kullanıcının değerlendireceği şey ortaya hiç çıkmaz.
-Bir aracın var olması, her seferinde çalıştırılacağı anlamına gelmez.
-
-Bu, yukarıdaki ölçme kurallarını geçersiz kılmaz: denetim çalıştırıldığında
-eşikler ve "0 kalan"ı sorgulama kuralı aynen geçerlidir. Değişen tek şey **ne
-zaman** çalıştırılacağı.
-
-### Liste uçları ve sayfalama
-
-Tüm liste uçları **aynı zarfı** döner: `{items, total, limit, offset}`. Kimi uç
-çıplak dizi dönseydi istemci her uç için ayrı bir okuma yolu yazardı.
-
-- Sınırlar `internal/paging` içinde tek yerde: varsayılan 25, azami 200.
-- Azami sınır kullanıcı için değil **veritabanı için**: `?limit=100000` tüm
-  tabloyu belleğe çeker.
-- Bozuk değer (`?limit=abc`) hata değildir, varsayılana düşer — liste ucu insan
-  eliyle de çağrılıyor ve 400 dönmek listeyi hiç göstermemek olurdu.
-- `total` **süzgeçten geçen** kayıt sayısıdır, tablodaki toplam değil.
-- Açılır liste besleyen sorgular (`projects.list({ limit: 200 })`) pencereyi
-  AÇIKÇA geniş verir; varsayılana güvenmek sessizce eksik seçenek gösterirdi.
-- Arayüzde tek bileşen: `components/ui/Pagination`. Aralık her zaman yazılır,
-  ileri/geri yalnızca birden fazla sayfa varken çıkar.
-
-`limit` adını başka bir anlamda kullanmayın: `/api/runs` bir süre onu
-eşzamanlılık sınırı için kullandı ve sayfalama denetimi yanlış aralık çizdi.
-Kapasite alanları ayrı: `active`, `concurrencyLimit`.
-
-### Renk token'ları: süsleme mi, denetim mi?
-
-| Token | Sorumluluk |
-|---|---|
-| `--color-line` | süsleme — kart kenarı, ayraç, düğüm çerçevesi |
-| `--color-line-strong` | süsleme (güçlü) — vurgulanmış çerçeve |
-| `--color-control-line` | **denetim sınırı** — düğme, girdi, açılır liste |
-
-Ayrımın testi: *bu çizgi olmasaydı kullanıcı orada tıklanabilir bir şey olduğunu
-anlar mıydı?* Hayırsa `control-line` ve 3:1 zorunlu. Bu rol tanımlı değilken
-bileşenler süsleme token'ını ödünç almıştı; ikincil düğmenin kenarı 1,8:1,
-girdininki 1,31:1 ölçüldü — yani düğme ve kutu sınırından tanınamıyordu.
-
-Süsleme çizgilerini koyulaştırmak yanlış cevaptı: arayüz gereksizce ağırlaşırdı.
 
 ### Yönetici rakamları
 
@@ -323,22 +189,6 @@ projede bir kez, arayüzde karşılığı olmayan bir yol belgeye yazıldı (spe
 
 ### Grafikler
 
-Rapor ekranındaki grafikler elle yazılmış SVG/CSS'tir; grafik kütüphanesi yok.
-Uyulan kurallar:
-
-- **Tek eksen.** İki farklı ölçek (çalıştırma sayısı ve dolar) asla aynı grafiğe
-  konmaz — ikinci bir y ekseni olmayan bir ilişki uydurur. İki ayrı kart olur.
-- **İki veya daha fazla seri varsa gösterge her zaman durur;** kimlik yalnızca
-  renkle taşınmaz. Metin seri rengini giymez — renk işaretin, yazı `ink` jetonunun.
-- **Durum renkleri** (`--color-chart-good|other|bad`) temaya göre DEĞİŞMEZ ve
-  yalnızca sonuç anlatır; seri rengi olarak kullanılmazlar. Doğrulandı: en yakın
-  çift, görme engeli benzetimi altında ΔE 11,3 (eşik 8), normal görüşte 27,6 (eşik 15).
-- Sarı açık temada 3:1 kontrastın altındadır. Bu yüzden yığılmış grafiğin
-  **tablo görünümü zorunludur** — sayıya renkten bağımsız bir yol her zaman açık.
-- İşaret ölçüleri sabit: çubuk ≤24px, veri ucu 4px yuvarlak/taban kare, çizgi 2px,
-  nokta r≥4 + 2px yüzey halkası, kılavuz çizgileri tek adım gri ve kesiksiz.
-- Eksende her noktaya etiket konmaz; kaydı olmayan günler **atlanmaz**, sıfır olarak
-  durur (atlanırsa zaman ekseni sıkışır ve trend yanlış okunur).
 
 ### Git
 
@@ -739,3 +589,61 @@ Sıradaki: **Faz 5 — Jira ve kod deposu entegrasyonları.** Jira'dan task çek
 PR açma, issue'ya yorum yazma.
 Faz listesi ve doğrulama adımları:
 [plans/01-mimari-ve-yol-haritasi-2026-08-09.md](plans/01-mimari-ve-yol-haritasi-2026-08-09.md)
+
+## Visual Design / UI Redesign
+
+Kullanıcı bir screenshot, mockup veya visual reference sağladığında
+ve bunu mevcut UI'ın tasarım referansı olarak verdiğinde, bu referansı
+uygulanması gereken tasarım hedefi olarak kabul et.
+
+Screenshot yalnızca "inspiration" değildir.
+
+Referans görseli analiz et:
+
+- layout
+- spacing
+- typography
+- visual hierarchy
+- component hierarchy
+- colors
+- borders
+- surfaces
+- buttons
+- navigation
+- tables
+- cards
+- status indicators
+- information density
+- responsive behavior
+
+Mevcut ekran ile referans arasındaki önemli görsel farkları belirle
+ve bunları implementation sırasında düzelt.
+
+Business logic, API contract, data model veya mevcut functionality
+gereksiz yere değiştirilmemelidir.
+
+Ancak görsel tasarımın uygulanması için mevcut component yapısının
+değiştirilmesi gerekiyorsa component yapısını değiştirmek serbesttir.
+
+### Visual Verification
+
+UI değişikliği yapıldıktan sonra mümkünse gerçek browser üzerinde
+ekranı kontrol et.
+
+Özellikle:
+
+- desktop
+- light mode
+- dark mode
+- hover/focus states
+- loading
+- error
+- empty state
+
+kontrol edilmelidir.
+
+Screenshot'taki tasarım ile gerçek uygulama arasında belirgin
+görsel fark varsa implementation'ı tekrar düzenle.
+
+İlk çalışan implementation'ı final kabul etme.
+Visual result yeterince kaliteli değilse iterate et.

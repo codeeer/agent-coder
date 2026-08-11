@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(src/components/**)",
+      "Edit(src/app/**)",
+      "Edit(src/styles/**)",
+      "Edit(tailwind.config.*)",
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(ls *)",
+      "Bash(cat src/components/*)",
+      "Bash(docker ps *)",
+      "Bash(docker images *)",
+      "Bash(docker logs *)",
+      "Bash(docker inspect *)",
+      "Bash(docker build *)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose down)",
+      "Bash(docker compose logs *)",
+      "Bash(docker compose ps *)",
+      "Bash(docker compose restart *)",
+      "Bash(docker stop *)",
+      "Bash(docker start *)"
+    ],
+    "deny": [
+      "Edit(src/lib/**)",
+      "Edit(src/api/**)",
+      "Edit(package.json)",
+      "Edit(.env*)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "enabledPlugins": {
+    "chrome-devtools-mcp@chrome-devtools-plugins": true
+  }
+}

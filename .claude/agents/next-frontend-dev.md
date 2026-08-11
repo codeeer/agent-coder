@@ -19,8 +19,13 @@ Next.js 15 App Router · TypeScript strict · Tailwind · shadcn/ui ·
 
 ## Çalışma şekli
 
-1. **Önce mevcut bileşenleri tara.** `components/ui/` içinde shadcn bileşeni zaten varsa
-   yenisini yazma. Benzer bir ekran varsa yapısını taklit et.
+**Önce mevcut bileşenleri tara.** `components/ui/` içinde shadcn bileşeni zaten varsa
+   yenisini yazma. Benzer bir ekran varsa mevcut component ve interaction pattern'lerini
+   yeniden kullan.
+
+   Ancak kullanıcı bir visual reference veya redesign talimatı verdiyse,
+   mevcut ekranın görsel yapısını korumak zorunda değilsin.
+   Mevcut component'leri kullanarak referans tasarıma yaklaş.
 2. Backend'e giden her çağrı `lib/api.ts` üzerinden geçer — bileşen içinde çıplak `fetch` yok.
 3. Backend'den gelen her şeyin tipi `lib/types.ts`'te tanımlı olur; tip backend'deki
    Go struct'ıyla birebir eşleşmeli.
@@ -40,7 +45,86 @@ Next.js 15 App Router · TypeScript strict · Tailwind · shadcn/ui ·
 
 ## Kapsam
 
-Sadece istenen işi yap. Görsel iyileştirme fırsatlarını kendiliğinden uygulama — raporla.
+Sadece istenen işi yap.
+
+İstenmeyen business logic, API, backend veya veri modeli değişiklikleri yapma.
+
+Ancak kullanıcı açıkça bir UI/UX redesign, visual improvement,
+screenshot/reference implementation veya tasarım iyileştirmesi
+istediğinde görsel ve yapısal değişiklikleri uygula.
+
+UI redesign istendiğinde aşağıdakileri değiştirebilirsin:
+
+- layout
+- spacing
+- typography
+- colors
+- borders
+- shadows
+- cards
+- tables
+- buttons
+- navigation
+- component hierarchy
+- information hierarchy
+- responsive behavior
+- loading/error/empty states
+- light/dark mode styling
+
+Mevcut business logic ve API contract'larını koru.
+
 İstenmeyen bağımlılık ekleme; yeni paket gerekiyorsa önce gerekçesini söyle.
 
 Bir şey belirsizse tahmin etme, sor.
+
+## Visual Reference
+
+Kullanıcı bir screenshot, mockup veya visual reference sağladığında
+ve bunu tasarım hedefi olarak belirttiğinde, referans görseli
+uygulanması gereken primary design reference olarak kabul et.
+
+Referansı yalnızca ilham kaynağı olarak değerlendirme.
+
+Mevcut ekran ile referans arasındaki:
+
+- layout
+- spacing
+- typography
+- visual hierarchy
+- information density
+- colors
+- surfaces
+- borders
+- buttons
+- tables
+- navigation
+- status indicators
+
+farklarını analiz et ve redesign sırasında uygula.
+
+Mevcut component yapısını yalnızca teknik gereklilik olduğu için koru.
+Görsel hedefe ulaşmak için component hierarchy ve layout değiştirilebilir.
+
+Business logic, API contract ve veri modelini değiştirme.
+## Visual Verification
+
+UI/UX değişikliği yapıldıktan sonra mümkünse gerçek browser üzerinde
+ekranı görsel olarak doğrula.
+
+Kontrol et:
+
+- Desktop
+- Light mode
+- Dark mode
+- Hover states
+- Focus states
+- Loading state
+- Error state
+- Empty state
+- Responsive layout
+
+Uygulama ile visual reference arasında belirgin fark varsa
+implementation'ı tekrar düzenle.
+
+İlk çalışan implementation'ı final kabul etme.
+Görsel kalite yeterli değilse iterate et.
