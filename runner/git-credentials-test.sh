@@ -25,20 +25,20 @@ kalan=0
 # geri verdiğini sınar. Her durum İZOLE bir HOME kullanır: bir öncekinin kaydı
 # sonrakini gölgelemesin.
 dogrula() {
-    local ad="$1" user="$2" token="$3"
+    local ad="$1" user="$2" token="$3" protokol="${4:-https}"
     local host="bitbucket.sirket.local:7990"
 
     HOME="$(mktemp -d)"
     export HOME
 
-    git_kimlik_kur "$host" "$user" "$token"
+    git_kimlik_kur "$host" "$user" "$token" "$protokol"
 
     # `|| true` ZORUNLU: eşleşme olmadığında `git credential fill` sıfırdan
     # farklı çıkıyor ve `set -e` betiği İLK başarısız durumda öldürüyordu — geri
     # kalan durumlar hiç raporlanmıyordu. Kaç durumun kaldığını görmek, hangi
     # karakterin bozduğunu anlamanın tek yolu.
     local cikti
-    cikti="$(printf 'protocol=https\nhost=%s\n\n' "$host" | git credential fill 2>&1 || true)"
+    cikti="$(printf 'protocol=%s\nhost=%s\n\n' "$protokol" "$host" | git credential fill 2>&1 || true)"
 
     # `|| true` burada da ZORUNLU: eşleşme yoksa `grep` sıfırdan farklı çıkar ve
     # `set -e` betiği yine öldürürdü. Başarısız durumda okunan değer BOŞ kalmalı,
@@ -77,6 +77,13 @@ dogrula "eğik çizgi (/)"      "omer"  "tok/en/123"
 dogrula "kuyruklu a (@)"      "omer"  "tok@en123"
 dogrula "yüzde (%)"           "omer"  "tok%en123"
 dogrula "hepsi bir arada"     'DOMAIN\omer'  'tok:en/123%ab@son'
+
+echo
+echo "Protokol:"
+# `protocol=https` SABİT yazılıydı; http adreslerinde git hiçbir kayıt bulamıyor
+# ve kimlik bilgisini HİÇ göndermiyordu. Kurum içi sunucular TLS'siz olabiliyor.
+dogrula "https"               "omer"  "tok/en123"  "https"
+dogrula "http (TLS'siz kurum)" "omer"  "tok/en123"  "http"
 
 echo
 echo "Ölçüm: $((gecen + kalan)) durum, $gecen geçti, $kalan kaldı"

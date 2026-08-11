@@ -14,6 +14,17 @@ git_host_cikar() {
     sed -E 's#^https?://([^/]+)/.*#\1#' <<<"$1"
 }
 
+# git_protokol_cikar, adresin şemasını (http|https) döndürür.
+#
+# SABİT `https` YAZILAMAZ: host çıkarımı `https?` kabul ediyor, yani `http://`
+# ile başlayan bir adres de buraya kadar geliyor. Kimlik bilgisi `protocol=https`
+# olarak kaydedilirse git, `http://` klonlamasında `protocol=http` arar, hiçbir
+# kayıt bulamaz ve kimlik bilgisi HİÇ GÖNDERİLMEZ — sunucuda Authorization
+# başlığının hiç görünmediği ölçüldü. Kurum içi sunucular TLS'siz olabiliyor.
+git_protokol_cikar() {
+    sed -E 's#^(https?)://.*#\1#' <<<"$1"
+}
+
 # git_kimlik_kur, kimlik bilgisini git'in kendi credential store'una yazar.
 #
 # NEDEN `git credential approve` — ELLE YAZILMIYOR:
@@ -39,13 +50,13 @@ git_host_cikar() {
 # yazarken percent-encoding'i git'in kendisi yapar — doğru kaçırma kuralını
 # bilen taraf odur.
 git_kimlik_kur() {
-    local host="$1" user="$2" token="$3"
+    local host="$1" user="$2" token="$3" protokol="${4:-https}"
 
     # Dosya yalnızca bu container'da yaşar ve iş bitince container'la silinir;
     # yine de başkasına okutulmaz.
     umask 077
 
     git config --global credential.helper store
-    printf 'protocol=https\nhost=%s\nusername=%s\npassword=%s\n\n' \
-        "$host" "$user" "$token" | git credential approve
+    printf 'protocol=%s\nhost=%s\nusername=%s\npassword=%s\n\n' \
+        "$protokol" "$host" "$user" "$token" | git credential approve
 }

@@ -36,14 +36,15 @@ if [[ -n "${REPO_URL:-}" ]]; then
     # container'da yaşar ve iş bitince container'la birlikte silinir.
     if [[ -n "${GIT_TOKEN:-}" ]]; then
         host="$(git_host_cikar "$REPO_URL")"
-        [[ "$host" != "$REPO_URL" ]] || die "REPO_URL bir https adresi olmalı"
+        [[ "$host" != "$REPO_URL" ]] || die "REPO_URL http veya https adresi olmalı"
+        protokol="$(git_protokol_cikar "$REPO_URL")"
 
         # GitHub token'ı kullanıcı adı istemez; Bitbucket ve genel Git ister.
         user="${GIT_USERNAME:-x-access-token}"
 
         # Kimlik bilgisi remote URL'e gömülmez; store'a git'in kendi kaçırma
         # kurallarıyla yazılır (bkz. git-credentials.sh).
-        git_kimlik_kur "$host" "$user" "$GIT_TOKEN"
+        git_kimlik_kur "$host" "$user" "$GIT_TOKEN" "$protokol"
     fi
 
     git config --global user.name "${GIT_AUTHOR_NAME:-Agent Coder}"
