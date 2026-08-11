@@ -52,7 +52,7 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	runCtx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
 
-	configFiles, err := runner.BuildConfigFiles(req.Provider, req.Agent)
+	configFiles, err := runner.BuildConfigFiles(req.Provider, req.Agent, req.Model)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", runner.ErrSandbox, err)
 	}

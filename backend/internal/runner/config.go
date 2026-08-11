@@ -49,7 +49,7 @@ const scriptMode int64 = 0o755
 //
 // Dosyalar container BAŞLATILMADAN ÖNCE kopyalanır: çalıştırma motoru agent
 // tanımlarını yalnızca açılışta okur, sonradan yazılan dosyayı görmez (ölçüldü).
-func BuildConfigFiles(p ProviderSpec, a AgentSpec) ([]ConfigFile, error) {
+func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string) ([]ConfigFile, error) {
 	if a.Slug == "" {
 		return nil, fmt.Errorf("agent slug boş olamaz")
 	}
@@ -57,7 +57,7 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec) ([]ConfigFile, error) {
 		return nil, fmt.Errorf("sağlayıcı slug boş olamaz")
 	}
 
-	providerCfg, err := buildConfig(p, a)
+	providerCfg, err := buildConfig(p, a, model)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func scriptPath(name string) string { return scriptsDir + "/" + name + ".sh" }
 var mcpTimeoutMS = 30_000
 
 // buildConfig, sağlayıcı ve MCP sunucularıyla motor yapılandırmasını üretir.
-func buildConfig(p ProviderSpec, a AgentSpec) ([]byte, error) {
+func buildConfig(p ProviderSpec, a AgentSpec, model string) ([]byte, error) {
 	// Anahtar yerine ortam değişkeni referansı yazılır.
 	options := map[string]any{
 		"apiKey":  "{env:" + APIKeyEnvVar + "}",
@@ -137,6 +137,29 @@ func buildConfig(p ProviderSpec, a AgentSpec) ([]byte, error) {
 		// Yerleşik olmayan sağlayıcılar OpenAI-uyumlu sürücüyle konuşur.
 		provider["npm"] = "@ai-sdk/openai-compatible"
 		provider["name"] = p.Slug
+
+		/*
+		 * Model AÇIKÇA tanımlanır — yerleşik olmayan sağlayıcının en kritik satırı.
+		 *
+		 * Motor, yerleşik sağlayıcıların model listesini kendi taşır; custom
+		 * sağlayıcıda ise modeli yapılandırmada bekler. Tanımsız bir modelle mesaj
+		 * gönderildiğinde sağlayıcıya HİÇ HTTP isteği atmadan iç hata veriyor ve
+		 * bize yalnızca şu yansıyordu:
+		 *     durum 500: {"name":"UnknownError","data":{"message":"Unexpected..."}}
+		 *
+		 * Teşhisi zor kılan şey buydu: adres, anahtar ve model elle denendiğinde
+		 * 200 dönüyor, model listesi arayüzde görünüyor, ama sağlayıcının loguna
+		 * hiçbir istek düşmüyordu — çünkü istek hiç çıkmıyordu.
+		 *
+		 * YALNIZCA seçili model yazılır, sağlayıcının tüm kataloğu değil:
+		 * bir çalıştırma tek modelle koşuyor (sendMessage tek bir modelID
+		 * gönderiyor), katalogun tamamını taşımak `runner` paketine katalog
+		 * bağımlılığı sokardı ve katalog bayatsa var olmayan modeller yazılırdı.
+		 */
+		if model == "" {
+			return nil, fmt.Errorf("%s sağlayıcısı için model zorunlu", p.Kind)
+		}
+		provider["models"] = map[string]any{model: map[string]any{}}
 
 	default:
 		return nil, fmt.Errorf("bilinmeyen sağlayıcı türü: %q", p.Kind)

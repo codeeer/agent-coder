@@ -27,6 +27,7 @@ func TestBuildConfigFiles_AnahtarDosyayaDuzMetinYazilmaz(t *testing.T) {
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter", APIKey: gizli},
 		AgentSpec{Slug: "reviewer", Description: "İnceler", Prompt: "Sen incelemecisin."},
+		"model-x",
 	)
 	require.NoError(t, err)
 
@@ -45,6 +46,7 @@ func TestBuildConfigFiles_OpenRouter(t *testing.T) {
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		AgentSpec{Slug: "reviewer", Prompt: "x"},
+		"model-x",
 	)
 	require.NoError(t, err)
 
@@ -70,6 +72,7 @@ func TestBuildConfigFiles_OzelSaglayiciOpenAIUyumluSurucuKullanir(t *testing.T) 
 			files, err := BuildConfigFiles(
 				ProviderSpec{Slug: "sirket-litellm", Kind: kind, BaseURL: "https://llm.sirket.local/v1/"},
 				AgentSpec{Slug: "coder", Prompt: "x"},
+				"model-x",
 			)
 			require.NoError(t, err)
 
@@ -97,6 +100,7 @@ func TestBuildConfigFiles_OzelSaglayiciAdressizReddedilir(t *testing.T) {
 	_, err := BuildConfigFiles(
 		ProviderSpec{Slug: "x", Kind: "litellm"},
 		AgentSpec{Slug: "coder", Prompt: "x"},
+		"model-x",
 	)
 	require.Error(t, err)
 }
@@ -105,6 +109,7 @@ func TestBuildConfigFiles_BilinmeyenTurReddedilir(t *testing.T) {
 	_, err := BuildConfigFiles(
 		ProviderSpec{Slug: "x", Kind: "uydurma", BaseURL: "https://x/v1"},
 		AgentSpec{Slug: "coder", Prompt: "x"},
+		"model-x",
 	)
 	require.Error(t, err)
 }
@@ -113,12 +118,14 @@ func TestBuildConfigFiles_BosSlugReddedilir(t *testing.T) {
 	_, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		AgentSpec{Slug: "", Prompt: "x"},
+		"model-x",
 	)
 	require.Error(t, err)
 
 	_, err = BuildConfigFiles(
 		ProviderSpec{Slug: "", Kind: "openrouter"},
 		AgentSpec{Slug: "a", Prompt: "x"},
+		"model-x",
 	)
 	require.Error(t, err)
 }
@@ -127,6 +134,7 @@ func TestBuildAgentFile_Bicim(t *testing.T) {
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		AgentSpec{Slug: "reviewer", Description: "Kodu inceler", Prompt: "Sen bir incelemecisin."},
+		"model-x",
 	)
 	require.NoError(t, err)
 
@@ -148,6 +156,7 @@ func TestBuildAgentFile_CokSatirliAciklamaFrontmatteriBozmaz(t *testing.T) {
 			Description: "Birinci satır\nikinci satır\r\nüçüncü \"tırnaklı\" satır",
 			Prompt:      "talimat",
 		},
+		"model-x",
 	)
 	require.NoError(t, err)
 
@@ -171,6 +180,7 @@ func TestBuildAgentFile_BosAciklamaVarsayilanAlir(t *testing.T) {
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		AgentSpec{Slug: "x", Description: "   ", Prompt: "talimat"},
+		"model-x",
 	)
 	require.NoError(t, err)
 	require.Contains(t, string(findFile(t, files, "x.md").Content), `description: "Agent"`)
@@ -185,6 +195,7 @@ func TestBuildConfigFiles_KullanicininDeposunaYazilmaz(t *testing.T) {
 			Slug: "x", Prompt: "y", AllowBash: true,
 			Scripts: []ScriptSpec{{Name: "upgrade", Content: "#!/bin/bash\n"}},
 		},
+		"model-x",
 	)
 	require.NoError(t, err)
 
@@ -207,7 +218,7 @@ func TestBuildConfigFiles_KullanicininDeposunaYazilmaz(t *testing.T) {
 func TestBuildConfigFiles_Betikler(t *testing.T) {
 	build := func(t *testing.T, a AgentSpec) []ConfigFile {
 		t.Helper()
-		files, err := BuildConfigFiles(ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a)
+		files, err := BuildConfigFiles(ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x")
 		require.NoError(t, err)
 		return files
 	}
@@ -339,7 +350,7 @@ func mcpAgent(servers ...MCPServerSpec) AgentSpec {
 func configJSON(t *testing.T, a AgentSpec) map[string]any {
 	t.Helper()
 	files, err := BuildConfigFiles(
-		ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a)
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x")
 	require.NoError(t, err)
 
 	var cfg map[string]any
@@ -383,7 +394,7 @@ func TestBuildConfigFiles_MCPAnahtariDosyayaYazilmaz(t *testing.T) {
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		mcpAgent(MCPServerSpec{
 			Name: "sentry", Transport: "http", URL: "https://x.dev/mcp", Secret: secret,
-		}))
+		}), "model-x")
 	require.NoError(t, err)
 
 	for _, f := range files {
@@ -420,4 +431,109 @@ func TestBuildPermissions_MCPAraclariAcikcaIzinli(t *testing.T) {
 		}
 	}
 	require.True(t, found, "atanmış sunucunun araçları izinli yazılmalı")
+}
+
+/*
+ * Custom sağlayıcıda model TANIMLI olmalı.
+ *
+ * Bu bloğun eksikliği, teşhisi en zor arızalardan birini üretiyordu: motor
+ * tanımsız modelle mesaj gönderildiğinde sağlayıcıya HİÇ HTTP isteği atmadan iç
+ * hata veriyor ve geriye yalnızca "durum 500: UnknownError" kalıyordu. Adres,
+ * anahtar ve model elle denendiğinde 200 dönüyor, model listesi arayüzde
+ * görünüyor, ama sağlayıcının loguna hiçbir istek düşmüyordu.
+ */
+func TestBuildConfigFiles_CustomSaglayicidaModelTanimli(t *testing.T) {
+	for _, kind := range []string{"litellm", "openai_compatible"} {
+		t.Run(kind, func(t *testing.T) {
+			const modelID = "openai/gpt-4.1-mini"
+
+			files, err := BuildConfigFiles(
+				ProviderSpec{Slug: "sirket-llm", Kind: kind, BaseURL: "https://llm.sirket.local/v1"},
+				AgentSpec{Slug: "coder", Prompt: "x"},
+				modelID,
+			)
+			require.NoError(t, err)
+
+			var cfg struct {
+				Provider map[string]struct {
+					Models map[string]map[string]any `json:"models"`
+				} `json:"provider"`
+			}
+			require.NoError(t, json.Unmarshal(findFile(t, files, "opencode.json").Content, &cfg))
+
+			models := cfg.Provider["sirket-llm"].Models
+			require.Contains(t, models, modelID,
+				"koşuda kullanılacak model yapılandırmada tanımlı olmalı")
+		})
+	}
+}
+
+/*
+ * Yapılandırmadaki anahtarlar, mesaj gönderiminde kullanılan kimliklerle
+ * BİREBİR aynı olmalı.
+ *
+ * `sendMessage` providerID olarak `req.Provider.Slug`, modelID olarak
+ * `req.Model` gönderiyor. Yapılandırmada başka bir ad kullanılsaydı motor yine
+ * eşleştiremez ve aynı sessiz 500 dönerdi — bu test o bağı kilitliyor.
+ */
+func TestBuildConfigFiles_SlugVeModelMesajlaEslesir(t *testing.T) {
+	const slug, modelID = "sirket-llm", "meta/llama-3.3-70b"
+
+	files, err := BuildConfigFiles(
+		ProviderSpec{Slug: slug, Kind: "litellm", BaseURL: "https://llm.sirket.local/v1"},
+		AgentSpec{Slug: "coder", Prompt: "x"},
+		modelID,
+	)
+	require.NoError(t, err)
+
+	var cfg struct {
+		Provider map[string]struct {
+			Models map[string]map[string]any `json:"models"`
+		} `json:"provider"`
+	}
+	require.NoError(t, json.Unmarshal(findFile(t, files, "opencode.json").Content, &cfg))
+
+	require.Contains(t, cfg.Provider, slug, "providerID = Provider.Slug")
+	require.Contains(t, cfg.Provider[slug].Models, modelID, "modelID = Request.Model")
+}
+
+// Modelsiz custom sağlayıcı SESSİZCE geçmez.
+//
+// Eskiden model olmadan da yapılandırma üretiliyor, arıza ancak koşu sırasında
+// anlaşılmaz bir 500 olarak görünüyordu. Erken ve açık hata yeğdir.
+func TestBuildConfigFiles_CustomSaglayiciModelsizReddedilir(t *testing.T) {
+	_, err := BuildConfigFiles(
+		ProviderSpec{Slug: "x", Kind: "litellm", BaseURL: "https://llm.sirket.local/v1"},
+		AgentSpec{Slug: "coder", Prompt: "x"},
+		"",
+	)
+	require.ErrorContains(t, err, "model")
+}
+
+// OpenRouter yolu DEĞİŞMEDİ: yerleşik sağlayıcı model listesini kendi taşır,
+// yapılandırmaya models bloğu yazılmaz.
+func TestBuildConfigFiles_OpenRouterModelsBlogunuAlmaz(t *testing.T) {
+	files, err := BuildConfigFiles(
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
+		AgentSpec{Slug: "coder", Prompt: "x"},
+		"anthropic/claude-sonnet-4",
+	)
+	require.NoError(t, err)
+
+	var cfg struct {
+		Provider map[string]map[string]any `json:"provider"`
+	}
+	require.NoError(t, json.Unmarshal(findFile(t, files, "opencode.json").Content, &cfg))
+
+	require.NotContains(t, cfg.Provider["openrouter"], "models",
+		"yerleşik sağlayıcıya models bloğu yazılmamalı")
+	require.NotContains(t, cfg.Provider["openrouter"], "npm")
+
+	// Model boşken de openrouter üretilebilmeli — eski davranış korunuyor.
+	_, err = BuildConfigFiles(
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
+		AgentSpec{Slug: "coder", Prompt: "x"},
+		"",
+	)
+	require.NoError(t, err)
 }
