@@ -46,6 +46,9 @@ ENV HOME=/home/agent
 RUN mkdir -p /home/agent/.config/opencode/agents /home/agent/scripts
 
 COPY --chmod=755 runner/entrypoint.sh /usr/local/bin/entrypoint.sh
+# entrypoint tarafından source edilir; testi de aynı dosyayı source ediyor ki
+# mantık iki yerde kopyalanmasın.
+COPY --chmod=755 runner/git-credentials.sh /usr/local/bin/git-credentials.sh
 
 WORKDIR /work
 EXPOSE 4096

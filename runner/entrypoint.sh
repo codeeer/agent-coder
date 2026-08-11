@@ -9,8 +9,17 @@
 # üretilmez. Sebebi: opencode agent tanımlarını yalnızca açılışta okur.
 set -euo pipefail
 
+# shellcheck source=runner/git-credentials.sh
+source /usr/local/bin/git-credentials.sh
+
 readonly WORKDIR=/work
 readonly PORT="${OPENCODE_PORT:-4096}"
+
+# Kimlik bilgisi eşleşmezse git kullanıcı adı SORMAYA çalışıyor; terminal
+# olmadığı için "could not read Username ... No such device or address" ile
+# ölüyor ve bu mesaj asıl nedeni gizliyor. Sorma kapatılınca git hemen ve
+# anlaşılır biçimde ("terminal prompts disabled") düşer.
+export GIT_TERMINAL_PROMPT=0
 
 log() { printf '[runner] %s\n' "$*" >&2; }
 
@@ -26,15 +35,15 @@ if [[ -n "${REPO_URL:-}" ]]; then
     # sızabilir. Bunun yerine credential store kullanılır; dosya yalnızca bu
     # container'da yaşar ve iş bitince container'la birlikte silinir.
     if [[ -n "${GIT_TOKEN:-}" ]]; then
-        host="$(sed -E 's#^https?://([^/]+)/.*#\1#' <<<"$REPO_URL")"
+        host="$(git_host_cikar "$REPO_URL")"
         [[ "$host" != "$REPO_URL" ]] || die "REPO_URL bir https adresi olmalı"
 
         # GitHub token'ı kullanıcı adı istemez; Bitbucket ve genel Git ister.
         user="${GIT_USERNAME:-x-access-token}"
 
-        umask 077
-        printf 'https://%s:%s@%s\n' "$user" "$GIT_TOKEN" "$host" >"$HOME/.git-credentials"
-        git config --global credential.helper store
+        # Kimlik bilgisi remote URL'e gömülmez; store'a git'in kendi kaçırma
+        # kurallarıyla yazılır (bkz. git-credentials.sh).
+        git_kimlik_kur "$host" "$user" "$GIT_TOKEN"
     fi
 
     git config --global user.name "${GIT_AUTHOR_NAME:-Agent Coder}"

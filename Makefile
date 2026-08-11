@@ -180,7 +180,7 @@ migrate-status: ## Migration durumunu göster
 # ─── Test ve kalite ─────────────────────────────────────────────────────────
 
 .PHONY: test
-test: test-backend test-frontend ## Tüm testleri çalıştır (entegrasyon hariç)
+test: test-backend test-frontend test-runner ## Tüm testleri çalıştır (entegrasyon hariç)
 
 .PHONY: test-integration
 test-integration: ## Gerçek Postgres'e karşı entegrasyon testleri (stack ayakta olmalı)
@@ -205,8 +205,20 @@ test-frontend: ## Frontend birim testleri ve tip kontrolü
 	$(NODE_RUN) npm run test
 	$(NODE_RUN) npm run typecheck
 
+# Runner'ın kabuk mantığı da test edilir: git kimlik bilgisi kurulumu yalnızca
+# "temiz" kullanıcı adı/token'larda çalışıyordu ve arıza ancak kurumsal bir
+# kurulumda, klonlama anında görülüyordu.
+#
+# Runner İMAJINDA değil, backend testleriyle aynı golang imajında koşar: test
+# edilen şey bash + git davranışı ve o her ikisinde de aynı. Runner imajına
+# bağlansaydı `make test`, imajı hiç derlememiş biri için düşerdi — testin
+# çalışması için dakikalarca derleme beklemek, testin çalıştırılmamasına yol açar.
+.PHONY: test-runner
+test-runner: ## Runner kabuk testleri (git kimlik bilgisi kurulumu)
+	docker run --rm -v "$(CURDIR)/runner":/r:ro golang:1.25 bash /r/git-credentials-test.sh
+
 .PHONY: lint
-lint: lint-backend lint-frontend ## Tüm linter'ları çalıştır
+lint: lint-backend lint-frontend lint-shell ## Tüm linter'ları çalıştır
 
 .PHONY: lint-backend
 lint-backend: ## gofmt + go vet
@@ -216,6 +228,11 @@ lint-backend: ## gofmt + go vet
 .PHONY: lint-frontend
 lint-frontend: ## eslint
 	$(NODE_RUN) npm run lint
+
+.PHONY: lint-shell
+lint-shell: ## Kabuk betiklerini shellcheck ile denetle
+	docker run --rm -v "$(CURDIR)":/mnt -w /mnt koalaman/shellcheck-alpine:stable \
+		shellcheck runner/entrypoint.sh runner/git-credentials.sh runner/git-credentials-test.sh
 
 .PHONY: fmt
 fmt: ## Go kodunu biçimlendir
