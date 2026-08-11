@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { describeError } from "@/lib/errors";
+import { describeError, type ErrorContext } from "@/lib/errors";
 import type { LLMProvider, LLMProviderType } from "@/lib/types";
 import {
   Badge,
@@ -281,7 +281,7 @@ function LLMProviderForm({
         />
       </label>
 
-      {save.isError && <FormError error={save.error} />}
+      {save.isError && <FormError error={save.error} context="llm" />}
 
       <div className="flex items-center gap-2 pt-1">
         <Button type="submit" variant="primary" disabled={!canSubmit || save.isPending}>
@@ -344,8 +344,21 @@ function DeleteButton({
   );
 }
 
-export function FormError({ error }: { error: unknown }) {
-  const { message, hint } = describeError(error);
+/**
+ * Form hatası kutusu — LLM ve git erişim formları paylaşır.
+ *
+ * `context` ipucunun hangi ekrana göre yazılacağını belirler; verilmezse ipucu
+ * gösterilmez. Paylaşılan bir bileşenin tek bir ekranın diline göre yazılmış
+ * ipucu göstermesi, diğer ekranda yanlış yönlendirme demektir.
+ */
+export function FormError({
+  error,
+  context,
+}: {
+  error: unknown;
+  context?: ErrorContext;
+}) {
+  const { message, hint } = describeError(error, context);
   return (
     <div className="rounded border border-danger/35 bg-danger-soft px-3 py-2 text-sm">
       <p className="font-medium text-danger">{message}</p>

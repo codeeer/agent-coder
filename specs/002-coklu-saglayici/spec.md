@@ -157,6 +157,15 @@ Kabul kriterleri:
 - **Gizli değerler için 001'in kuralları aynen geçerlidir:** şifreli saklanır, loglara ve
   yanıtlara düşmez, kaydedildikten sonra maskeli gösterilir.
 - **Doğrulama, sağlayıcının kendi yöntemiyle yapılır.** Her türün geçerlilik kontrolü farklıdır.
+- **Bitbucket'ta doğrulama ucu ADRESE göre seçilir.** Cloud ile kendi sunucusunda
+  barındırılan Server/DC kurulumlarının API şeması farklıdır: Cloud'da
+  `/2.0/user`, Server'da `/rest/api/1.0/...`. Ayrım için yeni bir tür eklenmez —
+  adres zaten cevabı taşır. Karşılaştırma adresin **host'u** üzerinden yapılır;
+  ham metin araması, yolunda `api.bitbucket.org` geçen kurumsal bir adresi
+  yanlışlıkla Cloud sayardı.
+- **404 kimlik hatası değil, adres hatasıdır.** Sunucu "böyle bir uç yok" diyorsa
+  erişim bilgisine hiç bakmamıştır. Kimlik hatası olarak raporlanırsa kullanıcı
+  doğru anahtarını yanlış sanıp boşuna yeniler.
 
 ## Hata Durumları
 
@@ -169,6 +178,8 @@ Kabul kriterleri:
 | Bir sağlayıcının kataloğu indirilemiyor | Diğerleri güncellenir; yalnızca o sağlayıcı "güncellenemedi" işaretlenir |
 | Hiç sağlayıcı tanımlı değil | Modeller ekranı "önce bir LLM sağlayıcı ekleyin" yönlendirmesi gösterir |
 | Bitbucket'ta kullanıcı adı girilmemiş | Kaydedilmez; eksik alan belirtilir |
+| Kendi sunucusundaki Bitbucket adresi girilmiş | Doğrulama `/rest/api/1.0/projects` ucundan yapılır; Cloud ucu denenmez |
+| Doğrulama ucu 404 döndü | Kaydedilmez; **adres** hatalı olarak işaretlenir — kimlik bilgisi hatası olarak değil |
 | Silinen sağlayıcının modelleri başka yerde kullanımda | Bu spec kapsamında kullanım yok; Faz 3'te ele alınacak |
 
 ---

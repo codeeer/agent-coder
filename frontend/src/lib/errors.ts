@@ -1,4 +1,7 @@
 import { ApiError } from "./api";
+import { baseUrlHint, type ErrorContext } from "./error-hints";
+
+export type { ErrorContext };
 
 /**
  * Backend hatasını kullanıcının yapabileceği bir eyleme çevirir.
@@ -6,7 +9,10 @@ import { ApiError } from "./api";
  * "Değer yanlış", "adres yanlış" ve "servise ulaşılamadı" ayrımı korunur —
  * kullanıcı üçünde farklı şey yapar.
  */
-export function describeError(error: unknown): {
+export function describeError(
+  error: unknown,
+  context?: ErrorContext,
+): {
   message: string;
   hint?: string;
 } {
@@ -25,8 +31,20 @@ export function describeError(error: unknown): {
         message: "Servise ulaşılamadı",
         hint: "Adresi ve bağlantınızı kontrol edip tekrar deneyin.",
       };
+    /*
+     * Adres hatası — ipucu ekrana göre değişir.
+     *
+     * Bir zamanlar burada koşulsuz "Örnek: https://llm.sirket.local/v1"
+     * yazıyordu. Bitbucket Server doğrulaması 404'ü adres hatası olarak
+     * raporlamaya başlayınca o metin git ekranında da görünür oldu ve kurumsal
+     * Bitbucket kullanıcısına adresinin sonuna `/v1` eklemesini önerir hale
+     * geldi — yanlış yönlendirme.
+     *
+     * Mesajın kendisi zaten ayrıntılı geliyor ("… sunucu bu adreste API
+     * sunmuyor (404)"), o yüzden bağlam bilinmiyorsa ipucu yazılmaz.
+     */
     case "invalid_base_url":
-      return { message: error.message, hint: "Örnek: https://llm.sirket.local/v1" };
+      return { message: error.message, hint: baseUrlHint(context) };
     case "bad_catalog":
       return {
         message: "Servis beklenen biçimde model listesi vermiyor",
@@ -47,3 +65,4 @@ export function describeError(error: unknown): {
       return { message: error.message };
   }
 }
+

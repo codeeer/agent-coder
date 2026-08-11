@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -46,21 +48,70 @@ func (v *Validator) validateGitHub(ctx context.Context, p Provider, secret strin
 	return v.check(req)
 }
 
+/*
+ * validateBitbucket, Cloud ve kurumsal Server/DC kurulumlarını ayırır.
+ *
+ * İkisinin API şeması FARKLI: Cloud'da `/2.0/user` var, Bitbucket Server'da yok
+ * — orada şema `/rest/api/1.0/...` biçiminde. Tek uca gitmek, kendi sunucusunu
+ * kullanan herkese 404 döndürüyordu ve 404 kimlik hatası sayıldığı için
+ * kullanıcı doğru token'ını yanlış sanıp boşuna yeniliyordu.
+ *
+ * Ayrım TÜR ile değil ADRES ile yapılır: yeni bir sağlayıcı türü eklemek
+ * kullanıcıyı "hangisini seçmeliyim" sorusuyla baş başa bırakırdı, oysa adres
+ * zaten cevabı içeriyor.
+ */
 func (v *Validator) validateBitbucket(ctx context.Context, p Provider, secret string) error {
 	if p.Username == "" {
 		return ErrMissingUsername
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.APIURL()+"/user", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, bitbucketProbe(p.APIURL()), nil)
 	if err != nil {
 		return fmt.Errorf("istek oluşturulamadı: %w", err)
 	}
-	// Bitbucket app password: kullanıcı adı + parola çifti.
+	// İki modda da Basic Auth: Cloud'da kullanıcı adı + app password,
+	// Server'da kullanıcı adı + kişisel erişim anahtarı (PAT) çifti çalışıyor.
 	req.SetBasicAuth(p.Username, secret)
 	req.Header.Set("Accept", "application/json")
 
 	return v.check(req)
 }
+
+// bitbucketProbe, doğrulama için çağrılacak uç.
+//
+// Server tarafında `projects` seçildi: her kurulumda var, okuma yetkisi yeten
+// en ucuz uç ve `limit=1` ile tek kayıt döner — doğrulama için bir kaydın
+// gelmesi bile gerekmez, 200 yeterlidir.
+func bitbucketProbe(apiURL string) string {
+	if bitbucketCloud(apiURL) {
+		return apiURL + "/user"
+	}
+	return apiURL + "/rest/api/1.0/projects?limit=1"
+}
+
+// bitbucketCloud, adresin Bitbucket Cloud'a ait olup olmadığı.
+//
+// Karşılaştırma HOST üzerinden yapılır, ham metin üzerinden değil:
+// `https://bitbucket.sirket.local/api.bitbucket.org/x` gibi bir yol düz metin
+// aramasıyla yanlışlıkla Cloud sayılır ve kurumsal kurulum yine yanlış uca
+// giderdi. Adres ayrıştırılamazsa metin karşılaştırmasına düşülür — orada da
+// yanılmak, hiç karar verememekten iyidir.
+func bitbucketCloud(apiURL string) bool {
+	// Adres boşsa APIURL() zaten Cloud varsayılanını vermiştir.
+	if strings.TrimSpace(apiURL) == "" {
+		return true
+	}
+
+	u, err := url.Parse(apiURL)
+	if err != nil || u.Host == "" {
+		return strings.Contains(apiURL, bitbucketCloudHost)
+	}
+
+	host := strings.ToLower(u.Hostname())
+	return host == bitbucketCloudHost || strings.HasSuffix(host, "."+bitbucketCloudHost)
+}
+
+const bitbucketCloudHost = "api.bitbucket.org"
 
 // check, doğrulama isteğinin sonucunu ortak kurallara göre yorumlar.
 func (v *Validator) check(req *http.Request) error {
@@ -76,8 +127,19 @@ func (v *Validator) check(req *http.Request) error {
 	case resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
 		return ErrInvalidSecret
 	case resp.StatusCode == http.StatusNotFound:
-		// Yanlış adres veya bu ucu sunmayan bir sunucu.
-		return fmt.Errorf("%w: adres bulunamadı (404)", ErrInvalidSecret)
+		/*
+		 * 404 bir KİMLİK hatası değil, ADRES hatasıdır.
+		 *
+		 * Sunucu isteği aldı ve "burada böyle bir uç yok" dedi — token'a
+		 * bakmadı bile. ErrInvalidSecret'e eşlendiği sürece kullanıcı
+		 * "erişim bilgisi doğrulanamadı" görüyor ve doğru token'ını
+		 * boşuna yeniliyordu; asıl sorun yanlış adres ya da API şemasıydı.
+		 *
+		 * ErrInvalidSecret ile BİRLİKTE sarmalanmaz: respondGitError'da
+		 * ErrInvalidSecret dalı önce geldiği için yine kimlik hatası
+		 * raporlanırdı.
+		 */
+		return fmt.Errorf("%w: sunucu bu adreste API sunmuyor (404)", ErrInvalidBaseURL)
 	case resp.StatusCode >= 500:
 		return fmt.Errorf("%w: sunucu %d döndü", ErrUnreachable, resp.StatusCode)
 	default:

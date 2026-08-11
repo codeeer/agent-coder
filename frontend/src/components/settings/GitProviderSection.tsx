@@ -315,7 +315,7 @@ function GitProviderForm({
         </Notice>
       )}
 
-      {save.isError && <FormError error={save.error} />}
+      {save.isError && <FormError error={save.error} context="git" />}
 
       <div className="flex items-center gap-2 pt-1">
         <Button

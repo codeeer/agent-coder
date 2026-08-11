@@ -482,6 +482,25 @@ verdiklerinde yeni kurulum yapan kullanıcı uygulamanın bozuk olduğunu sanıy
 4xx ve **ne yapılacağını söyleyen** bir mesajla döner; bir test bu ayrımı kilitliyor
 (`TestRespondRunError_YapilandirmaEksigi500Donmez`).
 
+**Doğrulamada 404, KİMLİK hatası değil ADRES hatasıdır.** Sunucu "böyle bir uç yok"
+diyorsa erişim bilgisine hiç bakmamıştır. `ErrInvalidSecret`'e eşlemek kullanıcıya
+"anahtarın yanlış" dedirtir; o da doğru anahtarını boşuna yeniler — asıl sorun adres
+ya da API şemasıdır. `ErrInvalidBaseURL` ile sarmalanır ve ikisiyle **birden**
+sarmalanmaz (`respondGitError`'da `ErrInvalidSecret` dalı önce geliyor, yine kimlik
+hatası raporlanırdı).
+
+**Bitbucket Cloud ve Server tek tür, iki uçtur.** API şemaları farklı: Cloud `/2.0/user`,
+Server `/rest/api/1.0/...`. Ayrım yeni bir sağlayıcı türüyle değil **adresle** yapılır —
+kullanıcıya "hangisini seçmeliyim" sorusu sordurmaz. Karşılaştırma adresin **host'u**
+üzerinden; ham metin araması yolunda `api.bitbucket.org` geçen kurumsal bir adresi
+yanlışlıkla Cloud sayar.
+
+**Paylaşılan hata bileşenleri tek bir ekranın diline göre yazılmaz.** `describeError`
+bir zamanlar `invalid_base_url` için koşulsuz "Örnek: …/v1" ipucu veriyordu; o kod git
+erişim formunda da kullanılınca kurumsal Bitbucket kullanıcısına adresinin sonuna `/v1`
+eklemesini önerir hale geldi. İpucu artık bağlam alıyor (`error-hints.ts`) ve bağlam
+bilinmiyorsa hiç yazılmıyor — yanlış ipucu, ipucu olmamasından kötüdür.
+
 **OpenRouter zorunlu bir bağımlılık değildir.** LiteLLM ve OpenAI-uyumlu servisler
 (vLLM, Azure OpenAI, Ollama) eşit desteklenir; kullanıcı arayüzünde ve belgelerde
 OpenRouter varsayılan yolmuş gibi sunulmaz. Kurum içi kurulumlarda dışarıya hiç
