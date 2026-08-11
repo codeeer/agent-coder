@@ -1,0 +1,201 @@
+# İmaj yayını — main'e her push'ta ve sürüm etiketlerinde GHCR'a basar.
+#
+# NEDEN MAIN'E DE BAĞLI (değişen karar):
+# Önceki hal yalnızca `v*` etiketlerini dinliyordu. Gerekçesi "latest her
+# commit'te değişirse imaj ile şema ayrışır" idi. Uygulamada bunun tersi oldu:
+# main'e düzeltmeler gitti ama etiket atılmadığı için imaj yayınlanmadı ve
+# `make quickstart` kullanan herkes AYLARCA eski backend ile koştu.
+#
+# Somut bedeli ölçüldü: git kimlik bilgisi çözümü main'de düzeltilmişti ama
+# yayındaki backend imajı eski olduğu için runner'a GIT_USERNAME/GIT_TOKEN hiç
+# geçmiyordu; özel depo klonlaması "could not read Username" ile düşüyordu.
+# Kod doğruydu, yayınlanan imaj değildi.
+#
+# Bayat imaj, hareketli `latest`ten daha tehlikeli. Sabit sürüm isteyen
+# `sha-<kısa>` veya semver etiketini kullanır — README bunu anlatıyor.
+#
+# NEDEN İKİ MİMARİ: geliştirme çoğunlukla arm64 Mac'te, sunucular çoğunlukla
+# amd64. Tek mimarili imaj, kullanıcıların yarısına "exec format error" demektir.
+#
+# Bu dosya eski `yayin.yml`in yerine geçti; ikisi birlikte dursaydı bir `v*`
+# etiketinde iki iş akışı aynı registry etiketlerine yarışırdı.
+
+name: İmaj yayını
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  # İmajın hangi iş akışından çıktığını doğrulanabilir kılar.
+  id-token: write
+  attestations: write
+
+# Arka arkaya gelen main push'larında eskisi iptal edilir; sürüm etiketleri
+# ASLA iptal edilmez — yarım kalan bir yayın, hiç yayınlanmamaktan kötüdür.
+concurrency:
+  group: yayin-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+jobs:
+  imaj:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Bağlam ve dockerfile yolları compose/Makefile ile BİREBİR aynı.
+          # runner'ın bağlamı proje köküdür: imaj .opencode/ altındaki agent
+          # tanımlarını da kopyalıyor (Makefile: docker build -f runner/Dockerfile .).
+          - ad: runner
+            dockerfile: runner/Dockerfile
+            baglam: .
+            surum_argi: false
+          # compose: context ./backend, dockerfile Dockerfile
+          - ad: backend
+            dockerfile: backend/Dockerfile
+            baglam: backend
+            # Yalnızca backend'de ARG VERSION var; ikiliye gömülüp /health ile
+            # görünüyor. Diğerlerine geçirmek BuildKit'te "kullanılmayan
+            # build-arg" uyarısı üretirdi.
+            surum_argi: true
+          # compose: context ./frontend, dockerfile Dockerfile
+          - ad: frontend
+            dockerfile: frontend/Dockerfile
+            baglam: frontend
+            surum_argi: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # amd64 dışındaki mimariyi emülasyonla derlemek için.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.ad }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          # metadata-action bu üçünü zaten üretiyor; AÇIKÇA yazılmalarının
+          # sebebi kullanıcının `docker inspect` ile imajın hangi commit'ten
+          # geldiğini görebilmesi — bu iş akışının var olma sebebi tam da
+          # imaj/kod kaymasını görünür kılmak.
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.baglam }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Sürüm ikiliye gömülür; imajın hangi commit'ten geldiği çalışırken de
+          # `/health` üzerinden sorulabilir olur.
+          build-args: ${{ matrix.surum_argi && format('VERSION={0}', steps.meta.outputs.version) || '' }}
+          cache-from: type=gha,scope=${{ matrix.ad }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.ad }}
+          provenance: true
+          sbom: true
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}-${{ matrix.ad }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+  # Yayınlanan imaj GERÇEKTEN çalışıyor mu?
+  #
+  # "İmaj bozuk" geri bildirimi kullanıcıdan gelmemeli — bu iş akışının kendisi
+  # zaten bayat imaj sorunundan doğdu, bir de bozuk imaj yayınlamayalım.
+  duman-testi:
+    needs: imaj
+    runs-on: ubuntu-latest
+    steps:
+      # sha- etiketi ÜÇ olay türünde de üretilir (main push, tag, elle
+      # tetikleme). `latest` yalnızca main'de, semver yalnızca etikette var;
+      # onlardan birini kullanmak testi kendi hatasıyla düşürürdü.
+      - id: etiket
+        run: echo "deger=sha-$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Runner imajı
+        run: |
+          set -euo pipefail
+          IMAJ="ghcr.io/${{ github.repository }}-runner:${{ steps.etiket.outputs.deger }}"
+          docker pull "$IMAJ"
+          # Betik dizini imajda hazır olmalı — tar kopyalaması dizin oluşturmuyor.
+          docker run --rm --entrypoint ls "$IMAJ" -ld /home/agent/scripts
+          docker run --rm --entrypoint opencode "$IMAJ" --version
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
+          echo "Runner imajı doğrulandı."
+
+      - name: Backend imajı
+        run: |
+          set -euo pipefail
+          IMAJ="ghcr.io/${{ github.repository }}-backend:${{ steps.etiket.outputs.deger }}"
+          docker pull "$IMAJ"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
+
+          # İmajın hangi commit'ten geldiği okunabilmeli — bu iş akışının amacı.
+          SHA=$(docker inspect "$IMAJ" \
+            --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
+          if [ "$SHA" != "${{ github.sha }}" ]; then
+            echo "HATA: imajdaki revision ($SHA) bu commit'le eşleşmiyor"; exit 1
+          fi
+          echo "Backend imajı doğrulandı — revision $SHA."
+
+      # EN KRİTİK KONTROL: frontend imajı taşınabilir mi?
+      #
+      # İmaj bir adresle derlenip BAŞKA bir adresle çalıştırılır. Sayfada çalışma
+      # anındaki adres görünmeli, derleme anındaki hiç görünmemeli. Bu test
+      # düşerse imaj tek bir kuruluma mühürlenmiş demektir ve yayınlanmamalıdır.
+      - name: Frontend imajı taşınabilir mi
+        run: |
+          set -euo pipefail
+          IMAJ="ghcr.io/${{ github.repository }}-frontend:${{ steps.etiket.outputs.deger }}"
+          docker pull "$IMAJ"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
+          docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
+
+          docker run -d --name fe -p 3099:3000 \
+            -e API_URL=http://calisma-aninda-verilen:9999 "$IMAJ"
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:3099 >/dev/null && break
+            sleep 2
+          done
+
+          HTML=$(curl -s http://localhost:3099)
+
+          if ! echo "$HTML" | grep -q "calisma-aninda-verilen:9999"; then
+            echo "HATA: çalışma anı adresi sayfada yok"; docker logs fe; exit 1
+          fi
+          # `grep -q ... && { exit 1; }` YAZILMAZ: grep bulamadığında (yani
+          # BAŞARI durumunda) AND-listesi başarısız döner ve `set -e` betiği
+          # düşürür — test tam ters çalışırdı.
+          if echo "$HTML" | grep -q "localhost:8080"; then
+            echo "HATA: derleme anındaki adres sayfaya sızmış"; exit 1
+          fi
+
+          docker rm -f fe
+          echo "Frontend imajı taşınabilir."

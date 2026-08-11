@@ -173,11 +173,37 @@ make quickstart
 > İmajlar `ghcr.io/codeeer/...` altında, **amd64 ve arm64** için yayınlanır.
 > Intel/AMD sunucu da Apple Silicon da doğru imajı kendiliğinden çeker.
 
-Belirli bir sürüme sabitlemek isterseniz:
+### Hangi etiketi kullanmalı
+
+`latest`, **main'e her commit'te yenilenir.** Denemek için en doğrusu budur:
+`make quickstart` her çalıştığında güncel imajı çeker, yani bir düzeltme
+yapıldığında siz de alırsınız.
+
+Ama "bugün çalışan kurulum yarın da aynı kalsın" istiyorsanız sabit bir etikete
+geçin:
 
 ```bash
-IMAGE_TAG=v0.1.0 make quickstart
+IMAGE_TAG=0.1.1        make quickstart   # sürüm etiketi
+IMAGE_TAG=sha-ebcc8a4  make quickstart   # tek bir commit
 ```
+
+| Etiket | Ne zaman değişir | Kimin için |
+|---|---|---|
+| `latest` | main'e her commit'te | denemek, güncel kalmak |
+| `0.1.1` · `0.1` | yalnızca yeni sürüm etiketinde | üretim benzeri kurulum |
+| `sha-<kısa>` | hiç — tek bir commit'e çakılı | hata ayıklama, tekrarlanabilirlik |
+
+Elinizdeki imajın hangi commit'ten geldiğini her zaman sorabilirsiniz:
+
+```bash
+docker inspect ghcr.io/codeeer/agent-coder-backend:latest \
+  --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'
+```
+
+> Bu etiketleme, yayınlanan imajların bir süre main'in gerisinde kalmasından
+> sonra kuruldu: kod düzeltilmiş ama imaj yayınlanmamıştı ve `quickstart`
+> kullanan herkes eski backend ile koşuyordu. Artık **her main commit'i imaj
+> üretir** ve imaj hangi commit'ten geldiğini üzerinde taşır.
 
 ### 🔨 Kaynaktan derleme yolu
 

@@ -106,6 +106,18 @@ quickstart: check-env ## Hazır imajlarla başlat (hiçbir şey derlenmez — en
 	@echo
 	@echo "  Arayüz : http://localhost:$(FRONTEND_PORT)"
 	@echo "  API    : http://localhost:$(BACKEND_PORT)/health"
+	@# İmajın hangi commit'ten geldiği YAZDIRILIR.
+	@#
+	@# Bir kez yayınlanan imajlar main'in gerisinde kaldı ve kimse fark etmedi:
+	@# `docker pull` "Image is up to date" diyordu — çünkü BAYAT olan registry'nin
+	@# kendisiydi. Kullanıcının elindeki sürümü görebilmesi, o sessiz kaymanın
+	@# tek panzehiri.
+	@# `|| echo` YETMEZ: etiketi olmayan bir imajda `docker inspect` BAŞARILI
+	@# olur ve boş satır döner; yedek değer ancak boşluk kontrolüyle devreye girer.
+	@sha=$$(docker inspect $(GHCR_BACKEND) \
+		--format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+		2>/dev/null | cut -c1-7); \
+	echo "  İmaj   : $${sha:-bilinmiyor} commit'inden"
 
 .PHONY: dev
 dev: check-env ## Hot reload ile geliştirme modunda başlat
