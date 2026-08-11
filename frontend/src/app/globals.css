@@ -108,7 +108,16 @@
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
   --shadow-pop: 0 8px 24px -6px rgb(16 24 40 / 0.12);
 
-  --radius-card: 8px;
+  /*
+   * 8px idi. Referans tasarımın panoları belirgin biçimde daha yuvarlak ve
+   * bunun bir işlevi var: pano, yan yana duran ONLARCA kutudan oluşuyor ve
+   * köşe yarıçapı arttıkça kutular birbirinden daha net ayrılıyor.
+   *
+   * Kart yarıçapı ile kart İÇİNDEKİ öğelerin yarıçapı (rounded-lg, 8px)
+   * arasında bir kademe fark kalıyor — iç içe iki yüzeyin aynı yarıçapı
+   * paylaşması, içteki öğeyi kartın kenarına yapışık gösterir.
+   */
+  --radius-card: 12px;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
@@ -159,6 +168,15 @@
    * warn (amber), danger (kırmızı), info (mavi) çemberin dört yerini tutuyor.
    */
   --color-series: #4f6bd8;
+  /*
+   * Serinin yumuşak zemini — durum renklerinin `-soft` karşılıkları gibi.
+   *
+   * İkon karoları (`IconTile`) altı hueluk bir palet kullanıyor ve beşi
+   * durum renklerinden geliyor. Altıncısı için `series` seçildi: hem
+   * paletteki tek boş yeri dolduruyor hem de karo DURUM ANLATMADIĞI için
+   * durum renklerinden birini altıncı kez ödünç almaktan iyi.
+   */
+  --color-series-soft: #e8ecfa;
 
   /*
    * Tuval zemini — sayfa zemininden AYRI bir jeton.
@@ -235,6 +253,7 @@
     --color-info-soft: #101f36;
 
     --color-series: #7f9cf5;
+    --color-series-soft: #171d33;
 
     --color-deck: #05070a;
     --color-deck-line: #1b2231;

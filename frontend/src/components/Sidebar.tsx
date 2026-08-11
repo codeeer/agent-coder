@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { SystemStatus } from "@/components/SystemStatus";
 import {
   IconLogo,
   IconAgent,
@@ -121,8 +121,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </nav>
 
-      <div className="border-t border-line p-3">
-        <ThemeToggle />
+      {/*
+        Dipte tema anahtarı DEĞİL sistem durumu duruyor.
+
+        Tema, arayüzün her ekranda aynı yerde bulunması gereken bir ayarı ve
+        yeri sayfa başlığının sağ ucu (bkz. `PageHeader`). Kenar çubuğunun
+        dibi ise referans tasarımda sistemin sağlığına ayrılmış — ve orası
+        onun doğru yeri: sürekli görünür, hiçbir işi bölmez.
+      */}
+      <div className="border-t border-line">
+        <SystemStatus />
       </div>
     </aside>
   );

@@ -647,3 +647,28 @@ görsel fark varsa implementation'ı tekrar düzenle.
 
 İlk çalışan implementation'ı final kabul etme.
 Visual result yeterince kaliteli değilse iterate et.
+### İkon sistemi
+
+Birincil ikon kitaplığı **Lucide React**'tir. Lucide'da karşılığı olmayan bir
+ikon gerekmedikçe elle SVG çizilmez.
+
+- Tek kitaplık kullanılır; aynı arayüzde iki ikon kümesi karışmaz.
+- İkonlar tutarlı, sade, **outline** tabanlı, görsel olarak dengeli ve
+  anlamlıdır.
+- **Emoji ikon değildir**; arayüz ikonu olarak kullanılmaz.
+- Boyut ve çizgi kalınlığı uygulamanın her yerinde aynıdır (16px / kalınlık 2).
+- Renk yalnızca **anlamlı durum** için kullanılır: başarı, uyarı, hata, etkin.
+  Diğer her yerde ikon rengini metinden miras alır (`currentColor`).
+
+Uygulama noktası: [`components/ui/icons.tsx`](frontend/src/components/ui/icons.tsx).
+Tüm çağrılar bu eşlem katmanından geçer — hangi lucide ikonunun neyi temsil
+ettiği tek yerde okunur ve boyut/kalınlık kuralı tek yerden uygulanır.
+
+Kuralın dışında kalan tek şey **grafikler ve mimari diyagramlarıdır**
+(`components/charts/*`, `components/docs/diagrams.tsx`). Onlar ikon değil,
+veri ve yapı çizimidir; ikon kitaplığında karşılıkları yoktur.
+
+Metin oku (`↑`, `→`) da bir ikon değildir: yazı tipine göre boyu ve hizası
+değişir. Bir arayüz işareti gerekiyorsa ikon kümesinden alınır. Rakamın
+yanındaki yön işareti (KPI kartındaki `↑ %12`) bunun istisnasıdır — orası
+tipografi, artı/eksi işareti gibi okunur.

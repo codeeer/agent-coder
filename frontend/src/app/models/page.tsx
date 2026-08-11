@@ -13,21 +13,22 @@ import {
   IconCheck,
   IconChip,
   IconRefresh,
-  IconSearch,
 } from "@/components/ui/icons";
 import {
   Button,
   Checkbox,
   EmptyState,
-  Input,
   Notice,
   PageHeader,
+  SearchField,
   Select,
   Skeleton,
+  Toolbar,
   formatRelative,
 } from "@/components/ui/primitives";
 
-const PAGE_SIZE = 50;
+/** Sayfa boyutu — liste ekrana sığsın; bkz. Akışlar ekranındaki karar. */
+const PAGE_SIZES = [20, 50, 100] as const;
 
 const TOOLS_OPTIONS: { value: ToolsFilter; label: string }[] = [
   { value: "yes", label: "Yalnızca araç destekleyenler" },
@@ -46,6 +47,7 @@ export default function ModelsPage() {
   const [sort, setSort] = useState<ModelSort>("name");
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
 
   // Her tuş vuruşunda istek atmamak için arama geciktirilir.
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function ModelsPage() {
   }, [rawQuery]);
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["models", { query, providerId, tools, freeOnly, sort, order, page }],
+    queryKey: ["models", { query, providerId, tools, freeOnly, sort, order, page, pageSize }],
     queryFn: () =>
       api.models.list({
         provider: providerId || undefined,
@@ -66,8 +68,8 @@ export default function ModelsPage() {
         free: freeOnly,
         sort,
         order,
-        limit: PAGE_SIZE,
-        offset: page * PAGE_SIZE,
+        limit: pageSize,
+        offset: page * pageSize,
       }),
   });
 
@@ -89,7 +91,9 @@ export default function ModelsPage() {
   const staleProviders = providers.filter((p) => p.lastError);
 
   return (
-    <div>
+    /* Üç bölge: başlık + süzgeçler üstte, tablo ortada kayar, sayfalama
+       altta sabit — bkz. `AppShell`'deki kabuk kararı. */
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="Modeller"
         description={
@@ -170,18 +174,15 @@ export default function ModelsPage() {
         </div>
       )}
 
-      {/* Filtreler */}
-      <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface p-3">
-        <div className="relative w-full sm:w-64">
-          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" />
-          <Input
-            className="pl-8"
-            aria-label="Model veya sağlayıcı ara"
-            placeholder="Model veya sağlayıcı ara…"
-            value={rawQuery}
-            onChange={(e) => setRawQuery(e.target.value)}
-          />
-        </div>
+      {/* Süzgeçler — arayüzün her liste ekranıyla aynı kap (`Toolbar`). */}
+      <Toolbar className="mt-5">
+        <SearchField
+          className="w-full sm:w-72"
+          aria-label="Model veya sağlayıcı ara"
+          placeholder="Model veya sağlayıcı ara…"
+          value={rawQuery}
+          onChange={(e) => setRawQuery(e.target.value)}
+        />
 
         {/*
           Genişlik SARMALAYICIDAN geliyor, `Select`'in kendi sınıfından değil.
@@ -239,10 +240,15 @@ export default function ModelsPage() {
           }}
         />
 
-      </div>
+        {data && (
+          <span className="ml-auto hidden text-2xs text-ink-3 lg:block">
+            {data.total} model
+          </span>
+        )}
+      </Toolbar>
 
-      {/* Üç durum: yükleniyor, hata, boş */}
-      <div className="mt-4">
+      {/* Üç durum: yükleniyor, hata, boş. Kayan bölge burası. */}
+      <div className="-mx-1 mt-4 min-h-0 flex-1 overflow-y-auto px-1">
         {isPending && <Skeleton rows={4} />}
 
         {isError && (
@@ -264,24 +270,33 @@ export default function ModelsPage() {
         )}
 
         {data && data.items.length > 0 && (
-          <>
-            <ModelTable
-              models={data.items}
-              sort={sort}
-              order={order}
-              onSortChange={toggleSort}
-            />
-
-            <Pagination
-              total={data.total}
-              limit={PAGE_SIZE}
-              offset={page * PAGE_SIZE}
-              onChange={(next) => setPage(Math.floor(next / PAGE_SIZE))}
-              unit="model"
-            />
-          </>
+          <ModelTable
+            models={data.items}
+            sort={sort}
+            order={order}
+            onSortChange={toggleSort}
+          />
         )}
       </div>
+
+      {/* Sayfalama kayan bölgenin DIŞINDA: her zaman görünür, sağ alt köşede. */}
+      {data && data.items.length > 0 && (
+        <Pagination
+              total={data.total}
+              limit={pageSize}
+              offset={page * pageSize}
+              onChange={(next) => setPage(Math.floor(next / pageSize))}
+              pageSize={{
+                value: pageSize,
+                options: PAGE_SIZES,
+                onChange: (size) => {
+                  setPageSize(size);
+                  setPage(0);
+                },
+              }}
+          unit="model"
+        />
+      )}
     </div>
   );
 }

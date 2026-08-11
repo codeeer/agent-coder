@@ -8,14 +8,13 @@ import { readableFailure } from "@/lib/failure";
 import { describeError } from "@/lib/errors";
 import type { ReportGroup, ReportSummary, ReportTotals } from "@/lib/types";
 import { BarList } from "@/components/charts/BarList";
-import { Sparkline } from "@/components/charts/Sparkline";
+import { StatCard, type StatCardProps } from "@/components/ui/StatCard";
 import { CostTrendChart } from "@/components/charts/CostTrendChart";
 import {
   RunsByDayChart,
   RunsByDayTable,
 } from "@/components/charts/RunsByDayChart";
 import {
-  changeRatio,
   formatCompact,
   formatCount,
   formatDuration,
@@ -32,8 +31,10 @@ import {
   Notice,
   PageHeader,
   Section,
+  Segmented,
   Select,
   Skeleton,
+  Toolbar,
 } from "@/components/ui/primitives";
 
 /**
@@ -45,20 +46,21 @@ import {
  */
 
 const PERIODS = [
-  { days: 7, label: "7 gün" },
-  { days: 30, label: "30 gün" },
-  { days: 90, label: "90 gün" },
+  { id: "7", label: "7 gün" },
+  { id: "30", label: "30 gün" },
+  { id: "90", label: "90 gün" },
 ] as const;
 
 export default function ReportsPage() {
-  const [days, setDays] = useState<number>(30);
+  const [days, setDays] = useState<(typeof PERIODS)[number]["id"]>("30");
   const [project, setProject] = useState("");
 
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.projects.list({ limit: 200 }) });
 
   const report = useQuery({
     queryKey: ["report", days, project],
-    queryFn: () => api.reports.summary({ days, project: project || undefined }),
+    queryFn: () =>
+      api.reports.summary({ days: Number(days), project: project || undefined }),
   });
 
   const data = report.data;
@@ -72,48 +74,31 @@ export default function ReportsPage() {
             ? `${data.days} günlük dönem · ${data.timezone} saatiyle`
             : "Agent'ların ne yaptığını ve neye mal olduğunu özetler."
         }
-        actions={
-          <div className="flex shrink-0 items-center gap-2">
-            {/* Genişlik SARMALAYICIDAN gelir: Select'in kendi sınıfı w-full
-                içerir ve dışarıdan verilen bir genişlik onu yenemez. */}
-            <div className="w-44 shrink-0">
-              <Select
-                className="h-8 text-xs"
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
-                aria-label="Proje filtresi"
-              >
-                <option value="">Tüm projeler</option>
-                {projects.data?.items.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="flex shrink-0 overflow-hidden rounded-lg border border-line">
-              {PERIODS.map((p, i) => (
-                <button
-                  key={p.days}
-                  type="button"
-                  onClick={() => setDays(p.days)}
-                  aria-pressed={days === p.days}
-                  className={`h-8 px-3 text-xs whitespace-nowrap transition-colors ${
-                    i > 0 ? "border-l border-line" : ""
-                  } ${
-                    days === p.days
-                      ? "bg-accent-soft font-medium text-accent"
-                      : "bg-surface text-ink-2 hover:bg-raised hover:text-ink"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        }
       />
+
+      {/* Süzgeçler başlığın DEĞİL listenin üstünde: dönem ve proje seçimi
+          sayfanın tamamına uygulanır ve her ekranda aynı yerde durur. */}
+      <Toolbar>
+        {/* Genişlik SARMALAYICIDAN gelir: Select'in kendi sınıfı w-full
+            içerir ve dışarıdan verilen bir genişlik onu yenemez. */}
+        <div className="w-48 shrink-0">
+          <Select
+            className="h-8 text-xs"
+            value={project}
+            onChange={(e) => setProject(e.target.value)}
+            aria-label="Proje süzgeci"
+          >
+            <option value="">Tüm projeler</option>
+            {projects.data?.items.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <Segmented label="Dönem" options={PERIODS} value={days} onChange={setDays} />
+      </Toolbar>
 
       {report.isPending && <Skeleton rows={4} />}
       {report.isError && (
@@ -188,7 +173,9 @@ function KpiStrip({ data }: { data: ReportSummary }) {
    */
   const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
 
-  const cards: KpiCardProps[] = [
+  const note = "öncekine göre";
+
+  const cards: StatCardProps[] = [
     usePRs
       ? {
           label: "Açılan PR",
@@ -197,6 +184,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
           previous: p.prsOpened,
           spark: d.map((x) => x.prsOpened),
           upIsGood: true,
+          periodNote: note,
         }
       : {
           label: "Tamamlanan iş",
@@ -205,6 +193,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
           previous: p.succeeded,
           spark: d.map((x) => x.succeeded),
           upIsGood: true,
+          periodNote: note,
         },
     {
       label: "Çalıştırma",
@@ -213,6 +202,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       previous: p.runs,
       spark: d.map((x) => x.runs),
       upIsGood: true,
+      periodNote: note,
     },
     {
       label: "Başarı",
@@ -221,6 +211,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
       spark: dailyRate,
       upIsGood: true,
+      periodNote: note,
     },
     {
       label: "Kod üreten",
@@ -228,6 +219,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       current: t.runsWithCode,
       previous: p.runsWithCode,
       upIsGood: true,
+      periodNote: note,
     },
     {
       label: "Değişen dosya",
@@ -237,13 +229,17 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       /* Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
          Yeşil/kırmızı boyamak olmayan bir yargı üretirdi. */
       upIsGood: null,
+      periodNote: note,
     },
     {
-      label: "Gönderilen branch",
+      // Etiket KISA: sekiz kart tek sıraya dizildiğinde "GÖNDERİLEN BRAN…"
+      // diye kırpılıyordu.
+      label: "Branch",
       value: formatCount(t.pushedBranches),
       current: t.pushedBranches,
       previous: p.pushedBranches,
       upIsGood: true,
+      periodNote: note,
     },
     {
       label: "Token",
@@ -251,6 +247,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       current: t.promptTokens + t.completionTokens,
       previous: p.promptTokens + p.completionTokens,
       upIsGood: null,
+      periodNote: note,
     },
     {
       label: "Maliyet",
@@ -261,6 +258,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       /* TEK "aşağısı iyi" kart. Maliyetin artması, ölçek büyürken normaldir;
          asıl yönetilebilir olan birim maliyet ve o aşağıdaki kartta duruyor. */
       upIsGood: false,
+      periodNote: note,
     },
   ];
 
@@ -278,77 +276,8 @@ function KpiStrip({ data }: { data: ReportSummary }) {
        kesiyordu. */
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
       {cards.map((c) => (
-        <KpiCard key={c.label} {...c} days={data.days} />
+        <StatCard key={c.label} {...c} />
       ))}
-    </div>
-  );
-}
-
-interface KpiCardProps {
-  label: string;
-  value: string;
-  current: number;
-  previous: number;
-  spark?: number[];
-  /** true: artış iyi · false: artış kötü · null: yön yorumlanmaz. */
-  upIsGood: boolean | null;
-}
-
-function KpiCard({
-  label,
-  value,
-  current,
-  previous,
-  spark,
-  upIsGood,
-  days,
-}: KpiCardProps & { days: number }) {
-  const ratio = changeRatio(current, previous);
-  const flat = ratio !== null && Math.abs(ratio) < 0.005;
-  const good = ratio !== null && ratio > 0 === upIsGood;
-
-  return (
-    <div className="rounded-card border border-line bg-surface px-3.5 py-3">
-      <div className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
-        {label}
-      </div>
-
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <div className="text-xl leading-none font-semibold tabular-nums">
-          {value}
-        </div>
-        {/* Kıvılcım YALNIZCA günlük serisi gerçekten olan kartlarda. Diğer
-            dördü için gün kırılımı üretilmiyor; oraya düz bir çizgi koymak
-            olmayan bir veriyi varmış gibi göstermek olurdu. */}
-        {spark && spark.length > 1 && (
-          <div className="hidden w-20 shrink-0 sm:block">
-            <Sparkline values={spark} label={`${label} — günlük seyir`} />
-          </div>
-        )}
-      </div>
-
-      <div className="mt-2 truncate text-2xs">
-        {ratio === null ? (
-          <span className="text-ink-3">önceki dönem: veri yok</span>
-        ) : (
-          <>
-            <span
-              className={
-                flat || upIsGood === null
-                  ? "text-ink-3"
-                  : good
-                    ? "font-medium text-ok"
-                    : "font-medium text-danger"
-              }
-            >
-              {flat
-                ? "≈ aynı"
-                : `${ratio > 0 ? "↑" : "↓"} ${formatPercent(Math.abs(ratio), 1)}`}
-            </span>{" "}
-            <span className="text-ink-3">son {days} güne göre</span>
-          </>
-        )}
-      </div>
     </div>
   );
 }

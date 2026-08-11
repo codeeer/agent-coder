@@ -7,16 +7,18 @@ import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
+import { formatDuration, formatMoney } from "@/components/charts/format";
 import { IconAgent } from "@/components/ui/icons";
 import {
   Badge,
+  Card,
   EmptyState,
-  Input,
-  List,
-  Mono,
   Notice,
   PageHeader,
+  SearchField,
+  Segmented,
   Skeleton,
+  Toolbar,
   formatRelative,
 } from "@/components/ui/primitives";
 import type { Run } from "@/lib/types";
@@ -40,16 +42,23 @@ const FILTERS = [
   },
 ] as const;
 
-const PAGE_SIZE = 25;
+/**
+ * Sayfa boyutu — bkz. Akışlar ekranındaki aynı karar.
+ *
+ * Liste ekrana sığmalı; sayfalama denetimi ancak sona kaydırılınca
+ * görünüyorsa sayfalama yok demektir.
+ */
+const PAGE_SIZES = [10, 25, 50] as const;
 
 export default function RunsPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState<number>(PAGE_SIZES[0]);
 
   const { data, isPending, isError, error } = useQuery({
-    queryKey: ["runs", offset],
-    queryFn: () => api.runs.list({ limit: PAGE_SIZE, offset }),
+    queryKey: ["runs", offset, limit],
+    queryFn: () => api.runs.list({ limit, offset }),
     // Çalışan iş varsa liste kendini tazelesin.
     refetchInterval: (q) =>
       q.state.data?.items.some((r) => isActive(r.status)) ? 3000 : false,
@@ -70,7 +79,9 @@ export default function RunsPage() {
   }, [data, filter, q]);
 
   return (
-    <div>
+    /* Üç bölge: başlık + araç çubuğu üstte, liste ortada kayar, sayfalama
+       altta sabit — bkz. `AppShell`'deki kabuk kararı. */
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="Çalıştırmalar"
         description="Agent çalıştırma geçmişi. Süzgeç ve arama açık sayfada çalışır. Süren işler kendiliğinden tazelenir."
@@ -88,109 +99,46 @@ export default function RunsPage() {
       />
 
       {data && data.items.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-line bg-surface p-0.5">
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFilter(f.id)}
-                aria-pressed={filter === f.id}
-                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
-                  filter === f.id
-                    ? "bg-accent-soft font-medium text-accent"
-                    : "text-ink-2 hover:text-ink"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="min-w-[180px] flex-1 sm:max-w-xs">
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Görev, proje, agent veya model ara"
-              aria-label="Çalıştırmalarda ara"
-            />
-          </div>
-        </div>
+        <Toolbar>
+          <Segmented
+            label="Durum süzgeci"
+            options={FILTERS}
+            value={filter}
+            onChange={setFilter}
+          />
+          <SearchField
+            className="min-w-45 flex-1 sm:max-w-sm"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Görev, proje, agent veya model ara…"
+            aria-label="Çalıştırmalarda ara"
+          />
+          <span className="ml-auto hidden text-2xs text-ink-3 lg:block">
+            süzgeç ve arama açık sayfada çalışır
+          </span>
+        </Toolbar>
       )}
 
-      {isPending && <Skeleton rows={3} />}
-      {isError && <Notice tone="error">{describeError(error).message}</Notice>}
+      {/* Kayan bölge. `min-h-0` olmadan flex öğesi içeriğinden küçülemez ve
+          sayfalama ekranın dışına düşerdi. */}
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+        {isPending && <Skeleton rows={3} />}
+        {isError && <Notice tone="error">{describeError(error).message}</Notice>}
 
-      {data?.items.length === 0 && (
-        <EmptyState
-          icon={<IconAgent className="size-4" />}
-          title="Henüz çalıştırma yok"
-          description="Agent'lar sayfasından bir agent seçip projelerinizden biri üzerinde çalıştırın."
-        />
-      )}
+        {data?.items.length === 0 && (
+          <EmptyState
+            icon={<IconAgent className="size-4" />}
+            title="Henüz çalıştırma yok"
+            description="Agent'lar sayfasından bir agent seçip projelerinizden biri üzerinde çalıştırın."
+          />
+        )}
 
-      {data && data.items.length > 0 && items.length === 0 && (
-        <Notice>Bu filtreye uyan çalıştırma yok.</Notice>
-      )}
+        {data && data.items.length > 0 && items.length === 0 && (
+          <Notice>Bu filtreye uyan çalıştırma yok.</Notice>
+        )}
 
-      {items.length > 0 && (
-        <List>
-          {items.map((run) => (
-            <Link
-              key={run.id}
-              href={`/runs/${run.id}`}
-              /*
-               * Dar ekranda SATIR DEĞİL, blok.
-               *
-               * Tek bir yatay satırdı: 128px sabit durum sütunu + sağda
-               * maliyet/tarih sütunu, görev metnine kalan yer ortadaki
-               * artıktı. 390px'lik bir telefonda bu artık ~90px'e düşüyor ve
-               * satırın TAŞIDIĞI ASIL BİLGİ — görev metni — "Sadece TAM..."
-               * diye kesiliyordu. Yani ekranda en çok yeri metadata alıyor,
-               * en az yeri içerik.
-               *
-               * Dar ekranda üç blok alt alta geçiyor ve görev metni tam
-               * genişliği alıyor; `sm` üstünde eski yatay düzen aynen duruyor.
-               */
-              className="flex flex-col gap-2 px-4 py-3 transition-colors hover:bg-raised sm:flex-row sm:items-center sm:gap-4"
-            >
-              <div className="shrink-0 sm:w-32">
-                <RunStatusBadge status={run.status} />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm">{run.task}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
-                  {/* Akış adımıysa hangi akışın parçası olduğu görünmeli;
-                      aksi halde tek başına çalıştırılmış gibi okunur. */}
-                  {run.workflowName && (
-                    <Badge tone="accent">
-                      {run.workflowName} · {run.stepName}
-                    </Badge>
-                  )}
-                  <span>{run.projectName}</span>
-                  <Mono>{run.agentSlug}</Mono>
-                  <span className="font-mono">{run.modelId}</span>
-                  {run.pushedBranch && (
-                    <Badge tone="info">→ {run.pushedBranch}</Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Dar ekranda yan yana tek satır, geniş ekranda sağda iki
-                  satırlık sütun — dikey yığın telefonda iki satır daha
-                  harcardı ve ikisi de kısa değerler. */}
-              <div className="flex shrink-0 items-center gap-3 sm:block sm:text-right">
-                <div className="font-mono text-xs tabular-nums">
-                  {run.costUsd > 0 ? `$${run.costUsd.toFixed(4)}` : "—"}
-                </div>
-                <div className="text-xs text-ink-3 sm:mt-1">
-                  {formatRelative(run.createdAt)}
-                </div>
-              </div>
-            </Link>
-          ))}
-        </List>
-      )}
+        {items.length > 0 && <RunTable items={items} />}
+      </div>
 
       {data && (
         <Pagination
@@ -204,9 +152,124 @@ export default function RunsPage() {
             // daraltma. Aramayı taşımak, kullanıcıya boş bir sayfa gösterirdi.
             setQ("");
           }}
+          pageSize={{
+            value: limit,
+            options: PAGE_SIZES,
+            onChange: (size) => {
+              setLimit(size);
+              setOffset(0);
+            },
+          }}
           unit="çalıştırma"
         />
       )}
     </div>
   );
+}
+
+/**
+ * Çalıştırma tablosu.
+ *
+ * ÖNCESİNDE SÜTUN BAŞLIĞI YOKTU: her satır kendi içinde etiketsiz beş
+ * değer taşıyordu ve sağdaki iki rakamın hangisinin maliyet, hangisinin
+ * süre olduğu ancak biçiminden tahmin ediliyordu. Aynı türden onlarca
+ * kaydın karşılaştırıldığı bir ekranda satırlar değil SÜTUNLAR okunur;
+ * sütunun ne olduğunu söyleyen tek şey de başlığıdır.
+ *
+ * Dar ekranda tablo yatay kaydırılır, satırlara BÖLÜNMEZ: bölünmüş bir
+ * tablo hizayı kaybeder ve hizasını kaybeden bir tablo, listeden daha
+ * kötüdür.
+ */
+function RunTable({ items }: { items: Run[] }) {
+  return (
+    <Card padded={false} className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-215 text-sm">
+          <thead>
+            <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
+              <th className="w-36 py-2.5 pl-4 font-medium">Durum</th>
+              <th className="py-2.5 font-medium">Görev / Proje</th>
+              <th className="w-64 py-2.5 font-medium">Agent / Model</th>
+              <th className="w-20 py-2.5 text-right font-medium">Süre</th>
+              <th className="w-24 py-2.5 text-right font-medium">Maliyet</th>
+              <th className="w-28 py-2.5 pr-4 text-right font-medium">Başlatıldı</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {items.map((run) => (
+              <tr
+                key={run.id}
+                className="group transition-colors hover:bg-raised"
+              >
+                <td className="py-2.5 pl-4">
+                  <RunStatusBadge status={run.status} />
+                </td>
+
+                <td className="max-w-0 py-2.5 pr-4">
+                  {/*
+                    Bağlantı SATIRIN TAMAMI değil ilk hücrede: `<tr>` bir
+                    bağlantı olamaz ve her hücreye ayrı `<a>` koymak ekran
+                    okuyucuya aynı hedefi altı kez okutur.
+                  */}
+                  <Link
+                    href={`/runs/${run.id}`}
+                    className="block truncate font-medium group-hover:text-accent"
+                    title={run.task}
+                  >
+                    {run.task}
+                  </Link>
+                  <div className="mt-0.5 flex items-center gap-2 text-2xs text-ink-3">
+                    {/* Akış adımıysa hangi akışın parçası olduğu görünmeli;
+                        aksi halde tek başına çalıştırılmış gibi okunur. */}
+                    {run.workflowName && (
+                      <Badge tone="accent">
+                        {run.workflowName} · {run.stepName}
+                      </Badge>
+                    )}
+                    <span className="truncate">{run.projectName}</span>
+                    {run.pushedBranch && (
+                      <Badge tone="info">→ {run.pushedBranch}</Badge>
+                    )}
+                  </div>
+                </td>
+
+                <td className="max-w-0 py-2.5 pr-4">
+                  <div className="truncate font-mono text-xs">{run.agentSlug}</div>
+                  <div className="mt-0.5 truncate font-mono text-2xs text-ink-3">
+                    {run.modelId}
+                  </div>
+                </td>
+
+                <td className="py-2.5 pr-4 text-right text-xs tabular-nums text-ink-2">
+                  {durationOf(run)}
+                </td>
+
+                <td className="py-2.5 pr-4 text-right font-mono text-xs tabular-nums">
+                  {run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
+                </td>
+
+                <td className="py-2.5 pr-4 text-right text-xs text-ink-3">
+                  {formatRelative(run.createdAt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Çalıştırma süresi.
+ *
+ * Süren işler için başlangıçtan ŞU ANA kadar; bitenler için gerçek süre.
+ * Bitmemiş bir işe tire koymak, ekranda en çok merak edilen sayıyı
+ * gizlemek olurdu.
+ */
+function durationOf(run: Run): string {
+  if (!run.startedAt) return "—";
+  const end = run.finishedAt ? new Date(run.finishedAt) : new Date();
+  const seconds = (end.getTime() - new Date(run.startedAt).getTime()) / 1000;
+  return seconds > 0 ? formatDuration(seconds) : "—";
 }

@@ -34,7 +34,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   return (
-    <div className="flex min-h-screen">
+    /*
+      Kabuk EKRAN YÜKSEKLİĞİNDE ve belgenin kendisi kaymaz.
+
+      Öncesinde `min-h-screen` idi ve kaydırma belgeye aitti: uzun bir liste
+      sayfayı uzatıyor, sayfalama denetimi de listenin ARDINDAN geliyordu —
+      yani sayfalar arasında gezinmek için önce listenin sonuna kadar
+      kaydırmak gerekiyordu. Kaydırmak ile sayfalamak aynı işi iki yoldan
+      yapınca ikisi de yarım kalıyor.
+
+      Şimdi kaydırma içerik bölgesine ait. Liste ekranları bunun üstüne
+      kendi düzenini kuruyor: başlık ve araç çubuğu üstte sabit, liste
+      ortada kayan bölge, sayfalama altta — her zaman görünür, sağ alt
+      köşede (referans tasarımdaki yeri).
+    */
+    <div className="flex h-screen overflow-hidden">
       {/* Geniş ekran: her zaman görünür. */}
       <div className="hidden lg:flex">
         <Sidebar />
@@ -63,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <main className="min-w-0 flex-1">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Dar ekranda üst çubuk: menüye ulaşmanın tek yolu bu. */}
         <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface px-4 lg:hidden">
           <button
@@ -92,8 +106,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           okunamayacak kadar uzamasını engellemek için var, ortalamak için
           değil — bu yüzden `mx-auto` YOK.
         */}
-        <div className="max-w-[1680px] px-5 py-6 sm:px-6 lg:px-8 lg:py-7">
-          {children}
+        {/*
+          Kaydıran bölge BURASI, belge değil.
+
+          İçteki sarmalayıcı `h-full`: kendi içeriği ekrana sığan sayfalar
+          (liste ekranları) böylece KESİN bir yüksekliğe sahip oluyor ve
+          "üstte başlık, ortada kayan liste, altta sayfalama" düzenini
+          kurabiliyor. Sığmayan sayfalarda (ayarlar, çalıştırma detayı)
+          içerik taşar ve dıştaki bölge kayar — yani hiçbir şey kırpılmaz.
+        */}
+        {/*
+          Dolgu KAYAN KABIN kendisinde, içindeki sarmalayıcıda değil.
+
+          Sarmalayıcıda olsaydı: kabuk artık tam yükseklikte ve sarmalayıcı
+          `h-full`, yani alt dolgusu 100% yüksekliğin dibinde durur —
+          içeriği taşan uzun sayfalarda (belgeler, ayarlar) taşan kısım o
+          dolgunun ALTINDA kalır ve sayfanın sonu ekranın kenarına yapışır.
+          Kaydırma kabının kendi alt dolgusu ise taşmaya dahil edilir.
+        */}
+        <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6 lg:px-8 lg:py-7">
+          <div className="flex h-full max-w-[1680px] flex-col">{children}</div>
         </div>
       </main>
     </div>

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
@@ -10,30 +10,80 @@ import {
   WorkflowRunBadge,
   isWorkflowActive,
 } from "@/components/workflows/WorkflowStatusBadge";
-import { IconPlus, IconWorkflow } from "@/components/ui/icons";
+import { IconFolder, IconPlus, IconWorkflow } from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
   EmptyState,
+  IconTile,
   Input,
   Notice,
   PageHeader,
+  SearchField,
+  Segmented,
   Select,
   Skeleton,
   Textarea,
+  Toolbar,
   formatRelative,
+  toneFromKey,
 } from "@/components/ui/primitives";
+import type { Workflow } from "@/lib/types";
 
-const PAGE_SIZE = 25;
+/**
+ * Sayfa boyutu.
+ *
+ * 25 idi ve ekrana sığmıyordu: liste tipik bir masaüstü penceresinde
+ * kaydırma gerektiriyor, sayfalama denetimi de ancak sona kadar
+ * kaydırılınca görünüyordu — yani sayfalama VARDI ama görünmüyordu.
+ * Kaydırmak ile sayfalamak aynı işi iki yoldan yapıyordu.
+ *
+ * Şimdi liste ekrana sığıyor ve gezinme sayfalamayla oluyor; isteyen
+ * sayfa boyutunu denetimin yanından büyütebiliyor.
+ */
+const PAGE_SIZES = [10, 25, 50] as const;
+
+/**
+ * Durum süzgeci.
+ *
+ * Süzgeç AÇIK SAYFADA çalışır, tüm geçmişte değil — backend'in liste ucu
+ * durum parametresi almıyor. Bu, Çalıştırmalar ekranındaki süzgeçle aynı
+ * davranış; iki listenin aynı şeyi farklı yapması kullanıcıya her ekranda
+ * yeniden öğrenmek düşerdi.
+ */
+const FILTERS = [
+  { id: "all", label: "Tüm durumlar" },
+  { id: "active", label: "Etkin" },
+  { id: "paused", label: "Duraklatıldı" },
+  { id: "draft", label: "Taslak" },
+] as const;
+
+type FilterId = (typeof FILTERS)[number]["id"];
+
+function matches(w: Workflow, filter: FilterId): boolean {
+  switch (filter) {
+    case "active":
+      return w.isActive && w.activeVersion !== null;
+    case "paused":
+      return !w.isActive;
+    case "draft":
+      return w.activeVersion === null;
+    default:
+      return true;
+  }
+}
 
 export default function WorkflowsPage() {
   const [creating, setCreating] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState<number>(PAGE_SIZES[0]);
+  const [filter, setFilter] = useState<FilterId>("all");
+  const [q, setQ] = useState("");
 
   const workflows = useQuery({
-    queryKey: ["workflows", offset],
-    queryFn: () => api.workflows.list({ limit: PAGE_SIZE, offset }),
+    queryKey: ["workflows", offset, limit],
+    queryFn: () => api.workflows.list({ limit, offset }),
     // Çalışan akış varsa liste kendini tazelesin.
     refetchInterval: (q) =>
       q.state.data?.items.some((w) => w.lastRun && isWorkflowActive(w.lastRun.status))
@@ -41,8 +91,27 @@ export default function WorkflowsPage() {
         : false,
   });
 
+  const items = useMemo(() => {
+    const rows = workflows.data?.items ?? [];
+    const needle = q.trim().toLocaleLowerCase("tr");
+    return rows.filter(
+      (w) =>
+        matches(w, filter) &&
+        (needle === "" ||
+          [w.name, w.description, w.projectName]
+            .filter(Boolean)
+            .some((v) => v.toLocaleLowerCase("tr").includes(needle))),
+    );
+  }, [workflows.data, filter, q]);
+
   return (
-    <div>
+    /*
+      Üç bölgeli düzen: üstte başlık ve araç çubuğu, ortada KAYAN liste,
+      altta sayfalama. Sayfalama listenin ardından gelen sıradan bir blok
+      olsaydı ona ulaşmak için önce listenin sonuna kadar kaydırmak
+      gerekirdi — yani sayfalama, ancak kaydırmayı bitirenlere görünürdü.
+    */
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="Akışlar"
         description="Adımları birbirine bağlı, kaydedilebilir akışlar. Her adım kendi agent'ı ve kendi modeliyle çalışır."
@@ -59,12 +128,37 @@ export default function WorkflowsPage() {
 
       {creating && <CreateForm onDone={() => setCreating(false)} />}
 
-      {workflows.isPending && <Skeleton rows={3} />}
-      {workflows.isError && (
-        <Notice tone="error">{describeError(workflows.error).message}</Notice>
+      {/* Araç çubuğu yalnızca gerçekten liste varken: tek akışı olan bir
+          kurulumda arama kutusu, aramayı gerektiren bir yığın olduğunu ima
+          ederdi. */}
+      {(workflows.data?.total ?? 0) > 0 && (
+        <Toolbar>
+          <SearchField
+            className="min-w-50 flex-1 sm:max-w-sm"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Akış, açıklama veya proje ara…"
+            aria-label="Akışlarda ara"
+          />
+          <Segmented
+            label="Durum süzgeci"
+            options={FILTERS}
+            value={filter}
+            onChange={setFilter}
+          />
+        </Toolbar>
       )}
 
-      {workflows.data?.total === 0 && !creating && (
+      {/* Kayan bölge. `min-h-0` şart: bir flex öğesi varsayılan olarak
+          içeriğinden küçülemez ve bu kural olmadan liste kabı taşıp
+          sayfalamayı ekranın dışına iterdi. */}
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+        {workflows.isPending && <Skeleton rows={3} />}
+        {workflows.isError && (
+          <Notice tone="error">{describeError(workflows.error).message}</Notice>
+        )}
+
+        {workflows.data?.total === 0 && !creating && (
         <EmptyState
           icon={<IconWorkflow className="size-4" />}
           title="Henüz akış yok"
@@ -75,57 +169,93 @@ export default function WorkflowsPage() {
             </Button>
           }
         />
-      )}
+        )}
 
-      {workflows.data && workflows.data.items.length > 0 && (
-        <div className="space-y-2.5">
-          {workflows.data.items.map((w) => (
+        {workflows.data && workflows.data.items.length > 0 && items.length === 0 && (
+          <Notice>Bu süzgece uyan akış yok.</Notice>
+        )}
+
+        {items.length > 0 && (
+          <div className="space-y-2.5">
+          {items.map((w) => (
             /* Kartın TAMAMI bağlantı: satırın sonundaki "Aç" düğmesi hem
                gereksiz bir tıklama hedefi hem de her satırda tekrar eden
                görsel gürültüydü — kartın kendisi zaten oraya götürüyor. */
             <Link
               key={w.id}
               href={`/workflows/${w.id}`}
-              className="block rounded-card border border-line bg-surface p-4 shadow-(--shadow-card) transition-colors hover:border-line-strong hover:bg-raised"
+              className="flex items-center gap-4 rounded-card border border-line bg-surface p-3.5 shadow-(--shadow-card) transition-colors hover:border-line-strong hover:bg-raised"
             >
-              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold tracking-[-0.01em]">
-                      {w.name}
-                    </span>
-                    {/* "tanımsız" ne olduğu belirsizdi; "taslak" bir sonraki
-                       adımı da söylüyor: henüz kaydedilmemiş bir akış. */}
-                    {!w.activeVersion && <Badge tone="warning">taslak</Badge>}
-                    {!w.isActive && <Badge tone="warning">duraklatıldı</Badge>}
-                  </div>
+              {/*
+                Karo, satırın kimlik işareti. Rengi akışın kimliğinden
+                türetiliyor ve sabit kalıyor: kullanıcı ikinci sayfada da
+                aradığı akışı aynı renkte buluyor. Karo DURUM ANLATMAZ —
+                onu sağdaki rozet söylüyor.
+              */}
+              <IconTile tone={toneFromKey(w.id)}>
+                <IconWorkflow className="size-4" />
+              </IconTile>
 
-                  {w.description && (
-                    <p className="mt-1 text-sm text-ink-2">{w.description}</p>
-                  )}
-                  <p className="mt-1.5 text-xs text-ink-3">{w.projectName}</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate text-sm font-semibold tracking-[-0.01em]">
+                    {w.name}
+                  </span>
+                  {/* "tanımsız" ne olduğu belirsizdi; "taslak" bir sonraki
+                     adımı da söylüyor: henüz kaydedilmemiş bir akış. */}
+                  {!w.activeVersion && <Badge tone="warning">taslak</Badge>}
+                  {!w.isActive && <Badge tone="warning">duraklatıldı</Badge>}
                 </div>
 
-                {/* Rozet tek başına "akış başarısız" gibi okunuyordu; başına
-                   "son çalışma" yazınca neyin durumu olduğu belli oluyor. */}
-                {w.lastRun && (
-                  <div className="flex shrink-0 items-center gap-2 text-xs text-ink-3">
-                    <span>son çalışma {formatRelative(w.lastRun.createdAt)}</span>
-                    <WorkflowRunBadge status={w.lastRun.status} />
-                  </div>
+                {w.description && (
+                  <p className="mt-0.5 truncate text-xs text-ink-2">{w.description}</p>
                 )}
+
+                <p className="mt-1 flex items-center gap-1.5 text-2xs text-ink-3">
+                  <IconFolder className="size-3.5" />
+                  {w.projectName}
+                </p>
               </div>
+
+              {/* Rozet tek başına "akış başarısız" gibi okunuyordu; başına
+                 "son çalışma" yazınca neyin durumu olduğu belli oluyor. */}
+              {w.lastRun && (
+                <div className="flex shrink-0 items-center gap-3 text-2xs text-ink-3">
+                  <span className="hidden sm:inline">
+                    son çalışma {formatRelative(w.lastRun.createdAt)}
+                  </span>
+                  <WorkflowRunBadge status={w.lastRun.status} />
+                </div>
+              )}
             </Link>
           ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
+      {/* Sayfalama KAYAN BÖLGENİN DIŞINDA: her zaman görünür, sağ alt köşede. */}
       {workflows.data && (
         <Pagination
           total={workflows.data.total}
           limit={workflows.data.limit}
           offset={workflows.data.offset}
-          onChange={setOffset}
+          onChange={(next) => {
+            setOffset(next);
+            // Arama sayfayla birlikte sıfırlanır: taşınsaydı kullanıcıya boş
+            // bir sayfa gösterirdi. Süzgeç ise bir NİYET, o kalıyor.
+            setQ("");
+          }}
+          pageSize={{
+            value: limit,
+            options: PAGE_SIZES,
+            onChange: (size) => {
+              setLimit(size);
+              // Boyut değişince ilk sayfaya dönülür: 50'lik listenin 3.
+              // sayfasındayken boyutu 10'a çekmek, var olmayan bir kayıt
+              // aralığına bakmak demek.
+              setOffset(0);
+            },
+          }}
           unit="akış"
         />
       )}

@@ -1,7 +1,12 @@
 "use client";
 
 import type { Model, ModelSort } from "@/lib/types";
-import { Badge } from "@/components/ui/primitives";
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconPlug,
+} from "@/components/ui/icons";
+import { Badge, IconTile, toneFromKey } from "@/components/ui/primitives";
 
 /** Fiyatı okunabilir biçime çevirir. Milyon token başına USD. */
 function formatPrice(perMTok: number): string {
@@ -40,22 +45,35 @@ export function ModelTable({
 }) {
   return (
     // Dar ekranda tablo yatay kayar; sayfanın kendisi kaymaz.
-    <div className="overflow-x-auto rounded-lg border border-line">
-      <table className="w-full min-w-[860px] text-sm">
-        <thead className="bg-raised text-left">
-          <tr>
+    <div className="overflow-x-auto rounded-card border border-line bg-surface shadow-(--shadow-card)">
+      <table className="w-full min-w-215 text-sm">
+        {/* Başlık şeridi Çalıştırmalar tablosuyla AYNI: iki tablo aynı
+            üründe iki farklı başlık dili konuşmamalı. */}
+        <thead>
+          <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
             {COLUMNS.map((col) => (
               <th
                 key={col.label}
-                className={`px-4 py-2.5 text-xs font-medium text-ink-2 ${col.align ?? ""}`}
+                className={`px-4 py-2.5 font-medium ${col.align ?? ""}`}
               >
                 {col.key ? (
+                  /* Sıralama yönü METİN OKUYLA (" ↑") gösteriliyordu; ok
+                     karakterinin boyu ve hizası yazı tipine göre değişiyor ve
+                     arayüzün ikon kümesiyle ne ölçüsü ne kalınlığı tutuyordu.
+                     Bu bir arayüz işareti, tipografi değil — yeri ikon kümesi. */
                   <button
                     onClick={() => onSortChange(col.key as ModelSort)}
-                    className="transition-colors hover:text-ink"
+                    className={`inline-flex items-center gap-1 uppercase transition-colors hover:text-ink ${
+                      col.align === "text-right" ? "flex-row-reverse" : ""
+                    }`}
                   >
                     {col.label}
-                    {sort === col.key && (order === "asc" ? " ↑" : " ↓")}
+                    {sort === col.key &&
+                      (order === "asc" ? (
+                        <IconChevronUp className="size-3.5" />
+                      ) : (
+                        <IconChevronDown className="size-3.5" />
+                      ))}
                   </button>
                 ) : (
                   col.label
@@ -64,18 +82,31 @@ export function ModelTable({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-line">
           {models.map((m) => (
             <tr
               key={`${m.providerId}:${m.id}`}
-              className="border-t border-line align-top hover:bg-raised/60"
+              className="align-top transition-colors hover:bg-raised"
             >
-              <td className="px-4 py-2.5 text-xs text-ink-2">
-                {m.providerName}
+              <td className="px-4 py-2.5">
+                {/*
+                  Sağlayıcı adının yanında renkli bir karo: onlarca satırın
+                  arasında hangi satırın hangi sağlayıcıya ait olduğu, adı
+                  okumadan görülüyor. Renk sağlayıcının kimliğinden türetilir,
+                  yani aynı sağlayıcı her sayfada aynı renkte.
+                */}
+                <div className="flex items-center gap-2">
+                  <IconTile tone={toneFromKey(m.providerId)} size="sm">
+                    <IconPlug className="size-3.5" />
+                  </IconTile>
+                  <span className="truncate text-xs text-ink-2">
+                    {m.providerName}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-2.5">
                 <div className="font-medium">{m.name}</div>
-                <div className="mt-0.5 font-mono text-xs text-ink-2">
+                <div className="mt-0.5 font-mono text-xs text-ink-3">
                   {m.id}
                 </div>
               </td>

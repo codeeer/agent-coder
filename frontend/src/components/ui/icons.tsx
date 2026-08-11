@@ -30,6 +30,10 @@ import {
   Bot,
   ChartColumn,
   Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   CirclePlay,
   CodeXml,
   Cpu,
@@ -131,6 +135,10 @@ export const IconTerminal = icon(Terminal);
 
 export const IconMenu = icon(Menu);
 export const IconClose = icon(X);
+export const IconChevronLeft = icon(ChevronLeft);
+export const IconChevronRight = icon(ChevronRight);
+export const IconChevronUp = icon(ChevronUp);
+export const IconChevronDown = icon(ChevronDown);
 
 /**
  * Kelime markasının simgesi.

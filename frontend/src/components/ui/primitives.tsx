@@ -6,6 +6,8 @@
  */
 
 import type React from "react";
+import { IconSearch } from "@/components/ui/icons";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ─── Yüzey ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,57 @@ export function List({
   );
 }
 
+/**
+ * Pano — başlığı KENDİ İÇİNDE taşıyan kart.
+ *
+ * `Section` başlığı kartın DIŞINA koyar; tek bir kartın üstünde bu doğru
+ * çalışır ama yan yana üç pano dizildiğinde çalışmaz: başlıklar kartların
+ * dışında havada durur, kartların üst kenarları hizalanmaz ve ızgara
+ * dağılır. Referans tasarımın bütün panoları başlığını içeride, ince bir
+ * ayraçla ayrılmış bir şeritte taşıyor — bu bileşen onu veriyor.
+ *
+ * Sağdaki `action` neredeyse her zaman "tümünü gör" bağlantısıdır: pano
+ * bir listenin ilk beş satırını gösterir, tamamı başka bir ekrandadır.
+ */
+export function Panel({
+  title,
+  action,
+  children,
+  /** Gövde kendi dolgusunu yönetsin — tablo ve tam genişlikli listeler için. */
+  padded = true,
+  className = "",
+}: {
+  title: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  padded?: boolean;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`flex flex-col overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card) ${className}`}
+    >
+      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-4">
+        <h2 className="truncate text-sm font-semibold tracking-[-0.01em]">
+          {title}
+        </h2>
+        {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
+      </header>
+      <div className={`min-w-0 flex-1 ${padded ? "p-4" : ""}`}>{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Pano başlığındaki "tümü" bağlantısı.
+ *
+ * `Button` DEĞİL: pano başlığında altı düğme yan yana durunca şerit bir
+ * araç çubuğuna dönüşüyor ve panonun asıl işi olan başlık okunmuyor.
+ * Referansta da bunlar düğme değil, sessiz birer bağlantı.
+ */
+export const panelLinkClass =
+  "rounded text-xs font-medium text-ink-3 transition-colors hover:text-accent";
+
 /** Kart içinde ikinci düzey yüzey — kod, diff, ayar satırı gibi bloklar. */
 export function Well({
   children,
@@ -80,6 +133,22 @@ export function Well({
 
 // ─── Sayfa iskeleti ─────────────────────────────────────────────────────────
 
+/**
+ * Sayfa başlığı — arayüzün TEK üst şeridi.
+ *
+ * Referans tasarımın en belirgin yapısal kararı bu: ekranın en üstünde tek
+ * bir satır var ve o satır hem sayfanın kim olduğunu (başlık + alt satır)
+ * hem de genel denetimleri (tema) taşıyor. İkinci bir uygulama çubuğu yok.
+ *
+ * Bu yüzden tema anahtarı buraya taşındı; kenar çubuğunun dibinde
+ * duruyordu. Oradaki yeri referansta SİSTEM DURUMUNA ait (bkz. Sidebar) ve
+ * daha önemlisi: tema, sayfanın değil arayüzün ayarı — sayfa başlığının
+ * sağ ucu, her ekranda aynı yerde duran tek noktadır.
+ *
+ * Alttaki kenarlık kaldırıldı. Başlığı içerikten ayıran şey artık boşluk;
+ * altındaki araç çubuğu ve panolar zaten kendi kenarlıklarını taşıyor ve
+ * üst üste üç yatay çizgi ekranı katlara bölüyordu.
+ */
 export function PageHeader({
   title,
   description,
@@ -90,19 +159,26 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="mb-7 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
         <h1 className="text-xl font-semibold">{title}</h1>
         {description && (
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">
             {description}
           </p>
         )}
       </div>
+
       {/* `flex-wrap`: dar ekranda beş düğmelik bir sıra tek satıra sığmıyor ve
           `shrink-0` yüzünden sondakiler ekranın dışına taşıyordu — akış
           ekranında "Kaydet" düğmesi telefonda hiç görünmüyordu. */}
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      <div className="flex flex-wrap items-center gap-2">
+        {actions}
+        {/* Ayraç yalnızca sayfanın kendi eylemi varsa: tek başına duran tema
+            anahtarının soluna çizgi çekmek, olmayan bir grubu ima ederdi. */}
+        {actions && <span className="mx-0.5 hidden h-6 w-px bg-line sm:block" />}
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
@@ -133,6 +209,172 @@ export function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * Araç çubuğu — listenin üstündeki arama + süzgeç şeridi.
+ *
+ * Referansın her liste ekranında var ve hep aynı yerde: başlığın altı,
+ * listenin üstü. Kendi yüzeyi VAR (kart gibi) çünkü listeyi süzen
+ * denetimler listenin bir parçası değil, ona uygulanan bir katman —
+ * zeminde serbest duran denetimler sayfanın neresine ait olduğunu
+ * söylemiyordu.
+ */
+export function Toolbar({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`mb-4 flex flex-wrap items-center gap-2 rounded-card border border-line bg-surface p-2 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Arama alanı — solda büyüteç, sağda kısayol ipucu.
+ *
+ * İpucu (`⌘K` gibi) SÜS DEĞİL: kısayol gerçekten bağlıysa verilir. Bağlı
+ * olmayan bir kısayolu yazmak, çalışmayan bir söz vermek olur.
+ */
+export function SearchField({
+  className = "",
+  hint,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { hint?: string }) {
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3">
+        <IconSearch className="size-4" />
+      </span>
+      <input
+        {...props}
+        className={`${fieldBase} h-9 bg-canvas pl-9 ${hint ? "pr-14" : ""}`}
+      />
+      {hint && (
+        <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded border border-line px-1.5 py-px font-mono text-2xs text-ink-3">
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Segment düğmeleri — birbirini dışlayan birkaç seçenek.
+ *
+ * Aynı kalıp üç ekranda üç ayrı yerde elle yazılmıştı (rapor dönemi,
+ * çalıştırma süzgeci, tema anahtarı): biri kutuyu `p-0.5` ile içeriden
+ * dolduruyordu, diğeri bölmeleri `border-l` ile ayırıyordu, üçüncüsü
+ * yuvarlaklığı farklıydı. Aynı işin üç görünümü.
+ */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: ReadonlyArray<{ id: T; label: React.ReactNode; title?: string }>;
+  value: T;
+  onChange: (id: T) => void;
+  label: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="flex shrink-0 rounded-lg border border-line bg-canvas p-0.5"
+    >
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          title={o.title}
+          onClick={() => onChange(o.id)}
+          aria-pressed={value === o.id}
+          className={`flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs whitespace-nowrap transition-colors duration-150 ${
+            value === o.id
+              ? "bg-accent-soft font-medium text-accent"
+              : "text-ink-2 hover:bg-raised hover:text-ink"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── İkon karosu ────────────────────────────────────────────────────────────
+
+/**
+ * Renkli ikon karosu — liste satırının solundaki kimlik işareti.
+ *
+ * Referansın liste satırlarını okunur kılan asıl şey bu: göz, satırı
+ * metinden değil karodan buluyor. Karo bir DURUM ANLATMAZ; yalnızca
+ * satırları birbirinden ayırır, bu yüzden rengi kaydın kimliğinden
+ * türetilir (`toneFromKey`) ve zaman içinde sabit kalır.
+ *
+ * Durum renkleriyle karışmaması için karo her zaman YUMUŞAK zeminlidir;
+ * dolu bir renk kullanılsaydı yanındaki durum rozetiyle yarışırdı.
+ */
+export type TileTone = "accent" | "info" | "success" | "warning" | "danger" | "series";
+
+const tileTones: Record<TileTone, string> = {
+  accent: "bg-accent-soft text-accent",
+  info: "bg-info-soft text-info",
+  success: "bg-ok-soft text-ok",
+  warning: "bg-warn-soft text-warn",
+  danger: "bg-danger-soft text-danger",
+  series: "bg-series-soft text-series",
+};
+
+const TILE_TONES: readonly TileTone[] = [
+  "accent",
+  "info",
+  "success",
+  "warning",
+  "danger",
+  "series",
+];
+
+/**
+ * Kimlikten sabit bir renk üretir.
+ *
+ * Sırayla dağıtılsaydı (`i % 6`) sayfa değiştikçe aynı kaydın rengi
+ * değişirdi — kullanıcı ikinci sayfada aradığı akışı rengiyle bulamazdı.
+ */
+export function toneFromKey(key: string): TileTone {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return TILE_TONES[hash % TILE_TONES.length]!;
+}
+
+export function IconTile({
+  tone = "accent",
+  size = "md",
+  children,
+}: {
+  tone?: TileTone;
+  /** sm: liste satırı içi · md: liste satırı başı. */
+  size?: "sm" | "md";
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center rounded-lg ${
+        size === "sm" ? "size-7" : "size-9"
+      } ${tileTones[tone]}`}
+    >
+      {children}
+    </span>
   );
 }
 
