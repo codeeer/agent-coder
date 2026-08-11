@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/agent-coder/backend/internal/agentreg"
+	"github.com/agent-coder/backend/internal/llm"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/runbuild"
 	"github.com/agent-coder/backend/internal/runs"
@@ -242,6 +243,22 @@ func (h *Handler) respondRunError(w http.ResponseWriter, r *http.Request, err er
 	case errors.Is(err, runbuild.ErrNoModel):
 		respondError(w, http.StatusBadRequest, "no_model",
 			"model seçilmedi ve agent'ın varsayılan modeli yok")
+
+	/*
+	 * Hiç LLM sağlayıcı tanımlı değil.
+	 *
+	 * Bu bir YAPILANDIRMA eksiği, sistem arızası değil. Haritalanmadığı sürece
+	 * `default` dalına düşüp 500 "internal_error" dönüyordu: yeni kurulum yapan
+	 * biri ilk çalıştırmasında uygulamanın bozuk olduğunu sanırdı. Git erişimi
+	 * eksikliğinde zaten aynı özenle davranılıyor.
+	 *
+	 * Sağlayıcı türü kasıtlı olarak anılmıyor: OpenRouter zorunlu değil, LiteLLM
+	 * ve OpenAI-uyumlu servisler de aynı ekrandan tanımlanıyor.
+	 */
+	case errors.Is(err, llm.ErrNotFound):
+		respondError(w, http.StatusPreconditionFailed, "no_llm_provider",
+			"tanımlı LLM sağlayıcı yok — Ayarlar → Modeller bölümünden "+
+				"bir sağlayıcı ekleyin (OpenRouter, LiteLLM veya OpenAI-uyumlu servis)")
 
 	case errors.Is(err, projects.ErrNotFound):
 		respondError(w, http.StatusBadRequest, "project_not_found", "proje bulunamadı")

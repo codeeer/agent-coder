@@ -476,6 +476,17 @@ klonlama hedefi ve boş olmak zorunda, ayrıca bizim dosyalarımız kullanıcın
 Dizin imajda önceden açılır — tar kopyalaması dizin oluşturmuyor. Betik adı doğrudan dosya
 adına dönüştüğü için dar (`[a-z0-9-]`) ve sessizce dönüştürülmez, baştan reddedilir.
 
+**Yapılandırma eksiği 5xx DÖNMEZ.** Sağlayıcı tanımlı değil, git erişimi yok, model
+seçilmemiş — bunlar arıza değil eksik ayar. `default` dalına düşüp 500 "internal_error"
+verdiklerinde yeni kurulum yapan kullanıcı uygulamanın bozuk olduğunu sanıyor. Her biri
+4xx ve **ne yapılacağını söyleyen** bir mesajla döner; bir test bu ayrımı kilitliyor
+(`TestRespondRunError_YapilandirmaEksigi500Donmez`).
+
+**OpenRouter zorunlu bir bağımlılık değildir.** LiteLLM ve OpenAI-uyumlu servisler
+(vLLM, Azure OpenAI, Ollama) eşit desteklenir; kullanıcı arayüzünde ve belgelerde
+OpenRouter varsayılan yolmuş gibi sunulmaz. Kurum içi kurulumlarda dışarıya hiç
+çıkmadan çalışmak mümkün olmalı.
+
 **Betik içeriği gizli değer değildir.** Şifrelenmez, arayüzde tam metin görünür. Container
 içinde zaten düz metin duruyor ve agent okuyabiliyor; şifrelemek yanlış bir güvenlik hissi
 verirdi. Gizli değer betiğe değil ortam değişkenine konur.

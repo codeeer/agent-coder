@@ -222,19 +222,33 @@ Açılış ekranı size üç adımlık bir kontrol listesi gösterir. Sırayla:
 
 **Ayarlar → Modeller → Sağlayıcı ekle**
 
-En kolayı [OpenRouter](https://openrouter.ai/keys): ücretsiz hesap açıp bir API
-anahtarı alın (`sk-or-v1-...`). Tek anahtarla Claude, GPT, Gemini, Llama ve
-yüzlerce modele erişirsiniz.
+**OpenRouter zorunlu değil.** Üç tür de eşit desteklenir; hangisi elinizdeyse
+onu seçin:
 
-Anahtarı yapıştırıp kaydedin. Sistem anahtarı **kaydetmeden önce doğrular** ve
-model kataloğunu (300+ model, fiyatlarıyla) çeker.
+| Sağlayıcı | Kimin için | Gereken |
+|---|---|---|
+| **LiteLLM proxy** | Kurum içi proxy'si olanlar | Proxy adresi + anahtar |
+| **OpenAI-uyumlu servis** | vLLM, Azure OpenAI, Ollama — `/v1/models` sunan her şey | Adres + anahtar |
+| **OpenRouter** | Dışarıdan tek anahtarla yüzlerce modele erişmek isteyenler | [API anahtarı](https://openrouter.ai/keys) |
+
+Kendi sunucunuzda model çalıştırıyorsanız (Ollama, vLLM) **dışarıya hiç
+çıkmadan** kullanabilirsiniz — kod deponuz da model çağrılarınız da ağınızda
+kalır.
+
+Hangisini seçerseniz seçin sistem **kaydetmeden önce bağlanıp doğrular** ve model
+kataloğunu çeker. Fiyat ve bağlam bilgisi sağlayıcı bildiriyorsa gelir;
+bildirmiyorsa katalogda yalnızca model adları görünür.
 
 > Anahtarınız veritabanında AES-256-GCM ile şifrelenir. Arayüzde bir daha tam
 > haliyle gösterilmez — yalnızca son 4 karakteri görünür.
 
-Kurumsal bir LiteLLM proxy'niz varsa onu da ekleyebilirsiniz; birden fazla
-sağlayıcı aynı anda tanımlı olabilir ve her agent adımı hangisini kullanacağını
-ayrı seçer.
+**Birden fazla sağlayıcı aynı anda tanımlı olabilir** ve her agent adımı
+hangisini kullanacağını ayrı seçer: analizi kurum içi ucuz bir modele, kod
+yazımını güçlü bir modele verebilirsiniz.
+
+> Hiç sağlayıcı tanımlamazsanız uygulama yine açılır; açılış ekranı bu adımı
+> eksik gösterir ve bir agent çalıştırmayı denediğinizde ne yapmanız gerektiğini
+> söyleyen bir uyarı alırsınız.
 
 ## 2️⃣ Proje ekleyin
 
