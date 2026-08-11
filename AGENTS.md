@@ -177,6 +177,10 @@ ile **ölç**. Aracın "tema eşliği" bölümü tam olarak bu hatayı arar — 
 bileşenin bir temada geçip diğerinde kalması. Göz bu hatayı bulamaz: iki tema
 aynı anda görülemiyor ve 4,1 ile 4,6 arası bakışla ayırt edilmiyor.
 
+> Buradaki "sonra ölç", ölçümün **nasıl** yapılacağını anlatır, ne zaman
+> tetikleneceğini değil. Denetim kendiliğinden çalıştırılmaz — bkz.
+> [Tema denetimi](#tema-denetimi).
+
 ### Görsel doğrulama
 
 Tip kontrolü, linter ve birim testler **rengin ve yerleşimin doğru olduğunu
@@ -210,6 +214,24 @@ sonucunu karşılaştırır**.
   bunları sessizce atlar — bir kez atladı, bütün rozet kenarları ölçüsüz kaldı.
 - "0 kalan" sonucunu sorgulayın: aracın gerçekten baktığını doğrulamadan
   temiz raporlamayın.
+
+**Denetim KENDİLİĞİNDEN çalıştırılmaz — kullanıcıya sorulur.** (kullanıcı kararı)
+
+Tasarım işi verildiğinde sıra şudur:
+
+1. İstenen tasarım **olduğu gibi** yapılır. Denetim kaygısıyla önden
+   yumuşatılmaz, "bu geçmez" diye kısılmaz.
+2. Kullanıcı **gözüyle bakar**. İlk hakem odur.
+3. `theme-audit` çalıştırılsın mı diye **sorulur**; kararı kullanıcı verir.
+
+Gerekçe: ölçüm, tasarımın *sonrasında* gelen bir kontroldür — *öncesinde* gelen
+bir kısıt değil. Denetimi baştan dayatmak, henüz görülmemiş bir tasarımı
+kendiliğinden törpüler ve kullanıcının değerlendireceği şey ortaya hiç çıkmaz.
+Bir aracın var olması, her seferinde çalıştırılacağı anlamına gelmez.
+
+Bu, yukarıdaki ölçme kurallarını geçersiz kılmaz: denetim çalıştırıldığında
+eşikler ve "0 kalan"ı sorgulama kuralı aynen geçerlidir. Değişen tek şey **ne
+zaman** çalıştırılacağı.
 
 ### Liste uçları ve sayfalama
 
