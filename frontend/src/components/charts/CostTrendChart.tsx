@@ -37,7 +37,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
   if (!last || total === 0) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border border-dashed border-line text-[12px] text-ink-3"
+        className="flex items-center justify-center rounded-lg border border-dashed border-line text-xs text-ink-3"
         style={{ height: HEIGHT }}
       >
         Bu dönemde maliyet oluşmadı
@@ -103,7 +103,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
                 x={PAD.left - 8}
                 y={y(t) + 3}
                 textAnchor="end"
-                className="fill-ink-3 text-[10px] tabular-nums"
+                className="fill-ink-3 text-2xs tabular-nums"
               >
                 {tickLabel(t)}
               </text>
@@ -111,11 +111,11 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
           ))}
 
           {/* Alan dolgusu bir yıkama: seriyi bastırmadan gövde kazandırır. */}
-          <path d={area} fill="var(--color-accent)" opacity={0.1} />
+          <path d={area} fill="var(--color-series)" opacity={0.1} />
           <path
             d={line}
             fill="none"
-            stroke="var(--color-accent)"
+            stroke="var(--color-series)"
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -135,7 +135,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
                 cx={x(hover)}
                 cy={y(active.costUsd)}
                 r={4}
-                fill="var(--color-accent)"
+                fill="var(--color-series)"
                 stroke="var(--color-surface)"
                 strokeWidth={2}
               />
@@ -147,7 +147,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
             cx={x(days.length - 1)}
             cy={y(last.costUsd)}
             r={4}
-            fill="var(--color-accent)"
+            fill="var(--color-series)"
             stroke="var(--color-surface)"
             strokeWidth={2}
           />
@@ -163,7 +163,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
                 textAnchor={
                   i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"
                 }
-                className="fill-ink-3 text-[10px]"
+                className="fill-ink-3 text-2xs"
               >
                 {formatDayLabel(d.date)}
               </text>
@@ -174,12 +174,12 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
 
       {active && hover !== null && (
         <Tooltip x={x(hover)} width={width}>
-          <div className="text-[12px] font-medium">{formatDayLong(active.date)}</div>
-          <div className="mt-1 flex justify-between gap-3 text-[11px]">
+          <div className="text-xs font-medium">{formatDayLong(active.date)}</div>
+          <div className="mt-1 flex justify-between gap-3 text-2xs">
             <span className="text-ink-2">Maliyet</span>
             <span className="tabular-nums">{formatMoney(active.costUsd)}</span>
           </div>
-          <div className="flex justify-between gap-3 text-[11px]">
+          <div className="flex justify-between gap-3 text-2xs">
             <span className="text-ink-2">Çalıştırma</span>
             <span className="tabular-nums">{formatCount(active.runs)}</span>
           </div>

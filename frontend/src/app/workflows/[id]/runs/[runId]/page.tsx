@@ -73,11 +73,11 @@ export default function WorkflowRunPage() {
         description={
           <span className="flex flex-wrap items-center gap-2">
             <WorkflowRunBadge status={r.status} />
-            <Link href={`/workflows/${id}`} className="text-[13px] hover:text-accent">
+            <Link href={`/workflows/${id}`} className="text-sm hover:text-accent">
               {r.workflowName}
             </Link>
             <Badge>v{r.version}</Badge>
-            <span className="text-[12px] text-ink-3">
+            <span className="text-xs text-ink-3">
               {TRIGGER_TEXT[r.triggerKind].long} ·{" "}
               {formatDate(r.createdAt)}
             </span>
@@ -133,7 +133,7 @@ export default function WorkflowRunPage() {
           {messages.length > 0 && (
             <Section title="İlerleme">
               <Card padded={false}>
-                <ul className="max-h-64 overflow-auto p-3 font-mono text-[12px]">
+                <ul className="max-h-64 overflow-auto p-3 font-mono text-xs">
                   {messages.map((m, i) => (
                     <li
                       key={i}
@@ -175,12 +175,12 @@ export default function WorkflowRunPage() {
 
           {Object.keys(r.triggerPayload).length > 0 && (
             <Card>
-              <p className="mb-2 text-[11px] tracking-wide text-ink-3 uppercase">
+              <p className="mb-2 text-2xs tracking-wide text-ink-3 uppercase">
                 Tetikleyici verisi
               </p>
               <dl className="space-y-1.5">
                 {Object.entries(r.triggerPayload).map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-3 text-[12px]">
+                  <div key={k} className="flex justify-between gap-3 text-xs">
                     <Mono>{k}</Mono>
                     <span className="truncate text-ink-2">{v}</span>
                   </div>
@@ -241,14 +241,26 @@ function StepRow({ step, index }: { step: WorkflowStep; index: number }) {
 
   return (
     <Card className={step.status === "running" ? "border-accent/40" : ""}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-raised text-[11px] font-medium text-ink-2">
+      {/*
+        `flex-wrap` KALDIRILDI.
+
+        Aynı listede iki farklı adım düzeni görünüyordu: kısa içerikli adımda
+        durum rozeti sağ üstte, uzun çıktılı adımda sol altta. İki ayrı kod
+        yolu sanılabilir ama tek bir bileşen var — sebep buydu: sol blok
+        uzayınca sağdaki rozet bloğu sarmalanıp alt satıra, yani sola
+        düşüyordu. Durumun yeri içeriğin uzunluğuna göre değişiyordu.
+
+        Sarmalama yerine sol blok `min-w-0 flex-1` ile daraltılabilir yapıldı;
+        uzun metin artık kendi sütununda sarıyor, rozet her adımda aynı yerde.
+      */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-raised text-2xs font-medium text-ink-2">
             {index + 1}
           </span>
           <div className="min-w-0">
-            <div className="text-[13px] font-medium">{step.nodeName || step.nodeId}</div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
+            <div className="text-sm font-medium">{step.nodeName || step.nodeId}</div>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
               {step.agentSlug && <Mono>{step.agentSlug}</Mono>}
               {step.modelId && <Mono>{step.modelId}</Mono>}
               {duration > 0 && <span>{formatDuration(duration)}</span>}
@@ -257,19 +269,19 @@ function StepRow({ step, index }: { step: WorkflowStep; index: number }) {
             {/* Agent olmayan adımın sonucu: PR adresi en işe yarar bilgi,
                 kaybolmamalı. */}
             {step.resultText && (
-              <p className="mt-1 text-[12px] text-ink-2">{step.resultText}</p>
+              <p className="mt-1 text-xs text-ink-2">{step.resultText}</p>
             )}
             {step.resultUrl && (
               <a
                 href={step.resultUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-0.5 inline-block truncate text-[12px] text-accent underline underline-offset-2"
+                className="mt-0.5 inline-block truncate text-xs text-accent underline underline-offset-2"
               >
                 {step.resultUrl}
               </a>
             )}
-            {step.error && <p className="mt-1.5 text-[12px] text-danger">{step.error}</p>}
+            {step.error && <p className="mt-1.5 text-xs text-danger">{step.error}</p>}
           </div>
         </div>
 

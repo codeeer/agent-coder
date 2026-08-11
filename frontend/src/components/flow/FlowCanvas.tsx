@@ -23,6 +23,17 @@ import { edgeId, type FlowEdge, type FlowNode } from "@/lib/workflow-graph";
 import { nodeTypes } from "@/components/flow/nodes";
 
 /**
+ * Sığdırmada izin verilen en yüksek yakınlaştırma.
+ *
+ * 1 idi, yani küçük bir akış hiçbir zaman büyütülmüyordu. Pratikte çoğu
+ * akışta bağlayıcı kısıt YİNE genişliktir — soldan sağa dizilen bir zincir
+ * kabına yatayda sığdığı kadar büyür ve bu sınıra hiç dayanmaz. Fark tek
+ * düğümlü ya da çok kısa akışlarda görülür; orada da üst sınır gerekli,
+ * yoksa tek bir düğüm ekranı kaplayacak kadar şişerdi.
+ */
+const FIT_MAX_ZOOM = 1.35;
+
+/**
  * Sinyal değişince görünümü sığdırır.
  *
  * `useReactFlow` yalnızca sağlayıcının İÇİNDE çalışır; bu yüzden ayrı bir
@@ -36,7 +47,7 @@ function FitOnSignal({ signal }: { signal?: number }) {
     // Düğüm DOM'a girip ölçülene kadar bekle; hemen çağrılırsa boyutu
     // bilinmeyen düğüm hesaba katılmaz.
     const t = setTimeout(
-      () => void flow.fitView({ padding: 0.2, maxZoom: 1, duration: 200 }),
+      () => void flow.fitView({ padding: 0.2, maxZoom: FIT_MAX_ZOOM, duration: 200 }),
       60,
     );
     return () => clearTimeout(t);
@@ -171,7 +182,7 @@ export function FlowCanvas({
 
   return (
     <div
-      className="overflow-hidden rounded-card border border-line bg-canvas"
+      className="overflow-hidden rounded-card border border-line bg-deck"
       style={{ height }}
     >
       <ReactFlowProvider>
@@ -191,7 +202,7 @@ export function FlowCanvas({
           elementsSelectable
           deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
           fitView
-          fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+          fitViewOptions={{ padding: 0.2, maxZoom: FIT_MAX_ZOOM }}
           proOptions={{ hideAttribution: false }}
         >
           <Background variant={BackgroundVariant.Dots} gap={18} size={1} />

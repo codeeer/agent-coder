@@ -29,6 +29,40 @@ export function Card({
   );
 }
 
+/**
+ * Liste kabı — kayıt listeleri için TEK deyim.
+ *
+ * Öncesinde uygulamada üç ayrı liste dili vardı: Projeler ve Agent'lar her
+ * kaydı ayrı bir `Card` olarak çiziyordu (kayıt başına bir kenarlık, bir
+ * gölge, aralarında boşluk), Panel ve Çalıştırmalar tek kap + ayraç
+ * kullanıyordu, Modeller ise tablo. Aynı üründe aynı işin üç görünümü.
+ *
+ * Doğrusu tek kap: bir liste TEK bir şeydir. Her satırı bağımsız bir yüzey
+ * yapmak aralarındaki ilişkiyi görsel olarak koparır ve ekranı kenarlıkla
+ * doldurur.
+ *
+ * Ayraçlar `divide-y` ile KAPTAN geliyor, satırdan değil. Öncesinde her
+ * liste `i > 0 ? "border-t" : ""` diye kendi indeks mantığını taşıyordu —
+ * üç yerde tekrarlanan, ilk satırda yanlışlıkla çizgi bırakmaya açık bir
+ * kalıptı. Satırlar artık sırasını bilmek zorunda değil ve `<Link>` de
+ * `<div>` de olabilirler.
+ */
+export function List({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`divide-y divide-line overflow-hidden rounded-card border border-line bg-surface ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Kart içinde ikinci düzey yüzey — kod, diff, ayar satırı gibi bloklar. */
 export function Well({
   children,
@@ -58,11 +92,9 @@ export function PageHeader({
   return (
     <header className="mb-7 flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
       <div className="min-w-0">
-        <h1 className="text-[22px] leading-tight font-semibold tracking-[-0.01em]">
-          {title}
-        </h1>
+        <h1 className="text-xl font-semibold">{title}</h1>
         {description && (
-          <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-ink-2">
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
             {description}
           </p>
         )}
@@ -90,17 +122,14 @@ export function Section({
     <section>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
+          <h2 className="text-base font-semibold tracking-[-0.01em]">{title}</h2>
           {description && (
-            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ink-2">
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ink-2">
               {description}
             </p>
           )}
         </div>
-        {/* `flex-wrap`: dar ekranda beş düğmelik bir sıra tek satıra sığmıyor ve
-          `shrink-0` yüzünden sondakiler ekranın dışına taşıyordu — akış
-          ekranında "Kaydet" düğmesi telefonda hiç görünmüyordu. */}
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
       {children}
     </section>
@@ -122,17 +151,30 @@ const buttonVariants: Record<ButtonVariant, string> = {
     "bg-surface text-ink border border-control-line hover:border-ink-2 hover:bg-raised",
   ghost:
     "bg-transparent text-ink-2 border border-transparent hover:bg-raised hover:text-ink",
-  // /35 idi: kenar açık temada 1,76:1, koyu temada 1,85:1 ölçüldü — yani "Sil"
-  // düğmesinin sınırı iki temada da görünmüyordu. Bu ölçüm uzun süre yapılmadı
-  // çünkü denetim aracı saydam renkleri sessizce atlıyordu (bkz. spec 010).
-  // /70: açık 3,32:1, koyu 3,90:1 — eşiği geçen en hafif değer.
+  /*
+   * Yıkıcı eylem DURGUNKEN sessiz, etkileşimde kırmızı.
+   *
+   * Önceki hali durgunken de kırmızı metin + kırmızı kenar taşıyordu ve
+   * yanındaki "Düzenle" ile aynı boydaydı. Agent listesinde altı satırın
+   * her birinde bir kırmızı düğme duruyordu: kırmızı, sayfada en sık
+   * görülen renk olunca uyarı olmaktan çıkıyor.
+   *
+   * Anlam kaybolmuyor, çünkü RENK ZATEN TEK KANAL DEĞİL — düğmenin üstünde
+   * "Sil" yazıyor. Projenin durum renkleri için uyguladığı kuralın aynısı.
+   *
+   * Kenar `control-line`: `secondary` ile aynı jeton, yani aynı ölçülmüş
+   * 3:1 denetim sınırı. Bu bilinçli — daha önce kenar `danger/35` iken
+   * açık temada 1,76:1, koyu temada 1,85:1 ölçülmüştü ve "Sil" düğmesinin
+   * sınırı iki temada da görünmüyordu (spec 010). Sessizleştirmek o hatayı
+   * geri getirmemeli: kırmızıyı hover'a taşıyoruz, sınırı zayıflatmıyoruz.
+   */
   danger:
-    "bg-transparent text-danger border border-danger/70 hover:bg-danger-soft",
+    "bg-transparent text-ink-2 border border-control-line hover:border-danger/70 hover:bg-danger-soft hover:text-danger",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
-  sm: "h-7 px-2.5 text-[12px] gap-1.5",
-  md: "h-8 px-3 text-[13px] gap-1.5",
+  sm: "h-7 px-2.5 text-xs gap-1.5",
+  md: "h-8 px-3 text-sm gap-1.5",
 };
 
 export function Button({
@@ -183,7 +225,7 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`inline-flex items-center rounded-md border px-1.5 py-[1px] text-[11px] font-medium whitespace-nowrap ${badgeTones[tone]}`}
+      className={`inline-flex items-center rounded-md border px-1.5 py-[1px] text-2xs font-medium whitespace-nowrap ${badgeTones[tone]}`}
     >
       {children}
     </span>
@@ -221,7 +263,7 @@ export function StatusDot({
 // Girdi kenarı da bir DENETİM sınırıdır: `border-line` ile beyaz kart üzerinde
 // 1,31:1 ölçülüyordu — kutunun nerede olduğu görünmüyordu.
 const fieldBase =
-  "w-full rounded-lg border border-control-line bg-canvas px-2.5 py-1.5 text-[13px] outline-none transition-colors duration-150 placeholder:text-ink-3 hover:border-ink-2 focus:border-accent disabled:opacity-50";
+  "w-full rounded-lg border border-control-line bg-canvas px-2.5 py-1.5 text-sm outline-none transition-colors duration-150 placeholder:text-ink-3 hover:border-ink-2 focus:border-accent disabled:opacity-50";
 
 export function Input({
   className = "",
@@ -261,7 +303,7 @@ export function Label({
 }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1 block text-[11px] font-medium tracking-wide text-ink-2 uppercase">
+      <span className="mb-1 block text-2xs font-medium tracking-wide text-ink-2 uppercase">
         {children}
         {hint && (
           <span className="ml-1.5 font-normal normal-case opacity-70">{hint}</span>
@@ -284,7 +326,7 @@ export function Checkbox({
 }) {
   return (
     <label
-      className={`inline-flex items-center gap-2 text-[13px] ${
+      className={`inline-flex items-center gap-2 text-sm ${
         disabled ? "opacity-50" : "cursor-pointer"
       }`}
     >
@@ -320,7 +362,7 @@ export function Notice({
 }) {
   return (
     <div
-      className={`rounded-lg border px-3.5 py-2.5 text-[13px] leading-relaxed ${noticeTones[tone]}`}
+      className={`rounded-lg border px-3.5 py-2.5 text-sm leading-relaxed ${noticeTones[tone]}`}
     >
       {title && <p className="font-medium">{title}</p>}
       {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
@@ -347,9 +389,9 @@ export function EmptyState({
           {icon}
         </div>
       )}
-      <p className="text-[14px] font-medium">{title}</p>
+      <p className="text-base font-medium">{title}</p>
       {description && (
-        <p className="mx-auto mt-1.5 max-w-md text-[13px] leading-relaxed text-ink-2">
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-ink-2">
           {description}
         </p>
       )}
@@ -388,10 +430,8 @@ export function Field({
 }) {
   return (
     <div className={`min-w-0 ${className}`}>
-      <dt className="text-[11px] tracking-wide text-ink-3 uppercase">{label}</dt>
-      <dd
-        className={`mt-0.5 truncate text-[13px] ${mono ? "font-mono text-[12px]" : ""}`}
-      >
+      <dt className="text-2xs tracking-wide text-ink-3 uppercase">{label}</dt>
+      <dd className={`mt-0.5 truncate text-sm ${mono ? "font-mono text-xs" : ""}`}>
         {value}
       </dd>
     </div>
@@ -408,7 +448,7 @@ export function Mono({
 }) {
   return (
     <code
-      className={`rounded bg-raised px-1.5 py-0.5 font-mono text-[12px] text-ink-2 ${className}`}
+      className={`rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-ink-2 ${className}`}
     >
       {children}
     </code>

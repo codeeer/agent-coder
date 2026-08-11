@@ -67,7 +67,7 @@ export function RunsByDayChart({ days }: { days: ReportDay[] }) {
               className="absolute right-0 left-0 border-t border-line"
               style={{ bottom: `${(t / top) * 100}%` }}
             >
-              <span className="absolute -top-2 -left-0.5 -translate-x-full bg-surface pr-1 text-[10px] tabular-nums text-ink-3">
+              <span className="absolute -top-2 -left-0.5 -translate-x-full bg-surface pr-1 text-2xs tabular-nums text-ink-3">
                 {formatCount(t)}
               </span>
             </div>
@@ -107,7 +107,7 @@ export function RunsByDayChart({ days }: { days: ReportDay[] }) {
               // hizalama içeri döner.
               <span
                 key={d.date}
-                className={`absolute text-[10px] whitespace-nowrap text-ink-3 ${
+                className={`absolute text-2xs whitespace-nowrap text-ink-3 ${
                   i === 0
                     ? "left-0"
                     : i === days.length - 1
@@ -184,17 +184,17 @@ function DayDetail({ day }: { day: ReportDay }) {
 
   return (
     <>
-      <div className="text-[12px] font-medium">{formatDayLong(day.date)}</div>
+      <div className="text-xs font-medium">{formatDayLong(day.date)}</div>
       <div className="mt-1.5 space-y-0.5">
         {rows
           .filter(([, v]) => v > 0)
           .map(([label, v]) => (
-            <div key={label} className="flex justify-between gap-3 text-[11px]">
+            <div key={label} className="flex justify-between gap-3 text-2xs">
               <span className="text-ink-2">{label}</span>
               <span className="tabular-nums">{formatCount(v)}</span>
             </div>
           ))}
-        <div className="flex justify-between gap-3 border-t border-line pt-0.5 text-[11px] font-medium">
+        <div className="flex justify-between gap-3 border-t border-line pt-0.5 text-2xs font-medium">
           <span>Toplam</span>
           <span className="tabular-nums">{formatCount(day.runs)}</span>
         </div>
@@ -221,7 +221,7 @@ function ChartShell({
 function EmptyPlot() {
   return (
     <div
-      className="flex items-center justify-center rounded-lg border border-dashed border-line text-[12px] text-ink-3"
+      className="flex items-center justify-center rounded-lg border border-dashed border-line text-xs text-ink-3"
       style={{ height: PLOT_HEIGHT }}
     >
       Bu dönemde çalıştırma yok
@@ -239,14 +239,14 @@ export function RunsByDayTable({ days }: { days: ReportDay[] }) {
   const rows = days.filter((d) => d.runs > 0);
 
   if (rows.length === 0) {
-    return <p className="text-[13px] text-ink-3">Bu dönemde çalıştırma yok.</p>;
+    return <p className="text-sm text-ink-3">Bu dönemde çalıştırma yok.</p>;
   }
 
   return (
     <div className="max-h-[260px] overflow-auto">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-xs">
         <thead className="sticky top-0 bg-surface">
-          <tr className="border-b border-line text-left text-[11px] tracking-wide text-ink-3 uppercase">
+          <tr className="border-b border-line text-left text-2xs tracking-wide text-ink-3 uppercase">
             <th className="py-1.5 pr-3 font-medium">Gün</th>
             <th className="py-1.5 pr-3 text-right font-medium">Toplam</th>
             <th className="py-1.5 pr-3 text-right font-medium">Başarılı</th>

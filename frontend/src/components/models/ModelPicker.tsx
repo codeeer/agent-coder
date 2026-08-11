@@ -170,7 +170,7 @@ export function ModelPicker({
   return (
     <div ref={rootRef} className="relative">
       <div className="relative">
-        <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-3" />
+        <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" />
         <input
           ref={inputRef}
           role="combobox"
@@ -183,7 +183,7 @@ export function ModelPicker({
             kullanır. Elle kopyalandığı için `control-line` düzeltmesinden payını
             almamıştı: aynı görünmesi gereken iki kutu iki farklı kenar rengi
             taşıyordu. */
-          className="w-full rounded-lg border border-control-line bg-canvas py-1.5 pr-16 pl-8 font-mono text-[12px] outline-none transition-colors duration-150 placeholder:font-sans placeholder:text-ink-3 hover:border-ink-2 focus:border-accent disabled:opacity-50"
+          className="w-full rounded-lg border border-control-line bg-canvas py-1.5 pr-16 pl-8 font-mono text-xs outline-none transition-colors duration-150 placeholder:font-sans placeholder:text-ink-3 hover:border-ink-2 focus:border-accent disabled:opacity-50"
           value={open ? query : (selected?.id ?? "")}
           placeholder={selected ? selected.id : emptyLabel}
           onFocus={() => setOpen(true)}
@@ -198,7 +198,7 @@ export function ModelPicker({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="absolute top-1/2 right-2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[11px] text-ink-3 transition-colors hover:bg-raised hover:text-ink"
+            className="absolute top-1/2 right-2 -translate-y-1/2 rounded px-1.5 py-0.5 text-2xs text-ink-3 transition-colors hover:bg-raised hover:text-ink"
           >
             temizle
           </button>
@@ -208,7 +208,7 @@ export function ModelPicker({
       {/* Seçili modelin sağlayıcısı ve uyarısı kapalıyken de görünür. */}
       {selected && !open && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-ink-3">{selected.providerName}</span>
+          <span className="text-2xs text-ink-3">{selected.providerName}</span>
           <ToolsHint model={selected} />
         </div>
       )}
@@ -221,7 +221,7 @@ export function ModelPicker({
           className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-control-line bg-overlay py-1 shadow-(--shadow-pop)"
         >
           {matches.length === 0 && (
-            <li className="px-3 py-2.5 text-[13px] text-ink-3">
+            <li className="px-3 py-2.5 text-sm text-ink-3">
               &quot;{query}&quot; için model bulunamadı
             </li>
           )}
@@ -246,10 +246,10 @@ export function ModelPicker({
                 className={`cursor-pointer px-3 py-1.5 ${active ? "bg-raised" : ""}`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="truncate font-mono text-[12px]">
+                  <span className="truncate font-mono text-xs">
                     <Highlight text={m.id} query={query} />
                   </span>
-                  <span className="shrink-0 text-[11px] text-ink-3">
+                  <span className="shrink-0 text-2xs text-ink-3">
                     {m.providerName}
                   </span>
                 </div>
@@ -257,12 +257,12 @@ export function ModelPicker({
                   <ToolsHint model={m} />
                   {m.isFree && <Badge tone="success">ücretsiz</Badge>}
                   {m.contextLength && (
-                    <span className="text-[11px] text-ink-3">
+                    <span className="text-2xs text-ink-3">
                       {formatContext(m.contextLength)} bağlam
                     </span>
                   )}
                   {m.promptPricePerMTok > 0 && (
-                    <span className="text-[11px] text-ink-3">
+                    <span className="text-2xs text-ink-3">
                       ${m.promptPricePerMTok.toFixed(2)}/M
                     </span>
                   )}

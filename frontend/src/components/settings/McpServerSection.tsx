@@ -40,7 +40,7 @@ export function McpServerSection() {
         !adding && (
           <Button
             variant="primary"
-            icon={<IconPlus className="size-3.5" />}
+            icon={<IconPlus className="size-4" />}
             onClick={() => setAdding(true)}
           >
             Sunucu ekle
@@ -58,7 +58,7 @@ export function McpServerSection() {
 
         {servers.data?.length === 0 && !adding && (
           <Card>
-            <p className="text-[13px] text-ink-2">
+            <p className="text-sm text-ink-2">
               Henüz sunucu yok. MCP, bir agent&apos;ın hata takip sistemi, dokümantasyon
               veya veritabanı şeması gibi dış kaynaklara <strong>standart bir
               protokolle</strong> erişmesini sağlar — her kaynak için ayrı kod
@@ -73,7 +73,7 @@ export function McpServerSection() {
 
         {/* Sınırın kendisi bir bilgi: kullanıcı yerel bir sunucu adresi girip
             neden kabul edilmediğini aramasın. */}
-        <p className="text-[12px] text-ink-3">
+        <p className="text-xs text-ink-3">
           Yalnızca uzak sunucular (HTTP/SSE) desteklenir. Bilgisayarda komut olarak
           çalışan (stdio) sunucular için henüz destek yok.
         </p>
@@ -112,8 +112,8 @@ function ServerCard({ server }: { server: McpServer }) {
               <Badge>anahtarsız</Badge>
             )}
           </div>
-          <p className="mt-1 font-mono text-[12px] break-all text-ink-2">{server.url}</p>
-          <p className="mt-1 text-[11px] text-ink-3">
+          <p className="mt-1 font-mono text-xs break-all text-ink-2">{server.url}</p>
+          <p className="mt-1 text-2xs text-ink-3">
             Son doğrulama: {formatDate(server.updatedAt)}
           </p>
         </div>
@@ -129,7 +129,7 @@ function ServerCard({ server }: { server: McpServer }) {
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[12px] text-ink-2">Agent&apos;lardan da kaldırılacak.</span>
+            <span className="text-xs text-ink-2">Agent&apos;lardan da kaldırılacak.</span>
             <Button
               size="sm"
               variant="danger"
@@ -158,7 +158,7 @@ function ServerCard({ server }: { server: McpServer }) {
 function ToolList({ tools }: { tools: string[] }) {
   if (tools.length === 0) {
     return (
-      <p className="mt-3 text-[12px] text-ink-3">
+      <p className="mt-3 text-xs text-ink-3">
         Bu sunucu hiç araç bildirmedi.
       </p>
     );
@@ -166,13 +166,13 @@ function ToolList({ tools }: { tools: string[] }) {
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      <span className="text-[11px] tracking-wide text-ink-3 uppercase">
+      <span className="text-2xs tracking-wide text-ink-3 uppercase">
         {tools.length} araç
       </span>
       {tools.map((t) => (
         <span
           key={t}
-          className="rounded border border-line bg-raised px-1.5 py-0.5 font-mono text-[11px] text-ink-2"
+          className="rounded border border-line bg-raised px-1.5 py-0.5 font-mono text-2xs text-ink-2"
         >
           {t}
         </span>
@@ -216,13 +216,13 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
 
   return (
     <Card>
-      <p className="text-[13px] font-medium">
+      <p className="text-sm font-medium">
         {editing ? "Sunucuyu düzenle" : "Yeni MCP sunucusu"}
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">Ad</span>
           <Input
             className="mt-1"
             value={name}
@@ -231,14 +231,14 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
           />
           {/* Adın araç adlarına önek olduğunu söylemek gerekiyor: kullanıcı
               neden nokta ve boşluk kabul edilmediğini yoksa anlamaz. */}
-          <span className="mt-1 block text-[11px] text-ink-3">
+          <span className="mt-1 block text-2xs text-ink-3">
             Araç adlarının öneki olur: <span className="font-mono">{name.trim() || "sentry"}_issue</span>.
             Harf, rakam, - ve _ kullanılabilir.
           </span>
         </label>
 
         <label className="block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">Taşıma</span>
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">Taşıma</span>
           <Select
             className="mt-1"
             value={transport}
@@ -251,9 +251,9 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
       </div>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Adres</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Adres</span>
         <Input
-          className="mt-1 font-mono text-[12px]"
+          className="mt-1 font-mono text-xs"
           value={url}
           placeholder="https://mcp.ornek.com/mcp"
           onChange={(e) => setUrl(e.target.value)}
@@ -261,7 +261,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">
           Erişim anahtarı
         </span>
         <Input
@@ -277,7 +277,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
           }
           onChange={(e) => setSecret(e.target.value)}
         />
-        <span className="mt-1 block text-[11px] text-ink-3">
+        <span className="mt-1 block text-2xs text-ink-3">
           Şifreli saklanır ve bir daha tam haliyle gösterilmez. Sunucuya
           <span className="font-mono"> Authorization: Bearer</span> başlığıyla gönderilir.
         </span>
@@ -294,9 +294,9 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
               if (e.target.checked) setSecret("");
             }}
           />
-          <span className="text-[12px]">
+          <span className="text-xs">
             Anahtarı kaldır
-            <span className="mt-0.5 block text-[11px] text-ink-3">
+            <span className="mt-0.5 block text-2xs text-ink-3">
               Anahtarsız çalışan sunucular var; bazıları anahtar gönderildiğinde
               isteği reddeder.
             </span>
@@ -319,7 +319,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
         <Button onClick={onDone} disabled={save.isPending}>
           Vazgeç
         </Button>
-        <span className="text-[12px] text-ink-3">
+        <span className="text-xs text-ink-3">
           Kaydetmeden önce sunucuya bağlanılır ve araçları okunur.
         </span>
       </div>

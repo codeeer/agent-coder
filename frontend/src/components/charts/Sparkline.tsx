@@ -51,8 +51,8 @@ export function Sparkline({
           ) : (
             <path
               d={areaPath(values, width, height, max)}
-              fill="var(--color-accent-soft)"
-              stroke="var(--color-accent)"
+              fill="color-mix(in srgb, var(--color-series) 18%, transparent)"
+              stroke="var(--color-series)"
               strokeWidth={1.5}
               strokeLinejoin="round"
             />

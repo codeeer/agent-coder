@@ -73,12 +73,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-expanded={open}
             className="-ml-1.5 flex size-9 items-center justify-center rounded-lg text-ink-2 transition-colors hover:bg-raised hover:text-ink"
           >
-            {open ? <IconClose className="size-5" /> : <IconMenu className="size-5" />}
+            {open ? <IconClose className="size-4" /> : <IconMenu className="size-4" />}
           </button>
-          <span className="text-[13px] font-semibold tracking-[-0.01em]">Agent Coder</span>
+          <span className="text-sm font-semibold tracking-[-0.01em]">Agent Coder</span>
         </div>
 
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+        {/*
+          İçerik ORTALANMIYOR — sola yaslı.
+
+          Önce `mx-auto max-w-5xl`, sonra `mx-auto max-w-7xl` idi. İkisinde de
+          asıl sorun `max-w` değil `mx-auto`ydu: içerik ortalanınca kenar
+          çubuğu ile içeriğin başı arasında koca bir oluk kalıyordu. 1920px'lik
+          bir ekranda bu oluk 240px'e çıkıyor ve sayfa, kenar çubuğuna bağlı
+          bir uygulama gibi değil, ortada yüzen bir kutu gibi duruyor.
+
+          Kenar çubuğu zaten sol kenarı tutuyor; içerik onun hemen devamında
+          başlamalı. Üst sınır yalnızca çok geniş ekranlarda satırların
+          okunamayacak kadar uzamasını engellemek için var, ortalamak için
+          değil — bu yüzden `mx-auto` YOK.
+        */}
+        <div className="max-w-[1680px] px-5 py-6 sm:px-6 lg:px-8 lg:py-7">
+          {children}
+        </div>
       </main>
     </div>
   );

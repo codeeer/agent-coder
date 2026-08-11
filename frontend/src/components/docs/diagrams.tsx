@@ -146,7 +146,7 @@ function Frame({
           {children}
         </svg>
       </div>
-      <p className="mt-1.5 text-[11px] text-ink-3 sm:hidden">
+      <p className="mt-1.5 text-2xs text-ink-3 sm:hidden">
         Diyagramın tamamı için yana kaydırın →
       </p>
     </div>

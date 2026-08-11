@@ -48,7 +48,7 @@ export function BackendStatus() {
           }
           pulse={state.kind === "loading"}
         />
-        <span className="text-[13px] font-medium">
+        <span className="text-sm font-medium">
           {state.kind === "loading" && "Backend kontrol ediliyor…"}
           {state.kind === "ok" && "Backend bağlı"}
           {state.kind === "error" && "Backend'e ulaşılamıyor"}
@@ -65,8 +65,8 @@ export function BackendStatus() {
 
       {state.kind === "error" && (
         <div className="mt-2">
-          <p className="text-[13px] text-ink-2">{state.message}</p>
-          <p className="mt-2 text-[12px] text-ink-3">
+          <p className="text-sm text-ink-2">{state.message}</p>
+          <p className="mt-2 text-xs text-ink-3">
             Servisler ayakta mı? <code>make ps</code> ile kontrol edin.
           </p>
         </div>

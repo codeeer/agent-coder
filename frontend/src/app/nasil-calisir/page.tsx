@@ -74,7 +74,7 @@ export default function HowItWorksPage() {
         <Note>
           Son adım pazarlık konusu değil: zaman aşımı, iptal ya da sunucunun yeniden başlaması —
           hangisi olursa olsun container ve volume siliniyor. Doğrulaması kolay:
-          <code className="mx-1 rounded bg-raised px-1.5 py-0.5 font-mono text-[12px]">docker ps -a</code>
+          <code className="mx-1 rounded bg-raised px-1.5 py-0.5 font-mono text-xs">docker ps -a</code>
           çalışma sonrası boş olmalı.
         </Note>
       </Step>
@@ -206,7 +206,7 @@ export default function HowItWorksPage() {
           </Decision>
           <Decision title="Kimlik doğrulama henüz yok" tone="warn">
             v1 tek kullanıcılıktır ve <b>internete açık bir sunucuda çalıştırılmamalıdır</b>. Şema
-            baştan <code className="font-mono text-[12px]">user_id</code> taşıyor; auth sonradan eklenecek.
+            baştan <code className="font-mono text-xs">user_id</code> taşıyor; auth sonradan eklenecek.
           </Decision>
         </div>
       </Step>
@@ -230,12 +230,12 @@ function Step({
   return (
     <section className="space-y-4">
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-[13px] font-semibold text-accent-ink">
+        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-ink">
           {no}
         </span>
         <div className="min-w-0">
-          <h2 className="text-[17px] font-semibold tracking-[-0.01em]">{title}</h2>
-          <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-ink-2">{lead}</p>
+          <h2 className="text-base font-semibold tracking-[-0.01em]">{title}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">{lead}</p>
         </div>
       </div>
 
@@ -248,7 +248,7 @@ function Step({
 
 function Note({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-4 border-t border-line pt-3 text-[13px] leading-relaxed text-ink-2">
+    <p className="mt-4 border-t border-line pt-3 text-sm leading-relaxed text-ink-2">
       {children}
     </p>
   );
@@ -257,8 +257,8 @@ function Note({ children }: { children: React.ReactNode }) {
 function Mini({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-line bg-raised p-3">
-      <p className="text-[13px] font-medium">{title}</p>
-      <p className="mt-1 text-[12px] leading-relaxed text-ink-2">{children}</p>
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-2">{children}</p>
     </div>
   );
 }
@@ -278,8 +278,8 @@ function Decision({
         tone === "warn" ? "border-warn/40 bg-warn-soft" : "border-line bg-raised"
       }`}
     >
-      <p className="text-[13px] font-medium">{title}</p>
-      <p className="mt-1.5 text-[12px] leading-relaxed text-ink-2">{children}</p>
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-ink-2">{children}</p>
     </div>
   );
 }

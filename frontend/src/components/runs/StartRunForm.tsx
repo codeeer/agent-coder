@@ -99,7 +99,7 @@ export function StartRunForm({
       >
         <div className="flex gap-3">
           <label className="block flex-1">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
               Proje
             </span>
             <Select
@@ -120,11 +120,11 @@ export function StartRunForm({
           </label>
 
           <label className="block flex-1">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
               Branch
             </span>
             <Input
-              className="mt-1 font-mono text-[12px]"
+              className="mt-1 font-mono text-xs"
               value={branch}
               placeholder={project?.defaultBranch ?? "varsayılan"}
               onChange={(e) => setBranch(e.target.value)}
@@ -133,7 +133,7 @@ export function StartRunForm({
         </div>
 
         <div>
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">
             Model
           </span>
           <div className="mt-1">
@@ -164,7 +164,7 @@ export function StartRunForm({
         )}
 
         <label className="block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">
             Görev
           </span>
           <Textarea
@@ -193,7 +193,7 @@ export function StartRunForm({
             Vazgeç
           </Button>
           {!agent.allowEdit && (
-            <span className="text-[12px] text-ink-3">
+            <span className="text-xs text-ink-3">
               Bu agent dosya değiştiremez — yalnızca inceler.
             </span>
           )}

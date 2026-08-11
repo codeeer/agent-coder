@@ -70,7 +70,7 @@ export function McpAccessSection() {
                 </Button>
               ) : (
                 <>
-                  <span className="text-[12px] text-ink-2">
+                  <span className="text-xs text-ink-2">
                     Eski adres anında geçersiz olur.
                   </span>
                   <Button
@@ -88,7 +88,7 @@ export function McpAccessSection() {
               )}
             </div>
 
-            <p className="mt-2 text-[12px] text-ink-3">
+            <p className="mt-2 text-xs text-ink-3">
               <strong>Bu adres bir anahtardır</strong> — bilen herkes akışlarınızı
               başlatabilir. Paylaşırken dikkat edin; sızdıysa yenileyin.
             </p>
@@ -96,11 +96,11 @@ export function McpAccessSection() {
             {/* Kurulumun kendisi belge okumayı gerektirmemeli: yapıştırılacak
                 metin doğrudan burada dursun. */}
             <Well className="mt-4 p-3">
-              <p className="text-[12px] font-medium">Claude Desktop kurulumu</p>
-              <p className="mt-1 text-[11px] text-ink-2">
+              <p className="text-xs font-medium">Claude Desktop kurulumu</p>
+              <p className="mt-1 text-2xs text-ink-2">
                 Ayarlar → Developer → Edit Config, sonra şunu ekleyin:
               </p>
-              <pre className="mt-2 overflow-x-auto font-mono text-[11px] leading-relaxed text-ink-2">
+              <pre className="mt-2 overflow-x-auto font-mono text-2xs leading-relaxed text-ink-2">
 {`{
   "mcpServers": {
     "agent-coder": {
@@ -112,7 +112,7 @@ export function McpAccessSection() {
               </pre>
             </Well>
 
-            <p className="mt-3 text-[12px] text-ink-3">
+            <p className="mt-3 text-xs text-ink-3">
               Sunulan araçlar: <Mono>akislari_listele</Mono>,{" "}
               <Mono>akis_calistir</Mono>, <Mono>calisma_durumu</Mono>.
               Başlatılan çalışmalar burada da görünür — tetikleyicisi{" "}

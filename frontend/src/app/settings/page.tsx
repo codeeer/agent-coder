@@ -103,7 +103,7 @@ function TabContent({ tab }: { tab: TabID }) {
           >
             <RuntimeSettings groups={["catalog"]} showHeadings={false} />
           </Section>
-          <p className="text-[12px] leading-relaxed text-ink-3">
+          <p className="text-xs leading-relaxed text-ink-3">
             Not: <code>.env</code> dosyasında <code>OPENROUTER_API_KEY</code>{" "}
             tanımlıysa ve hiç LLM sağlayıcı yoksa, açılışta otomatik olarak bir
             OpenRouter sağlayıcısı oluşturulur. İstemiyorsanız o değişkeni boşaltın.
@@ -182,13 +182,13 @@ function SettingsNav({
             type="button"
             onClick={() => onSelect(id)}
             aria-current={on ? "page" : undefined}
-            className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.75 text-[13px] whitespace-nowrap transition-colors ${
+            className={`flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.75 text-sm whitespace-nowrap transition-colors ${
               on
                 ? "bg-accent-soft font-medium text-accent"
                 : "text-ink-2 hover:bg-raised hover:text-ink"
             }`}
           >
-            <Icon className="size-3.75 shrink-0" />
+            <Icon className="size-4 shrink-0" />
             {label}
           </button>
         );

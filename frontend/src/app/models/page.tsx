@@ -8,7 +8,13 @@ import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
 import type { ModelSort, ToolsFilter } from "@/lib/types";
 import { ModelTable } from "@/components/models/ModelTable";
-import { IconChip, IconRefresh, IconSearch } from "@/components/ui/icons";
+import {
+  IconAlert,
+  IconCheck,
+  IconChip,
+  IconRefresh,
+  IconSearch,
+} from "@/components/ui/icons";
 import {
   Button,
   Checkbox,
@@ -97,7 +103,7 @@ export default function ModelsPage() {
           <Button
             onClick={() => refresh.mutate()}
             disabled={refresh.isPending}
-            icon={<IconRefresh className="size-3.5" />}
+            icon={<IconRefresh className="size-4" />}
           >
             {refresh.isPending ? "Yenileniyor…" : "Tümünü yenile"}
           </Button>
@@ -138,11 +144,19 @@ export default function ModelsPage() {
         <div className="mt-4">
           <Notice>
             <ul className="space-y-0.5">
+              {/* `✓` / `✗` metin karakterleriydi: yazı tipine göre boyu ve
+                  hizası değişiyor, arayüzün geri kalanındaki ikonlarla ne
+                  ölçüsü ne kalınlığı tutuyordu. Artık aynı ikon kümesinden. */}
               {refresh.data.results.map((r) => (
-                <li key={r.providerId}>
-                  {r.ok
-                    ? `✓ ${r.providerName}: ${r.count} model`
-                    : `✗ ${r.providerName}: ${r.error}`}
+                <li key={r.providerId} className="flex items-start gap-1.5">
+                  {r.ok ? (
+                    <IconCheck className="mt-0.5 size-4 shrink-0 text-ok" />
+                  ) : (
+                    <IconAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+                  )}
+                  <span>
+                    {r.providerName}: {r.ok ? `${r.count} model` : r.error}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -158,8 +172,8 @@ export default function ModelsPage() {
 
       {/* Filtreler */}
       <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-surface p-3">
-        <div className="relative w-64">
-          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-3" />
+        <div className="relative w-full sm:w-64">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-3" />
           <Input
             className="pl-8"
             aria-label="Model veya sağlayıcı ara"
@@ -169,38 +183,52 @@ export default function ModelsPage() {
           />
         </div>
 
-        <Select
-          className="w-auto"
-          aria-label="Sağlayıcıya göre süz"
-          value={providerId}
-          onChange={(e) => {
-            setProviderId(e.target.value);
-            setPage(0);
-          }}
-        >
-          <option value="">Tüm sağlayıcılar</option>
-          {providers.map((p) => (
-            <option key={p.providerId} value={p.providerId}>
-              {p.providerName} ({p.modelCount})
-            </option>
-          ))}
-        </Select>
+        {/*
+          Genişlik SARMALAYICIDAN geliyor, `Select`'in kendi sınıfından değil.
+          Öncesinde `className="w-auto"` yazılıydı ama işe yaramıyordu:
+          `fieldBase` zaten `w-full` taşıyor ve iki utility de aynı özelliği
+          (`width`) veriyor. Hangisinin kazandığına sınıf dizgisindeki sıra
+          değil, üretilen CSS'teki sıra karar veriyor — `w-full` kazanıyordu.
+          Sonuç: 256px'lik arama kutusunun altında tam genişlikte iki açılır
+          liste, süzgeç çubuğu üç satıra yayılmış ve bozuk duruyordu.
 
-        <Select
-          className="w-auto"
-          aria-label="Araç desteğine göre süz"
-          value={tools}
-          onChange={(e) => {
-            setTools(e.target.value as ToolsFilter);
-            setPage(0);
-          }}
-        >
-          {TOOLS_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </Select>
+          Arama kutusu zaten bu deseni kullanıyordu (`<div className="w-64">`);
+          üçü artık aynı yolla ölçülüyor ve tek satırda hizalanıyor.
+        */}
+        <div className="w-full sm:w-52">
+          <Select
+            aria-label="Sağlayıcıya göre süz"
+            value={providerId}
+            onChange={(e) => {
+              setProviderId(e.target.value);
+              setPage(0);
+            }}
+          >
+            <option value="">Tüm sağlayıcılar</option>
+            {providers.map((p) => (
+              <option key={p.providerId} value={p.providerId}>
+                {p.providerName} ({p.modelCount})
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="w-full sm:w-64">
+          <Select
+            aria-label="Araç desteğine göre süz"
+            value={tools}
+            onChange={(e) => {
+              setTools(e.target.value as ToolsFilter);
+              setPage(0);
+            }}
+          >
+            {TOOLS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         <Checkbox
           label="Yalnızca ücretsizler"
@@ -223,7 +251,7 @@ export default function ModelsPage() {
 
         {data && data.items.length === 0 && (
           <EmptyState
-            icon={<IconChip className="size-5" />}
+            icon={<IconChip className="size-4" />}
             title={query ? `"${query}" için sonuç yok` : "Model bulunamadı"}
             description={
               query

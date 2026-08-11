@@ -49,7 +49,7 @@ export function ScriptSection() {
         !adding && (
           <Button
             variant="primary"
-            icon={<IconPlus className="size-3.5" />}
+            icon={<IconPlus className="size-4" />}
             onClick={() => setAdding(true)}
           >
             Betik ekle
@@ -67,7 +67,7 @@ export function ScriptSection() {
 
         {scripts.data?.total === 0 && !adding && (
           <Card>
-            <p className="text-[13px] text-ink-2">
+            <p className="text-sm text-ink-2">
               Henüz betik yok. Bir agent standart bir işi &mdash; bağımlılık
               yükseltme, geçiş uygulama, kontrol listesi &mdash; her seferinde
               biraz farklı yapabilir. Betik bunu sabitler:{" "}
@@ -93,7 +93,7 @@ export function ScriptSection() {
 
         {/* Sınırın kendisi bir bilgi: kullanıcı betiğini yazıp neden hiç
             çalışmadığını aramasın. */}
-        <p className="text-[12px] text-ink-3">
+        <p className="text-xs text-ink-3">
           Betikler yalnızca <strong>komut çalıştırma yetkisi açık</strong>{" "}
           agent&apos;lara verilir. Yetkisi kapalı bir agent&apos;ın ortamına
           kopyalanmazlar.
@@ -126,14 +126,14 @@ function ScriptCard({ script }: { script: Script }) {
         <div className="min-w-0">
           <span className="font-medium">{script.name}</span>
           {script.description && (
-            <p className="mt-1 text-[13px] text-ink-2">{script.description}</p>
+            <p className="mt-1 text-sm text-ink-2">{script.description}</p>
           )}
           {/* Agent'ın göreceği yol: kullanıcı talimatında ona atıfta bulunmak
               isterse aynı metni kullanabilmeli. */}
-          <p className="mt-1 font-mono text-[12px] break-all text-ink-3">
+          <p className="mt-1 font-mono text-xs break-all text-ink-3">
             {SCRIPT_DIR}/{script.name}.sh
           </p>
-          <p className="mt-1 text-[11px] text-ink-3">
+          <p className="mt-1 text-2xs text-ink-3">
             Güncellendi: {formatDate(script.updatedAt)}
           </p>
         </div>
@@ -149,7 +149,7 @@ function ScriptCard({ script }: { script: Script }) {
           </div>
         ) : (
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[12px] text-ink-2">
+            <span className="text-xs text-ink-2">
               Agent&apos;lardan da kaldırılacak.
             </span>
             <Button
@@ -203,13 +203,13 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
 
   return (
     <Card>
-      <p className="text-[13px] font-medium">
+      <p className="text-sm font-medium">
         {editing ? "Betiği düzenle" : "Yeni betik"}
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">Ad</span>
           <Input
             className="mt-1"
             value={name}
@@ -218,7 +218,7 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
           />
           {/* Adın dosya adına dönüştüğünü söylemek gerekiyor: kullanıcı neden
               boşluk ve büyük harf kabul edilmediğini yoksa anlamaz. */}
-          <span className="mt-1 block text-[11px] text-ink-3">
+          <span className="mt-1 block text-2xs text-ink-3">
             Dosya adı olur:{" "}
             <span className="font-mono">
               {SCRIPT_DIR}/{name.trim() || "upgrade-deps"}.sh
@@ -228,7 +228,7 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
         </label>
 
         <label className="block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">
             Ne işe yarar
           </span>
           <Input
@@ -239,7 +239,7 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
           />
           {/* Açıklama süs değil: agent'ın talimatına yazılıyor ve betiğin ne
               zaman çağrılacağını modele anlatan tek ipucu bu. */}
-          <span className="mt-1 block text-[11px] text-ink-3">
+          <span className="mt-1 block text-2xs text-ink-3">
             Agent&apos;ın talimatına yazılır — betiği <strong>ne zaman</strong>{" "}
             çağıracağını buradan anlar.
           </span>
@@ -247,9 +247,9 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
       </div>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">İçerik</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">İçerik</span>
         <Textarea
-          className="mt-1 min-h-56 font-mono text-[12px] leading-relaxed"
+          className="mt-1 min-h-56 font-mono text-xs leading-relaxed"
           value={content}
           spellCheck={false}
           onChange={(e) => setContent(e.target.value)}
@@ -257,12 +257,12 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
       </label>
 
       <Well className="mt-3 p-3">
-        <p className="text-[12px]">
+        <p className="text-xs">
           <strong>Betiğe gizli değer yazmayın.</strong> Betikler şifrelenmez ve
           agent onları okuyabilir. Token gerekiyorsa ortam değişkeninden okuyun:{" "}
           <Mono>&quot;$GIT_TOKEN&quot;</Mono>
         </p>
-        <p className="mt-2 text-[11px] text-ink-2">
+        <p className="mt-2 text-2xs text-ink-2">
           Betik agent&apos;ın kabuğunda, klonlanan deponun içinde çalışır. Hata
           durumunda durması için <Mono>set -euo pipefail</Mono> önerilir.
         </p>
@@ -281,7 +281,7 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
         <Button onClick={onDone} disabled={save.isPending}>
           Vazgeç
         </Button>
-        <span className="text-[12px] text-ink-3">
+        <span className="text-xs text-ink-3">
           Değişiklik bir sonraki çalıştırmada geçerli olur.
         </span>
       </div>

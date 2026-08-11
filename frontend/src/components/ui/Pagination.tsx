@@ -37,7 +37,7 @@ export function Pagination({
 
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-      <span className="text-[12px] text-ink-2">
+      <span className="text-xs text-ink-2">
         {many ? (
           <>
             <strong className="font-medium text-ink">
@@ -62,7 +62,7 @@ export function Pagination({
           >
             ← Önceki
           </Button>
-          <span className="text-[12px] text-ink-2 tabular-nums">
+          <span className="text-xs text-ink-2 tabular-nums">
             {page} / {pageCount}
           </span>
           <Button

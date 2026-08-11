@@ -1,9 +1,29 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { QueryProvider } from "@/lib/query-provider";
 import { apiConfigScript, serverApiUrl } from "@/lib/runtime-config";
 import { themeBootstrapScript } from "@/lib/theme";
 import "./globals.css";
+
+/*
+ * Arayüz yazı tipi.
+ *
+ * `latin-ext` alt kümesi ZORUNLU: Türkçenin ğ, ş, ı ve İ harfleri Latin
+ * Extended-A bloğunda. Yalnızca `latin` ile bu dört harf başka bir yazı
+ * tipine düşer ve satır ortasında kesim değişir.
+ *
+ * `next/font` yazı tipini DERLEME ANINDA indirip uygulamanın kendi altına
+ * koyar; çalışma anında Google'a istek gitmez. Bu yüzden ne yeni bir paket
+ * ne de dış bağlantı gerekiyor.
+ *
+ * `display: swap`: yazı tipi inene kadar metin görünmez kalmaz.
+ */
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "Agent Coder",
@@ -30,7 +50,7 @@ export default function RootLayout({
     // suppressHydrationWarning: aşağıdaki betik data-theme'i React'tan ÖNCE
     // yazar, dolayısıyla sunucunun ürettiği HTML ile istemcininki bu öznitelikte
     // kasıtlı olarak ayrışır.
-    <html lang="tr" suppressHydrationWarning>
+    <html lang="tr" className={inter.variable} suppressHydrationWarning>
       <head>
         {/* Temayı ilk boyamadan önce uygular; yanlış temanın bir an görünüp
             sıçramasını (FOUC) engeller. */}

@@ -55,7 +55,17 @@
 
   /* Metin — üçü de kart, sayfa VE vurgu zemininde 4,5:1 üstü */
   --color-ink: #0d1117;
-  --color-ink-2: #545d6b;
+  /*
+   * #545d6b idi. ink-3 (#646e7d) ile arasındaki fark gözle ayırt edilemiyordu:
+   * üç kademe iddia edilen hiyerarşi ekranda iki kademe olarak okunuyordu —
+   * agent kartında "Yetkileri: …" ile "Varsayılan model: …" satırları farklı
+   * önemde ama aynı görünüyordu.
+   *
+   * Boşluk ORTA TONU KOYULAŞTIRARAK açıldı, alt tonu açarak değil. Diğer yön
+   * de mümkündü ama ink-3'ün yukarı doğru yeri yok: #6e7787 denenmiş ve sayfa
+   * zemininde 3,98:1'e düşmüştü. Bu yön kontrastı düşürmüyor, artırıyor.
+   */
+  --color-ink-2: #3d4655;
   /* #6e7787 idi: kart üzerinde 4,51:1 geçiyordu ama sayfa zemininde 3,98:1
      kalıyordu — ayarlar notu ve grafik ekseni orada duruyor. */
   --color-ink-3: #646e7d;
@@ -98,9 +108,74 @@
   --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
   --shadow-pop: 0 8px 24px -6px rgb(16 24 40 / 0.12);
 
-  --radius-card: 10px;
+  --radius-card: 8px;
 
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  /*
+   * Tip skalası.
+   *
+   * Öncesinde skala YOKTU: ekranlarda 10, 11, 12, 13, 14, 15, 16, 17, 22, 24
+   * ve 44px'lik keyfi değerler yan yana duruyordu (`text-[13px]` biçiminde
+   * 265 kullanım). Bir boyutun neden seçildiğini söyleyen bir kural olmayınca
+   * her yeni bileşen bir yenisini ekliyordu.
+   *
+   * `xs`, `sm` ve `base` BİLEREK Tailwind'in varsayılan değerlerinde
+   * bırakıldı. Bunlar kodda hâlihazırda 68 yerde adıyla kullanılıyor;
+   * yeniden tanımlamak o kullanımların hepsini sessizce kaydırırdı —
+   * göze çarpmayan, diff'te görünmeyen bir gerileme olurdu.
+   *
+   * Yalnızca eksik basamaklar ekleniyor: 11px'in adı yoktu, `lg` ve `xl`
+   * ise hiç kullanılmıyordu (bu yüzden yeniden tanımlanmaları güvenli).
+   *
+   * Gövde metni 13px değil `sm` (14px). 13px, referans olarak alınan
+   * yoğunluktaki arayüzlerde bile taban değil ikincil bir kademedir.
+   */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 15px;
+  /* xs 12/16, sm 14/20, base 16/24 — Tailwind varsayılanı, dokunulmadı. */
+  --text-lg: 20px;
+  --text-lg--line-height: 28px;
+  --text-xl: 24px;
+  --text-xl--line-height: 30px;
+  --text-xl--letter-spacing: -0.02em;
+  /* Yalnızca rapor ekranındaki kahraman rakam için. 44px'lik keyfi bir
+     değerdi; skalanın dışında kalan tek boyut olmasın diye buraya alındı. */
+  --text-2xl: 40px;
+  --text-2xl--line-height: 44px;
+  --text-2xl--letter-spacing: -0.025em;
+
+  /*
+   * Grafik seri rengi — aksandan AYRI.
+   *
+   * Üç grafik bileşeni de çubuğunu/çizgisini `--color-accent` ile çiziyordu.
+   * Aynı mor aynı ekranda hem "birincil eylem" hem "veri" anlamına geliyordu:
+   * rapordaki çubuklar ile "Agent oluştur" düğmesi aynı renkti. Bir renk iki
+   * şey anlatınca ikisini de anlatmaz.
+   *
+   * Aksandan yeterince uzak ama durum renklerinden de uzak: ok (yeşil),
+   * warn (amber), danger (kırmızı), info (mavi) çemberin dört yerini tutuyor.
+   */
+  --color-series: #4f6bd8;
+
+  /*
+   * Tuval zemini — sayfa zemininden AYRI bir jeton.
+   *
+   * Tuval `bg-canvas` kullanıyordu, yani sayfa zemininin tam kendisi: kart
+   * kenarlığı olmasa nerede başlayıp bittiği anlaşılmıyordu. Asıl bedelini
+   * koyu tema ödüyordu — zemin #0a0c10, düğüm gövdesi #121620; iki değer o
+   * kadar yakındı ki düğümler zeminden ayrılmıyor, tuval bir kuyu gibi
+   * duruyordu.
+   *
+   * Değer her iki temada da zeminden bir adım UZAĞA çekildi: açık temada
+   * biraz daha koyu, koyu temada biraz daha koyu. Yön aynı değil çünkü iş
+   * aynı değil — her ikisinde de amaç düğümün (surface) zeminden ayrılması,
+   * ve o ayrım açık temada zaten güçlüydü, koyuda yoktu.
+   */
+  --color-deck: #e6eaf1;
+  --color-deck-line: #d3dae4;
 }
 
 /*
@@ -136,7 +211,11 @@
     --color-control-line: #606d86;
 
     --color-ink: #e7eaf0;
-    --color-ink-2: #98a2b3;
+    /* #98a2b3 idi. Açık temadakiyle aynı sebep — ink-3'ten ayırt
+       edilemiyordu — ama YÖN TERS: koyu zeminde "daha parlak = daha
+       önemli". Aynı yönü iki temaya uygulamak vurguyu birinde ters
+       çevirirdi. */
+    --color-ink-2: #b3bdcc;
     /* #6b7686 idi: üç zeminde de 4,5:1'in altındaydı (3,62–4,25). Açık temada
        aynı token geçiyordu — bileşenler değil, YALNIZCA tema kalıyordu. */
     --color-ink-3: #7f8b9b;
@@ -154,6 +233,11 @@
     --color-danger-soft: #2e1419;
     --color-info: #6aa9ff;
     --color-info-soft: #101f36;
+
+    --color-series: #7f9cf5;
+
+    --color-deck: #05070a;
+    --color-deck-line: #1b2231;
 
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
@@ -179,7 +263,7 @@
   --color-control-line: #606d86;
 
   --color-ink: #e7eaf0;
-  --color-ink-2: #98a2b3;
+  --color-ink-2: #b3bdcc;
   --color-ink-3: #7f8b9b;
 
   --color-accent: #7b7bf0;
@@ -195,6 +279,11 @@
   --color-danger-soft: #2e1419;
   --color-info: #6aa9ff;
   --color-info-soft: #101f36;
+
+  --color-series: #7f9cf5;
+
+  --color-deck: #05070a;
+  --color-deck-line: #1b2231;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
@@ -234,9 +323,22 @@
   }
 
   body {
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    /*
+     * Jetondan geliyor: `--font-sans` Inter'i, o inmezse sistem yığınını
+     * verir. Adı buraya elle yazılsaydı `font-sans` utility'si ile gövdenin
+     * yazı tipi iki ayrı yerden gelir ve er geç ayrışırdı.
+     */
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /*
+     * cv02/cv03/cv04 — Inter'in açık 4, 6 ve 9 rakamları. Sistem yazı
+     * tipinde bu satır ETKİSİZDİ (o alternatifler orada yok); Inter ile
+     * gerçekten çalışıyor. Rakamın çok olduğu bir arayüzde 6 ile 9'un
+     * birbirine benzememesi maliyet ve token sütunlarında işe yarıyor.
+     */
     font-feature-settings: "cv02", "cv03", "cv04";
   }
 }
@@ -330,7 +432,7 @@
  */
 @layer base {
   .react-flow {
-    --xy-background-color: var(--color-canvas);
+    --xy-background-color: var(--color-deck);
     --xy-edge-stroke: var(--color-line-strong);
     --xy-edge-stroke-selected: var(--color-accent);
     --xy-connectionline-stroke: var(--color-accent);
@@ -350,13 +452,49 @@
 
   /* Nokta deseni: zeminden bir adım uzak, dikkat çekmemeli. */
   .react-flow__background-pattern {
-    color: var(--color-line);
+    color: var(--color-deck-line);
   }
 
   .react-flow__attribution {
     font-size: 10px;
   }
-  .react-flow__attribution a {
-    color: var(--color-ink-3);
-  }
+}
+
+/*
+ * React Flow atıf bağlantısı — KATMAN DIŞINDA. İkinci bilinçli istisna
+ * (birincisi odak halkası).
+ *
+ * Kütüphane bu bağlantıyı kendi stil dosyasında `color: #999` ile boyuyor ve
+ * o kural KATMANSIZ. CSS'te katmansız bir bildirim, katmanlı olanların
+ * hepsini yener — özgüllükten bağımsız olarak. Kural `@layer base` içindeyken
+ * bu yüzden hiçbir zaman uygulanmadı: jeton yazılıydı ama ekrana çıkan renk
+ * hep kütüphanenin #999'uydu.
+ *
+ * Sonuç ölçüldü: açık temada 2,36:1 (gerek 4,5), koyu temada 7,08:1 —
+ * ders kitabı örneği bir "tema eşliği" hatası, bir temada geçip diğerinde
+ * kalıyordu. Gözle bulunamazdı; iki tema aynı anda görülemiyor ve zaten
+ * kimse 10px'lik bir atıf yazısına bakmıyor.
+ *
+ * Denetim de bulamamıştı, çünkü `theme-audit`'in varsayılan sayfa listesinde
+ * tuval ekranı yok — bu satırın gerçekten ölçülmesi için o sayfa elle
+ * verilmek zorunda.
+ *
+ * Atıf KALDIRILMIYOR, yalnızca okunur hale getiriliyor: React Flow'un
+ * lisansı Pro olmadan atfın görünür kalmasını şart koşuyor.
+ *
+ * Seçici bilerek `.react-flow` ile başlıyor. Katman dışına çıkmak TEK BAŞINA
+ * yetmedi: kütüphanenin stil dosyası bileşenin içinden import ediliyor
+ * (`FlowCanvas.tsx`), yani bu dosyadan SONRA yükleniyor. İki kural da
+ * katmansız ve özgüllükleri eşit olunca (0,1,1) kaynak sırası karar veriyor
+ * ve sonradan gelen kazanıyor. Fazladan sınıf özgüllüğü (0,2,1) yapıp
+ * sıradan bağımsız kazanmasını sağlıyor.
+ *
+ * Renk `ink-3` DEĞİL `ink-2`. ink-3'ün değerleri sayfa zeminine, karta ve
+ * vurgu yüzeyine göre seçilmişti; `deck` sonradan eklenen DÖRDÜNCÜ bir
+ * yüzey ve orada 4,28:1 kalıyor — eşiğin hemen altında, gözle ayırt
+ * edilemeyecek kadar yakın. Yeni bir yüzey eklerken üzerine düşen her
+ * mürekkep jetonunu yeniden ölçmek gerekiyor; bu satır o dersin kaydı.
+ */
+.react-flow .react-flow__attribution a {
+  color: var(--color-ink-2);
 }

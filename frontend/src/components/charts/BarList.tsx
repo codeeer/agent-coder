@@ -30,7 +30,7 @@ export function BarList({
   emptyLabel?: string;
 }) {
   if (rows.length === 0) {
-    return <p className="text-[13px] text-ink-3">{emptyLabel}</p>;
+    return <p className="text-sm text-ink-3">{emptyLabel}</p>;
   }
 
   const max = Math.max(...rows.map((r) => r.value), 1);
@@ -40,10 +40,10 @@ export function BarList({
       {rows.map((r) => (
         <li key={r.key}>
           <div className="flex items-baseline justify-between gap-3">
-            <span className="truncate text-[13px]" title={r.label}>
+            <span className="truncate text-sm" title={r.label}>
               {r.label}
             </span>
-            <span className="shrink-0 text-[12px] tabular-nums text-ink-2">
+            <span className="shrink-0 text-xs tabular-nums text-ink-2">
               {r.valueLabel ?? formatCount(r.value)}
             </span>
           </div>
@@ -51,12 +51,12 @@ export function BarList({
           {/* Çubuk tabandan büyür; yalnızca veri ucu yuvarlak. */}
           <div className="mt-1 h-2 w-full overflow-hidden rounded-[2px] bg-raised">
             <div
-              className="h-full rounded-r-[4px] bg-accent"
+              className="h-full rounded-r-[4px] bg-series"
               style={{ width: `${Math.max((r.value / max) * 100, 1.5)}%` }}
             />
           </div>
 
-          {r.note && <p className="mt-1 text-[11px] text-ink-3">{r.note}</p>}
+          {r.note && <p className="mt-1 text-2xs text-ink-3">{r.note}</p>}
         </li>
       ))}
     </ul>

@@ -12,6 +12,7 @@ import {
   Badge,
   EmptyState,
   Input,
+  List,
   Mono,
   Notice,
   PageHeader,
@@ -95,7 +96,7 @@ export default function RunsPage() {
                 type="button"
                 onClick={() => setFilter(f.id)}
                 aria-pressed={filter === f.id}
-                className={`rounded-md px-2.5 py-1 text-[12px] transition-colors ${
+                className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
                   filter === f.id
                     ? "bg-accent-soft font-medium text-accent"
                     : "text-ink-2 hover:text-ink"
@@ -121,7 +122,7 @@ export default function RunsPage() {
 
       {data?.items.length === 0 && (
         <EmptyState
-          icon={<IconAgent className="size-5" />}
+          icon={<IconAgent className="size-4" />}
           title="Henüz çalıştırma yok"
           description="Agent'lar sayfasından bir agent seçip projelerinizden biri üzerinde çalıştırın."
         />
@@ -132,22 +133,33 @@ export default function RunsPage() {
       )}
 
       {items.length > 0 && (
-        <div className="overflow-hidden rounded-card border border-line">
-          {items.map((run, i) => (
+        <List>
+          {items.map((run) => (
             <Link
               key={run.id}
               href={`/runs/${run.id}`}
-              className={`flex items-center gap-4 bg-surface px-4 py-3 transition-colors hover:bg-raised ${
-                i > 0 ? "border-t border-line" : ""
-              }`}
+              /*
+               * Dar ekranda SATIR DEĞİL, blok.
+               *
+               * Tek bir yatay satırdı: 128px sabit durum sütunu + sağda
+               * maliyet/tarih sütunu, görev metnine kalan yer ortadaki
+               * artıktı. 390px'lik bir telefonda bu artık ~90px'e düşüyor ve
+               * satırın TAŞIDIĞI ASIL BİLGİ — görev metni — "Sadece TAM..."
+               * diye kesiliyordu. Yani ekranda en çok yeri metadata alıyor,
+               * en az yeri içerik.
+               *
+               * Dar ekranda üç blok alt alta geçiyor ve görev metni tam
+               * genişliği alıyor; `sm` üstünde eski yatay düzen aynen duruyor.
+               */
+              className="flex flex-col gap-2 px-4 py-3 transition-colors hover:bg-raised sm:flex-row sm:items-center sm:gap-4"
             >
-              <div className="w-32 shrink-0">
+              <div className="shrink-0 sm:w-32">
                 <RunStatusBadge status={run.status} />
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px]">{run.task}</div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-3">
+                <div className="truncate text-sm">{run.task}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
                   {/* Akış adımıysa hangi akışın parçası olduğu görünmeli;
                       aksi halde tek başına çalıştırılmış gibi okunur. */}
                   {run.workflowName && (
@@ -164,17 +176,20 @@ export default function RunsPage() {
                 </div>
               </div>
 
-              <div className="shrink-0 text-right">
-                <div className="font-mono text-[12px] tabular-nums">
+              {/* Dar ekranda yan yana tek satır, geniş ekranda sağda iki
+                  satırlık sütun — dikey yığın telefonda iki satır daha
+                  harcardı ve ikisi de kısa değerler. */}
+              <div className="flex shrink-0 items-center gap-3 sm:block sm:text-right">
+                <div className="font-mono text-xs tabular-nums">
                   {run.costUsd > 0 ? `$${run.costUsd.toFixed(4)}` : "—"}
                 </div>
-                <div className="mt-1 text-[12px] text-ink-3">
+                <div className="text-xs text-ink-3 sm:mt-1">
                   {formatRelative(run.createdAt)}
                 </div>
               </div>
             </Link>
           ))}
-        </div>
+        </List>
       )}
 
       {data && (

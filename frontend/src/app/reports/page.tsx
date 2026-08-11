@@ -64,7 +64,7 @@ export default function ReportsPage() {
   const data = report.data;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-5">
       <PageHeader
         title="Rapor"
         description={
@@ -78,7 +78,7 @@ export default function ReportsPage() {
                 içerir ve dışarıdan verilen bir genişlik onu yenemez. */}
             <div className="w-44 shrink-0">
               <Select
-                className="h-8 text-[12px]"
+                className="h-8 text-xs"
                 value={project}
                 onChange={(e) => setProject(e.target.value)}
                 aria-label="Proje filtresi"
@@ -99,7 +99,7 @@ export default function ReportsPage() {
                   type="button"
                   onClick={() => setDays(p.days)}
                   aria-pressed={days === p.days}
-                  className={`h-8 px-3 text-[12px] whitespace-nowrap transition-colors ${
+                  className={`h-8 px-3 text-xs whitespace-nowrap transition-colors ${
                     i > 0 ? "border-l border-line" : ""
                   } ${
                     days === p.days
@@ -124,7 +124,7 @@ export default function ReportsPage() {
 
       {data && data.totals.runs === 0 && data.previous.runs === 0 && (
         <EmptyState
-          icon={<IconAgent className="size-5" />}
+          icon={<IconAgent className="size-4" />}
           title="Bu dönemde çalıştırma yok"
           description="Bir agent çalıştırdığınızda maliyet, üretilen değişiklik ve başarı oranı burada toplanır."
           action={
@@ -137,11 +137,218 @@ export default function ReportsPage() {
 
       {data && (data.totals.runs > 0 || data.previous.runs > 0) && (
         <>
+          <KpiStrip data={data} />
           <Headline data={data} />
           <Charts data={data} />
           <Breakdowns data={data} />
         </>
       )}
+    </div>
+  );
+}
+
+/* ── KPI şeridi ──────────────────────────────────────────────────────────── */
+
+/**
+ * Dönemin tamamını tek bakışta veren rakam şeridi.
+ *
+ * Öncesinde bu bilgiler kahraman kartının altında tek satırlık düz metin
+ * olarak duruyordu ("Çalıştırma: 42 · Kod üreten: 9 · …"): sekiz rakam aynı
+ * puntoda, aynı renkte, yan yana. Hiçbiri diğerinden ayrılmıyordu ve
+ * hiçbirinin YÖNÜ görünmüyordu — 42 çalıştırma iyi mi kötü mü, artmış mı
+ * azalmış mı, okunamıyordu.
+ *
+ * Her kart üç şey söylüyor: ne olduğu, kaç olduğu, hangi yöne gittiği.
+ *
+ * ÖLÇÜLMEYEN HİÇBİR ŞEY YOK. Bu tür panolarda sık görülen "birleştirilen PR",
+ * "reddedilen PR" ya da "kazanılan süre" gibi rakamlar burada bilerek yok:
+ * sistem PR'ın sonrasını takip etmiyor ve "kazanılan süre" ölçülen değil
+ * uydurulan bir sayıdır. Ekran, bilmediği şeyi ima etmez (spec 012 K4).
+ */
+function KpiStrip({ data }: { data: ReportSummary }) {
+  const t = data.totals;
+  const p = data.previous;
+  const d = data.daily;
+
+  /** Günlük başarı oranı — biten kayıtlar üzerinden; süren işler payda dışı. */
+  const dailyRate = d.map((x) => {
+    const finished = x.runs - x.active;
+    return finished > 0 ? (x.succeeded / finished) * 100 : 0;
+  });
+
+  const finished = t.runs - t.active;
+  const prevFinished = p.runs - p.active;
+
+  /*
+   * İlk kart SONUÇ rakamıdır ve şeridin en soldaki, yani en çok okunan yeri.
+   *
+   * PR düğümü olmayan bir kurulumda "Açılan PR: 0" yazmak, en görünür yere
+   * sistemin hiç çalışmadığı izlenimini koymak olurdu. Böyle bir kurulumda
+   * sonuç rakamı tamamlanan işe düşer — bu ayrım kahraman karttan devralındı.
+   */
+  const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
+
+  const cards: KpiCardProps[] = [
+    usePRs
+      ? {
+          label: "Açılan PR",
+          value: formatCount(t.prsOpened),
+          current: t.prsOpened,
+          previous: p.prsOpened,
+          spark: d.map((x) => x.prsOpened),
+          upIsGood: true,
+        }
+      : {
+          label: "Tamamlanan iş",
+          value: formatCount(t.succeeded),
+          current: t.succeeded,
+          previous: p.succeeded,
+          spark: d.map((x) => x.succeeded),
+          upIsGood: true,
+        },
+    {
+      label: "Çalıştırma",
+      value: formatCount(t.runs),
+      current: t.runs,
+      previous: p.runs,
+      spark: d.map((x) => x.runs),
+      upIsGood: true,
+    },
+    {
+      label: "Başarı",
+      value: formatPercent(t.succeeded, finished),
+      current: finished > 0 ? t.succeeded / finished : 0,
+      previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
+      spark: dailyRate,
+      upIsGood: true,
+    },
+    {
+      label: "Kod üreten",
+      value: formatCount(t.runsWithCode),
+      current: t.runsWithCode,
+      previous: p.runsWithCode,
+      upIsGood: true,
+    },
+    {
+      label: "Değişen dosya",
+      value: formatCompact(t.filesChanged),
+      current: t.filesChanged,
+      previous: p.filesChanged,
+      /* Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
+         Yeşil/kırmızı boyamak olmayan bir yargı üretirdi. */
+      upIsGood: null,
+    },
+    {
+      label: "Gönderilen branch",
+      value: formatCount(t.pushedBranches),
+      current: t.pushedBranches,
+      previous: p.pushedBranches,
+      upIsGood: true,
+    },
+    {
+      label: "Token",
+      value: formatCompact(t.promptTokens + t.completionTokens),
+      current: t.promptTokens + t.completionTokens,
+      previous: p.promptTokens + p.completionTokens,
+      upIsGood: null,
+    },
+    {
+      label: "Maliyet",
+      value: formatMoney(t.costUsd),
+      current: t.costUsd,
+      previous: p.costUsd,
+      spark: d.map((x) => x.costUsd),
+      /* TEK "aşağısı iyi" kart. Maliyetin artması, ölçek büyürken normaldir;
+         asıl yönetilebilir olan birim maliyet ve o aşağıdaki kartta duruyor. */
+      upIsGood: false,
+    },
+  ];
+
+  return (
+    /*
+      Sekiz kart TEK SIRAYA değil, dörtlü iki sıraya diziliyor.
+      İçerik sütunu 1280px; sekize bölününce karta ~140px kalıyor ve o
+      genişlikte hem etiket ("GÖNDERİLEN BR…") hem değişim metni ("önceki
+      dönemde …") kesiliyordu. Kesilen bir rakam şeridi yoğun değil, bozuk
+      görünür. Dörtlüde karta ~290px düşüyor ve hiçbir şey kırpılmıyor.
+    */
+    /* Ekran genişledikçe sıra sayısı düşer: dar ekranda 2, orta ekranda 4,
+       geniş ekranda sekizi tek sıra. Sabit dörtlü bırakmak 1920px'de üst
+       yarıyı boşa harcıyordu; sabit sekizli bırakmak 1280px'de etiketleri
+       kesiyordu. */
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
+      {cards.map((c) => (
+        <KpiCard key={c.label} {...c} days={data.days} />
+      ))}
+    </div>
+  );
+}
+
+interface KpiCardProps {
+  label: string;
+  value: string;
+  current: number;
+  previous: number;
+  spark?: number[];
+  /** true: artış iyi · false: artış kötü · null: yön yorumlanmaz. */
+  upIsGood: boolean | null;
+}
+
+function KpiCard({
+  label,
+  value,
+  current,
+  previous,
+  spark,
+  upIsGood,
+  days,
+}: KpiCardProps & { days: number }) {
+  const ratio = changeRatio(current, previous);
+  const flat = ratio !== null && Math.abs(ratio) < 0.005;
+  const good = ratio !== null && ratio > 0 === upIsGood;
+
+  return (
+    <div className="rounded-card border border-line bg-surface px-3.5 py-3">
+      <div className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
+        {label}
+      </div>
+
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="text-xl leading-none font-semibold tabular-nums">
+          {value}
+        </div>
+        {/* Kıvılcım YALNIZCA günlük serisi gerçekten olan kartlarda. Diğer
+            dördü için gün kırılımı üretilmiyor; oraya düz bir çizgi koymak
+            olmayan bir veriyi varmış gibi göstermek olurdu. */}
+        {spark && spark.length > 1 && (
+          <div className="hidden w-20 shrink-0 sm:block">
+            <Sparkline values={spark} label={`${label} — günlük seyir`} />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 truncate text-2xs">
+        {ratio === null ? (
+          <span className="text-ink-3">önceki dönem: veri yok</span>
+        ) : (
+          <>
+            <span
+              className={
+                flat || upIsGood === null
+                  ? "text-ink-3"
+                  : good
+                    ? "font-medium text-ok"
+                    : "font-medium text-danger"
+              }
+            >
+              {flat
+                ? "≈ aynı"
+                : `${ratio > 0 ? "↑" : "↓"} ${formatPercent(Math.abs(ratio), 1)}`}
+            </span>{" "}
+            <span className="text-ink-3">son {days} güne göre</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -171,24 +378,6 @@ function Headline({ data }: { data: ReportSummary }) {
   // sistemin çalışmadığı izlenimi verirdi; kahraman rakam tamamlanan işe düşer.
   const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
 
-  const hero = usePRs
-    ? {
-        label: "Açılan pull request",
-        value: formatCount(t.prsOpened),
-        current: t.prsOpened,
-        previous: p.prsOpened,
-        spark: data.daily.map((d) => d.prsOpened),
-        sparkLabel: "Günlük açılan PR",
-      }
-    : {
-        label: "Tamamlanan iş",
-        value: formatCount(t.succeeded),
-        current: t.succeeded,
-        previous: p.succeeded,
-        spark: data.daily.map((d) => d.succeeded),
-        sparkLabel: "Günlük tamamlanan iş",
-      };
-
   // Değişiklik boyutu PR başına hesaplanır; PR yoksa çalıştırma başına.
   const changeUnits = usePRs ? t.prsOpened : t.runsWithCode;
   const linesPerUnit =
@@ -196,35 +385,25 @@ function Headline({ data }: { data: ReportSummary }) {
 
   return (
     <Card>
-      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
-        <div className="min-w-[220px]">
-          <div className="text-[12px] tracking-wide text-ink-3 uppercase">
-            {hero.label}
-          </div>
-          <div className="mt-1.5 text-[44px] leading-none font-semibold tracking-[-0.02em]">
-            {hero.value}
-          </div>
-          <Delta
-            current={hero.current}
-            previous={hero.previous}
-            days={data.days}
-            upIsGood
-          />
-        </div>
+      {/*
+        Kahraman rakam ve kıvılcımı KPI şeridine taşındı — şeridin ilk kartı.
+        Burada tekrarlanması aynı sayıyı iki kez göstermek olurdu.
+        Geriye kalan, bu kartın asıl işi: DENGE.
 
-        {/* Kıvılcım tek soruya cevap verir: artıyor mu? Eksen ve etiket
-            bilinçli olarak yok — onlar aşağıdaki tam grafiklerin işi. */}
-        {/* Genişlik sınırlı: kıvılcım kartın tamamına yayılınca kahraman
-            rakamla yarışıyor ve boş alanı grafik sanılıyor. */}
-        <div className="min-w-[160px] flex-1 sm:max-w-[300px]">
-          <div className="text-[11px] text-ink-3">{data.days} günlük seyir</div>
-          <div className="mt-2">
-            <Sparkline values={hero.spark} label={hero.sparkLabel} />
-          </div>
-        </div>
-      </div>
+        Dört rakam rastgele seçilmedi (spec 012 K3) — biri sonuç, biri
+        güvenilirlik, biri RİSK, biri birim maliyet. Hız gösteren bir rakam
+        asla yalnız durmaz: PR sayısının arttığı ama değişiklik boyutunun da
+        büyüdüğü bir dönem ilerleme değil, biriken risktir. Şerit hızı
+        gösteriyor; bu kart onu dengeleyen okumayı veriyor.
+      */}
+      {/* Açıklama paragrafı kaldırıldı. Panel başlığı ne olduğunu söylüyor;
+          altındaki dört rakam kendini anlatıyor. Bir panonun her kutusuna
+          ne işe yaradığını anlatan bir paragraf koymak, panoyu belge yapar. */}
+      <h2 className="text-sm font-semibold tracking-[-0.01em]">
+        Rakamların dengesi
+      </h2>
 
-      <dl className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-line pt-5 sm:grid-cols-4">
+      <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
         <Stat
           label="Jira'dan otomatik"
           value={formatCount(t.jiraTasks)}
@@ -251,18 +430,18 @@ function Headline({ data }: { data: ReportSummary }) {
           aynı şey değil ve sistem aradaki farkı bilmiyor; bilmediğini söylemek
           tasarımın parçası. */}
       {usePRs && (
-        <p className="mt-4 border-t border-line pt-3 text-[12px] text-ink-3">
+        <p className="mt-4 border-t border-line pt-3 text-xs text-ink-3">
           Açılan PR sayısıdır — birleştirilip birleştirilmediğini, incelemeden
           geçip geçmediğini bu sistem takip etmiyor.
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-[12px] text-ink-2">
-        <SubStat label="Çalıştırma" value={formatCount(t.runs)} />
-        <SubStat label="Kod üreten" value={formatCount(t.runsWithCode)} />
-        <SubStat label="Gönderilen branch" value={formatCount(t.pushedBranches)} />
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-xs text-ink-2">
+        {/* Çalıştırma, kod üreten, gönderilen branch ve token buradan
+            kaldırıldı: dördü de artık KPI şeridinde, kendi yönleriyle
+            birlikte duruyor. Burada yalnızca şeritte KARŞILIĞI OLMAYANLAR
+            kalıyor — süre ve başarısızlık kırılımı. */}
         <SubStat label="Ortalama süre" value={formatDuration(t.avgDurationSec)} />
-        <SubStat label="Token" value={formatCompact(t.promptTokens + t.completionTokens)} />
         <SubStat label="Başarısız" value={formatCount(t.failed)} />
         {t.timeout > 0 && <SubStat label="Zaman aşımı" value={formatCount(t.timeout)} />}
         {t.cancelled > 0 && <SubStat label="İptal" value={formatCount(t.cancelled)} />}
@@ -283,12 +462,12 @@ function Stat({
 }) {
   return (
     <div>
-      <dt className="text-[11px] tracking-wide text-ink-3 uppercase">{label}</dt>
+      <dt className="text-2xs tracking-wide text-ink-3 uppercase">{label}</dt>
       {/* Büyük tek sayı orantılı rakamlarla yazılır; tabular-nums bu boyutta gevşek görünür. */}
-      <dd className="mt-1 text-[22px] leading-none font-semibold tracking-[-0.01em]">
+      <dd className="mt-1 text-xl leading-none font-semibold tracking-[-0.01em]">
         {value}
       </dd>
-      {note && <p className="mt-1 text-[11px] text-ink-3">{note}</p>}
+      {note && <p className="mt-1 text-2xs text-ink-3">{note}</p>}
     </div>
   );
 }
@@ -301,50 +480,6 @@ function SubStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/**
- * Önceki dönemle değişim.
- *
- * Yön ile "iyi/kötü" AYNI ŞEY DEĞİLDİR: maliyetin artması kötü, çalıştırmanın
- * artması iyi. Rengi belirleyen bu ikisinin çarpımıdır.
- */
-function Delta({
-  current,
-  previous,
-  days,
-  upIsGood,
-}: {
-  current: number;
-  previous: number;
-  days: number;
-  upIsGood: boolean;
-}) {
-  const ratio = changeRatio(current, previous);
-  if (ratio === null) {
-    return (
-      <p className="mt-2 text-[12px] text-ink-3">
-        Önceki {days} günde kayıt yok
-      </p>
-    );
-  }
-
-  const up = ratio > 0;
-  const flat = Math.abs(ratio) < 0.005;
-  const good = up === upIsGood;
-
-  return (
-    <p className="mt-2 text-[12px] text-ink-2">
-      <span
-        className={
-          flat ? "text-ink-3" : good ? "font-medium text-ok" : "font-medium text-danger"
-        }
-      >
-        {flat ? "≈ aynı" : `${up ? "↑" : "↓"} ${formatPercent(Math.abs(ratio), 1)}`}
-      </span>{" "}
-      önceki {days} güne göre
-    </p>
-  );
-}
-
 /* ── Grafikler ───────────────────────────────────────────────────────────── */
 
 function Charts({ data }: { data: ReportSummary }) {
@@ -353,17 +488,21 @@ function Charts({ data }: { data: ReportSummary }) {
   const [asTable, setAsTable] = useState(false);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="grid items-start gap-5 xl:grid-cols-2">
+      {/*
+        Panel başlıkları TEK SATIR: ad solda, eylem/değer sağda.
+
+        Öncesinde her başlığın altında bir açıklama paragrafı vardı ("Sonuca
+        göre; kaydı olmayan günler de eksende durur.", "…iki ölçek birbirini
+        yanlış anlatır."). Bunlar TASARIM GEREKÇESİYDİ, kullanıcının bilgisi
+        değil — yeri kod yorumu, ekran değil. Panonun her kutusuna kendini
+        savunan bir paragraf koymak panoyu belgeye çeviriyordu.
+      */}
       <Card>
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
-              Günlük çalıştırma
-            </h2>
-            <p className="mt-1 text-[12px] text-ink-2">
-              Sonuca göre; kaydı olmayan günler de eksende durur.
-            </p>
-          </div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-[-0.01em]">
+            Günlük çalıştırma
+          </h2>
           <Button size="sm" onClick={() => setAsTable((v) => !v)}>
             {asTable ? "Grafik" : "Tablo"}
           </Button>
@@ -377,14 +516,15 @@ function Charts({ data }: { data: ReportSummary }) {
       </Card>
 
       <Card>
-        <div className="mb-4">
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-[-0.01em]">
             Günlük maliyet
           </h2>
-          <p className="mt-1 text-[12px] text-ink-2">
-            Dönem toplamı {formatMoney(data.totals.costUsd)}. Çalıştırma sayısıyla
-            aynı eksene konmaz — iki ölçek birbirini yanlış anlatır.
-          </p>
+          {/* Dönem toplamı paragrafın içinde bir cümleydi; artık başlığın
+              karşısında bir değer. Aynı bilgi, taranabilir yerde. */}
+          <span className="font-mono text-xs tabular-nums text-ink-2">
+            {formatMoney(data.totals.costUsd)}
+          </span>
         </div>
         <CostTrendChart days={data.daily} />
       </Card>
@@ -396,12 +536,20 @@ function Charts({ data }: { data: ReportSummary }) {
 
 function Breakdowns({ data }: { data: ReportSummary }) {
   return (
-    <div className="space-y-7">
-      <div className="grid gap-5 xl:grid-cols-2">
+    /*
+      Üç sütunlu bant.
+
+      İkili ızgarada "Proje bazında" iki satır içeriyor, komşusu beş; yanında
+      ekranın yarısı kadar ölü alan kalıyordu. Hatalar paneli ise en altta tek
+      başına tam genişlik kaplıyordu — oysa içeriği birkaç satırlık metin.
+      Üçü aynı bantta yan yana durunca hem boşluk kapanıyor hem de "hangi
+      agent / hangi proje / neden başarısız" aynı bakışta okunuyor.
+    */
+    <div className="space-y-5">
+      <div className="grid items-start gap-5 xl:grid-cols-3">
         <Card>
           <Section
             title="Agent bazında"
-            description="Hangi agent ne kadar iş yaptı."
           >
             <BarList
               rows={data.byAgent.map((g) => ({
@@ -419,7 +567,7 @@ function Breakdowns({ data }: { data: ReportSummary }) {
         </Card>
 
         <Card>
-          <Section title="Proje bazında" description="Emek hangi depoya gitti.">
+          <Section title="Proje bazında">
             <BarList
               rows={data.byProject.map((g) => ({
                 key: g.key,
@@ -433,45 +581,44 @@ function Breakdowns({ data }: { data: ReportSummary }) {
             />
           </Section>
         </Card>
+
+        {data.failures.length > 0 && (
+          <Card>
+            <Section
+              title="Tekrar eden hatalar"
+            >
+              <ul className="divide-y divide-line">
+                {data.failures.map((f) => (
+                  <li
+                    key={f.message}
+                    className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
+                  >
+                    <span
+                      className="min-w-0 flex-1 text-sm text-ink-2"
+                      title={f.message}
+                    >
+                      {readableFailure(f.message)}
+                    </span>
+                    <Badge tone="danger">{formatCount(f.count)} kez</Badge>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          </Card>
+        )}
       </div>
 
       <Card padded={false}>
-        <div className="p-5 pb-3">
-          <h2 className="text-[15px] font-semibold tracking-[-0.01em]">
+        <div className="flex items-center justify-between gap-3 p-5 pb-3">
+          <h2 className="text-sm font-semibold tracking-[-0.01em]">
             Model bazında
           </h2>
-          <p className="mt-1 text-[12px] text-ink-2">
-            Hangi model neye mal oldu ve ne kadarı tuttu.
-          </p>
+          <span className="text-xs text-ink-3">
+            {formatCount(data.byModel.length)} model
+          </span>
         </div>
         <GroupTable rows={data.byModel} totals={data.totals} />
       </Card>
-
-      {data.failures.length > 0 && (
-        <Card>
-          <Section
-            title="Tekrar eden hatalar"
-            description="En sık görülen sebepler; ayrıntı çalıştırma kaydında."
-          >
-            <ul className="divide-y divide-line">
-              {data.failures.map((f) => (
-                <li
-                  key={f.message}
-                  className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <span
-                    className="min-w-0 flex-1 text-[13px] text-ink-2"
-                    title={f.message}
-                  >
-                    {readableFailure(f.message)}
-                  </span>
-                  <Badge tone="danger">{formatCount(f.count)} kez</Badge>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        </Card>
-      )}
     </div>
   );
 }
@@ -486,15 +633,15 @@ function GroupTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="px-5 pb-5 text-[13px] text-ink-3">Bu dönemde kayıt yok.</p>
+      <p className="px-5 pb-5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>
     );
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-[13px]">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
-          <tr className="border-y border-line text-left text-[11px] tracking-wide text-ink-3 uppercase">
+          <tr className="border-y border-line text-left text-2xs tracking-wide text-ink-3 uppercase">
             <th className="py-2 pl-5 font-medium">Model</th>
             <th className="py-2 pr-4 text-right font-medium">İş</th>
             <th className="py-2 pr-4 text-right font-medium">Başarı</th>
@@ -508,8 +655,8 @@ function GroupTable({
           {rows.map((g) => (
             <tr key={g.key} className="border-b border-line last:border-0">
               <td className="py-2.5 pl-5">
-                <div className="font-mono text-[12px]">{g.label}</div>
-                <div className="mt-0.5 text-[11px] text-ink-3">
+                <div className="font-mono text-xs">{g.label}</div>
+                <div className="mt-0.5 text-2xs text-ink-3">
                   {g.key.split(" / ")[0]}
                 </div>
               </td>

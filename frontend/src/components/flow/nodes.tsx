@@ -69,7 +69,7 @@ function AgentNodeBase({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`w-56 rounded-card border bg-surface shadow-(--shadow-card) transition-colors ${ring} ${
+      className={`w-60 rounded-card border bg-surface shadow-(--shadow-card) transition-colors ${ring} ${
         selected ? "ring-2 ring-accent/30" : ""
       }`}
     >
@@ -79,18 +79,18 @@ function AgentNodeBase({ data, selected }: NodeProps) {
       <div className="flex items-start gap-2 px-3 py-2.5">
         <IconAgent className="mt-0.5 size-4 shrink-0 text-ink-3" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">
+          <div className="truncate text-sm font-medium">
             {d.name || <span className="text-ink-3">adsız adım</span>}
           </div>
           {/* Düzenlemede eksik agent uyarı, izlemede sessizlik: çalışmış bir
               adımda "seçilmedi" yazmak yanlış olurdu. */}
           {(d.agentLabel || !d.readOnly) && (
-            <div className="mt-0.5 truncate text-[11px] text-ink-3">
+            <div className="mt-0.5 truncate text-xs text-ink-3">
               {d.agentLabel ?? "agent seçilmedi"}
             </div>
           )}
           {d.config.model && (
-            <div className="mt-0.5 truncate font-mono text-[10px] text-ink-3">
+            <div className="mt-0.5 truncate font-mono text-2xs text-ink-3">
               {d.config.model}
             </div>
           )}
@@ -98,7 +98,7 @@ function AgentNodeBase({ data, selected }: NodeProps) {
       </div>
 
       {(d.status || hasProblem) && (
-        <div className="border-t border-line px-3 py-1.5 text-[11px]">
+        <div className="border-t border-line px-3 py-1.5 text-xs">
           {hasProblem ? (
             <span className="text-danger">{d.problems?.[0]}</span>
           ) : (
@@ -164,7 +164,7 @@ function ActionNodeBase({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`w-56 rounded-card border bg-raised shadow-(--shadow-card) transition-colors ${ring} ${
+      className={`w-60 rounded-card border bg-raised shadow-(--shadow-card) transition-colors ${ring} ${
         selected ? "ring-2 ring-accent/30" : ""
       }`}
     >
@@ -173,17 +173,17 @@ function ActionNodeBase({ data, selected }: NodeProps) {
       <div className="flex items-start gap-2 px-3 py-2.5">
         <Icon className="mt-0.5 size-4 shrink-0 text-ink-3" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">
+          <div className="truncate text-sm font-medium">
             {d.name || ACTION_LABELS[d.kind] || "Adım"}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-ink-3">
+          <div className="mt-0.5 truncate text-xs text-ink-3">
             {actionDetail(d)}
           </div>
         </div>
       </div>
 
       {(d.status || hasProblem) && (
-        <div className="border-t border-line px-3 py-1.5 text-[11px]">
+        <div className="border-t border-line px-3 py-1.5 text-xs">
           {hasProblem ? (
             <span className="text-danger">{d.problems?.[0]}</span>
           ) : (
@@ -219,8 +219,8 @@ function TriggerNodeBase({ data, selected }: NodeProps) {
       }`}
     >
       <div className="flex items-center gap-2">
-        <IconPlay className="size-3.5 text-ink-3" />
-        <span className="text-[12px] font-medium">{TRIGGER_LABELS[d.kind] ?? "Başlangıç"}</span>
+        <IconPlay className="size-4 text-ink-3" />
+        <span className="text-sm font-medium">{TRIGGER_LABELS[d.kind] ?? "Başlangıç"}</span>
       </div>
       {/* Tetikleyiciye bağ GİRMEZ: akışın başıdır, giriş tutamağı yok. */}
       <Handle type="source" position={Position.Right} className="!size-2 !bg-line-strong" />

@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   Card,
+  List,
   Checkbox,
   Input,
   Notice,
@@ -45,7 +46,11 @@ export default function AgentsPage() {
   });
 
   return (
-    <div className="max-w-4xl">
+    /* `max-w-4xl` kaldırıldı: Projeler ve Çalıştırmalar aynı türden listeler
+       ama tam genişlikte duruyordu. Aynı iş için iki farklı sayfa genişliği
+       keyfi bir farktı. Açıklama metni zaten kendi `max-w-prose` sınırını
+       taşıyor, yani okuma satırı uzamıyor. */
+    <div>
       <PageHeader
         title="Agent'lar"
         description="Hazır agent'ların talimatını kendi kurallarınıza göre değiştirebilir, sıfırdan kendi agent'ınızı oluşturabilirsiniz."
@@ -54,7 +59,7 @@ export default function AgentsPage() {
             <Button
               variant="primary"
               onClick={() => setCreating(true)}
-              icon={<IconPlus className="size-3.5" />}
+              icon={<IconPlus className="size-4" />}
             >
               Agent oluştur
             </Button>
@@ -76,14 +81,18 @@ export default function AgentsPage() {
           <Notice tone="error">{describeError(agents.error).message}</Notice>
         )}
 
-        {agents.data?.items.map((a) => (
-          <AgentCard
-            key={a.id}
-            agent={a}
-            providers={providers.data ?? []}
-            models={models.data?.items ?? []}
-          />
-        ))}
+        {agents.data && agents.data.items.length > 0 && (
+          <List>
+            {agents.data.items.map((a) => (
+              <AgentRow
+                key={a.id}
+                agent={a}
+                providers={providers.data ?? []}
+                models={models.data?.items ?? []}
+              />
+            ))}
+          </List>
+        )}
 
         {agents.data && (
           <Pagination
@@ -99,7 +108,7 @@ export default function AgentsPage() {
   );
 }
 
-function AgentCard({
+function AgentRow({
   agent,
   providers,
   models,
@@ -132,58 +141,117 @@ function AgentCard({
   const provider = providers.find((p) => p.id === agent.defaultProviderId);
 
   return (
-    <Card>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-medium">{agent.name}</h2>
-            <span className="font-mono text-xs text-ink-2">{agent.slug}</span>
-            {agent.source === "builtin" ? (
-              <Badge>hazır</Badge>
-            ) : (
-              <Badge tone="info">özel</Badge>
-            )}
+    /*
+     * `group`: eylemlerin hover'da açılması buna bağlı.
+     *
+     * Satır önceden üst üste dizilmiş DÖRT metin satırıydı (ad, açıklama,
+     * yetkiler, model) ve hepsi sola yaslıydı; aralarındaki tek fark punto
+     * ve renkti. Göz nereye bakacağını bilmiyordu.
+     *
+     * Şimdi üç bölge var: solda çıpa (simge), ortada içerik, sağda eylemler.
+     */
+    <div className="group px-4 py-3.5">
+      <div className="flex items-start gap-3.5">
+        {/*
+          Görsel çıpa — SİMGE DEĞİL, MONOGRAM.
+
+          Satır çıplak metinle başlıyordu; listede göz her satırın nerede
+          başladığını yeniden aramak zorundaydı. Sabit genişlikte bir kutu
+          sol kenarda dikey ritim kuruyor.
+
+          İlk hali agent simgesiydi ama altı satırda aynı simge duruyordu:
+          hiçbir şeyi ayırt etmiyor, yalnızca yer dolduruyordu — yani
+          tanımı gereği dekoratif. Monogram aynı ritmi kuruyor ama ayırt
+          edici: satırlar birbirinden bakışla ayrılıyor.
+
+          `toLocaleUpperCase("tr")`: Türkçede "i" harfinin büyüğü "İ".
+          Öntanımlı büyütme "I" verir ve bir agent adı "İ" ile başlıyorsa
+          monogram yanlış harfi gösterirdi.
+        */}
+        <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-sm font-semibold text-ink-2 select-none">
+          {agent.name.charAt(0).toLocaleUpperCase("tr")}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h2 className="text-sm font-semibold tracking-[-0.01em]">
+              {agent.name}
+            </h2>
+            <span className="font-mono text-xs text-ink-3">{agent.slug}</span>
+            {agent.source === "custom" && <Badge tone="info">özel</Badge>}
             {agent.isModified && <Badge tone="warning">değiştirilmiş</Badge>}
           </div>
 
-          <p className="mt-1 max-w-prose text-sm text-ink-2">
+          {/* İki satırda kesiliyor: liste taranacak bir şey, okunacak değil.
+              Tam metin agent'ı düzenlerken zaten görünüyor. */}
+          <p className="mt-1 line-clamp-2 max-w-prose text-sm text-ink-2">
             {agent.description}
           </p>
 
-          <PermissionLine agent={agent} />
-
-          <p className="mt-2 text-xs text-ink-2">
-            Varsayılan model:{" "}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <PermissionLine agent={agent} />
             {agent.defaultModel ? (
-              <span className="font-mono">
+              <span className="ml-auto truncate pl-2 font-mono text-2xs text-ink-3">
                 {provider ? `${provider.name} · ` : ""}
                 {agent.defaultModel}
               </span>
             ) : (
-              "seçilmemiş"
+              <span className="ml-auto pl-2 text-2xs text-ink-3">
+                model seçilmemiş
+              </span>
             )}
-          </p>
+          </div>
         </div>
 
         {!editing && !confirming && !running && (
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            <Button variant="primary" onClick={() => setRunning(true)}>
-              Çalıştır
-            </Button>
-            <Button onClick={() => setShowPrompt((v) => !v)}>
-              {showPrompt ? "Talimatı gizle" : "Talimatı gör"}
-            </Button>
-            <Button onClick={() => setEditing(true)}>Düzenle</Button>
-            {agent.isModified && (
-              <Button onClick={() => reset.mutate()} disabled={reset.isPending}>
-                {reset.isPending ? "…" : "Sıfırla"}
+          /*
+           * Satır eylemleri İKİNCİL — ama GÖRÜNÜR.
+           *
+           * İki uçtan da geçildi. Önce hepsi dolu mor birincil düğmeydi ve
+           * liste altı agent gösterdiği için sayfada altı tane duruyordu;
+           * aksan her satırda tekrarlanınca vurgu olmaktan çıkıyor ve sağ
+           * üstteki gerçek birincil eylem ("Agent oluştur") aralarında
+           * kayboluyordu.
+           *
+           * Sonra tersine kaçıldı: `ghost` yapıldılar ve kenarlıkları da
+           * zeminleri de gitti — düğme oldukları anlaşılmıyordu. Bu, projenin
+           * kendi `control-line` kuralının ihlaliydi: "bu çizgi olmasaydı
+           * kullanıcı orada tıklanabilir bir şey olduğunu anlar mıydı?"
+           * Cevap hayırsa kenarlık ZORUNLU.
+           *
+           * Doğru yer ikisinin ortası: hepsi `secondary` — kenarlıklı, yani
+           * düğme oldukları belli; dolu değil, yani birincil eylemle
+           * yarışmıyorlar. Hiyerarşi renkle değil DOLGUYLA kuruluyor.
+           *
+           * İKİNCİ SORUN SAYIYDI: altı satır × üç düğme = ekranda sürekli
+           * duran on sekiz düğme. Asıl eylem ("Çalıştır") her satırda
+           * kalıyor; geri kalanlar imlecin üstünde olduğu satırda açılıyor.
+           * Ekranda aynı anda görünen düğme sayısı üçte birine iniyor.
+           *
+           * Gizlenmiyorlar, ERTELENİYORLAR — üç yoldan da ulaşılabilir:
+           *   · fareyle satırın üstüne gelince (`group-hover`)
+           *   · klavyeyle sekmeyle girince (`group-focus-within`)
+           *   · dar ekranda hep açık (`sm:` öncesi opaklık 1) — dokunmatik
+           *     cihazda hover diye bir şey yok, orada erteleme gizlemek olurdu
+           */
+          <div className="flex shrink-0 items-start gap-2">
+            <div className="flex flex-wrap justify-end gap-2 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+              <Button onClick={() => setShowPrompt((v) => !v)}>
+                {showPrompt ? "Talimatı gizle" : "Talimatı gör"}
               </Button>
-            )}
-            {agent.source === "custom" && (
-              <Button variant="danger" onClick={() => setConfirming(true)}>
-                Sil
-              </Button>
-            )}
+              <Button onClick={() => setEditing(true)}>Düzenle</Button>
+              {agent.isModified && (
+                <Button onClick={() => reset.mutate()} disabled={reset.isPending}>
+                  {reset.isPending ? "…" : "Sıfırla"}
+                </Button>
+              )}
+              {agent.source === "custom" && (
+                <Button variant="danger" onClick={() => setConfirming(true)}>
+                  Sil
+                </Button>
+              )}
+            </div>
+            <Button onClick={() => setRunning(true)}>Çalıştır</Button>
           </div>
         )}
 
@@ -210,7 +278,7 @@ function AgentCard({
 
       {showPrompt && !editing && (
         <Well className="mt-4 max-h-80 overflow-auto p-3.5">
-          <pre className="font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
+          <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap">
             {agent.prompt}
           </pre>
         </Well>
@@ -233,7 +301,7 @@ function AgentCard({
           />
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -249,10 +317,12 @@ function AgentCard({
  * yetkinin ekranda yer kaplaması gerekmiyor — yokluğu zaten cevap.
  */
 function PermissionLine({ agent }: { agent: Agent }) {
+  /* Çip olarak kısaldılar: "dosya değiştirebilir" bir cümlenin parçasıydı,
+     "dosya" ise bir etiket. Tam anlam `title` ile duruyor. */
   const izinli = [
-    agent.allowEdit && "dosya değiştirebilir",
-    agent.allowBash && "komut çalıştırabilir",
-    agent.allowWebfetch && "ağa çıkabilir",
+    agent.allowEdit && "dosya yazar",
+    agent.allowBash && "komut çalıştırır",
+    agent.allowWebfetch && "ağa çıkar",
   ].filter(Boolean) as string[];
 
   const mcp = agent.mcpServerIds.length;
@@ -260,20 +330,34 @@ function PermissionLine({ agent }: { agent: Agent }) {
   // sayıyı yazmak, olmayan bir yeteneği varmış gibi göstermek olurdu.
   const betik = agent.allowBash ? agent.scriptIds.length : 0;
 
+  /*
+   * Yetkiler ÇİP, cümle değil.
+   *
+   * Önceden "Yetkileri: dosya değiştirebilir · komut çalıştırabilir · ağa
+   * çıkabilir" diye tek satır düz metindi. İki sorunu vardı: satırdaki diğer
+   * üç metin bloğuyla aynı görünüyordu, ve bir agent'ın neye yetkili olduğu
+   * ancak cümle okunarak anlaşılıyordu — oysa bu, listede TARANAN bir bilgi.
+   *
+   * "Yalnızca okur" hâli bilerek ayrı tutuldu ve `ok` tonunda: bu bir eksiklik
+   * değil, güvenlik özelliği. Yetkisiz bir agent'ın deponuza yazamayacağını
+   * söylüyor ve o cümlenin kaybolmaması gerekiyordu.
+   */
   return (
-    <p className="mt-2 text-xs text-ink-2">
-      {mcp > 0 && (
-        <>
-          {mcp} dış araç sunucusuna erişebilir ·{" "}
-        </>
-      )}
-      {betik > 0 && <>{betik} hazır betik çalıştırabilir · </>}
+    <>
       {izinli.length === 0 ? (
-        <>Yalnızca okur — hiçbir şeyi değiştiremez.</>
+        <Badge tone="success" title="Bu agent hiçbir şeyi değiştiremez">
+          yalnızca okur
+        </Badge>
       ) : (
-        <>Yetkileri: {izinli.join(" · ")}</>
+        izinli.map((y) => <Badge key={y}>{y}</Badge>)
       )}
-    </p>
+      {mcp > 0 && (
+        <Badge tone="info" title="Dış araç sunucusu (MCP)">
+          {mcp} dış araç
+        </Badge>
+      )}
+      {betik > 0 && <Badge title="Hazır betik">{betik} betik</Badge>}
+    </>
   );
 }
 
@@ -392,7 +476,7 @@ function AgentForm({
           Talimat (agent&apos;a verilen sistem yönergesi)
         </span>
         <Textarea
-          className="mt-1 h-64 font-mono text-[12px] leading-relaxed"
+          className="mt-1 h-64 font-mono text-xs leading-relaxed"
           value={prompt}
           placeholder="Sen bir kod incelemecisisin. …"
           onChange={(e) => setPrompt(e.target.value)}
@@ -400,7 +484,7 @@ function AgentForm({
       </label>
 
       <div>
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">
           Varsayılan model
         </span>
         <div className="mt-1">
@@ -454,9 +538,9 @@ function AgentForm({
       <fieldset className="mt-3 rounded border border-line p-3">
         <legend className="px-1 text-xs text-ink-2">Dış araçlar (MCP)</legend>
         {mcpServers.data === undefined ? (
-          <p className="text-[12px] text-ink-3">Yükleniyor…</p>
+          <p className="text-xs text-ink-3">Yükleniyor…</p>
         ) : mcpServers.data.length === 0 ? (
-          <p className="text-[12px] text-ink-3">
+          <p className="text-xs text-ink-3">
             Tanımlı sunucu yok. Ayarlar → Dış araçlar bölümünden ekleyebilirsiniz.
           </p>
         ) : (
@@ -476,7 +560,7 @@ function AgentForm({
                 />
               ))}
             </PickerList>
-            <p className="mt-2 text-[11px] text-ink-3">
+            <p className="mt-2 text-2xs text-ink-3">
               Seçilmeyen sunucuların araçları bu agent&apos;a hiç sunulmaz.
             </p>
           </div>
@@ -488,9 +572,9 @@ function AgentForm({
       <fieldset className="mt-3 rounded border border-line p-3">
         <legend className="px-1 text-xs text-ink-2">Betikler</legend>
         {scripts.data === undefined ? (
-          <p className="text-[12px] text-ink-3">Yükleniyor…</p>
+          <p className="text-xs text-ink-3">Yükleniyor…</p>
         ) : scripts.data.items.length === 0 ? (
-          <p className="text-[12px] text-ink-3">
+          <p className="text-xs text-ink-3">
             Tanımlı betik yok. Ayarlar → Betikler bölümünden ekleyebilirsiniz.
           </p>
         ) : (
@@ -529,7 +613,7 @@ function AgentForm({
                 </Notice>
               </div>
             ) : (
-              <p className="mt-2 text-[11px] text-ink-3">
+              <p className="mt-2 text-2xs text-ink-3">
                 Seçilen betikler agent&apos;ın ortamına konur ve talimatına
                 yazılır. Ne zaman çağıracağına agent karar verir.
               </p>
@@ -613,10 +697,10 @@ function PickerRow({
         className="mt-0.5 size-3.5 shrink-0 accent-accent"
       />
       <span className="min-w-0">
-        <span className={`block text-[13px] ${mono ? "font-mono" : "font-medium"}`}>
+        <span className={`block text-sm ${mono ? "font-mono" : "font-medium"}`}>
           {title}
         </span>
-        {note && <span className="mt-0.5 block text-[12px] text-ink-2">{note}</span>}
+        {note && <span className="mt-0.5 block text-xs text-ink-2">{note}</span>}
       </span>
     </label>
   );

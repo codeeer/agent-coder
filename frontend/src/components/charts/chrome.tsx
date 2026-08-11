@@ -28,7 +28,7 @@ export function Legend({ series }: { series: Series[] }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
       {series.map((s) => (
-        <li key={s.key} className="flex items-center gap-1.5 text-[12px] text-ink-2">
+        <li key={s.key} className="flex items-center gap-1.5 text-xs text-ink-2">
           <span
             aria-hidden="true"
             className="size-2.5 shrink-0 rounded-[3px]"

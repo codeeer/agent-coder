@@ -12,8 +12,8 @@ import {
   Button,
   Card,
   EmptyState,
-  Field,
   Input,
+  List,
   Notice,
   PageHeader,
   Select,
@@ -46,7 +46,7 @@ export default function ProjectsPage() {
             <Button
               variant="primary"
               onClick={() => setAdding(true)}
-              icon={<IconPlus className="size-3.5" />}
+              icon={<IconPlus className="size-4" />}
             >
               Proje ekle
             </Button>
@@ -70,7 +70,7 @@ export default function ProjectsPage() {
 
         {projects.data?.total === 0 && !adding && (
           <EmptyState
-            icon={<IconFolder className="size-5" />}
+            icon={<IconFolder className="size-4" />}
             title="Henüz proje yok"
             description="Bir agent çalıştırabilmek için önce üzerinde çalışacağı depoyu tanımlayın."
             action={
@@ -81,13 +81,17 @@ export default function ProjectsPage() {
           />
         )}
 
-        {projects.data?.items.map((p) => (
-          <ProjectCard
-            key={p.id}
-            project={p}
-            gitProviders={gitProviders.data ?? []}
-          />
-        ))}
+        {projects.data && projects.data.items.length > 0 && (
+          <List>
+            {projects.data.items.map((p) => (
+              <ProjectRow
+                key={p.id}
+                project={p}
+                gitProviders={gitProviders.data ?? []}
+              />
+            ))}
+          </List>
+        )}
 
         {projects.data && (
           <Pagination
@@ -103,7 +107,7 @@ export default function ProjectsPage() {
   );
 }
 
-function ProjectCard({
+function ProjectRow({
   project,
   gitProviders,
 }: {
@@ -125,26 +129,42 @@ function ProjectCard({
   });
 
   return (
-    <Card>
+    <div className="px-4 py-3">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-medium">{project.name}</h2>
+            {/* Rozet YALNIZCA sağlayıcı için: bu bir sınıflandırma, iki
+                değerden biri. Çalıştırma sayısı ise metadata — aşağıdaki
+                satırda düz metin olarak duruyor. Sayıyı hap içine koymak,
+                rozetin "durum/tür" anlamını sulandırıyordu. */}
             {provider ? (
               <Badge tone="info">{provider.name}</Badge>
             ) : (
               <Badge title="Kimlik doğrulamasız klonlanır">açık depo</Badge>
             )}
-            {project.runCount > 0 && (
-              <Badge>{project.runCount} çalıştırma</Badge>
-            )}
           </div>
 
-          <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <Field label="Depo" value={project.repoUrl} mono />
-            <Field label="Branch" value={project.defaultBranch} mono />
-            <Field label="Eklendi" value={formatRelative(project.createdAt)} />
-          </dl>
+          {/*
+            Öncesinde `DEPO` / `BRANCH` / `EKLENDİ` büyük harf etiketleriyle
+            bir `<dl>` idi. O düzen bir DETAY ekranının dili: her değerin
+            üstünde adı yazar. Liste satırında değerlerin ne olduğu zaten
+            biçimlerinden belli (URL, branch adı, göreli zaman) ve etiketler
+            satır başına üç fazladan metin kademesi ekliyordu.
+          */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-2">
+            <span className="truncate font-mono">{project.repoUrl}</span>
+            <span className="text-ink-3">·</span>
+            <span className="font-mono">{project.defaultBranch}</span>
+            <span className="text-ink-3">·</span>
+            <span>{formatRelative(project.createdAt)} eklendi</span>
+            {project.runCount > 0 && (
+              <>
+                <span className="text-ink-3">·</span>
+                <span>{project.runCount} çalıştırma</span>
+              </>
+            )}
+          </div>
         </div>
 
         {!editing && !confirming && (
@@ -185,7 +205,7 @@ function ProjectCard({
           />
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

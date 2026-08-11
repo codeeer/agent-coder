@@ -189,7 +189,7 @@ function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {
     <div className="flex flex-col items-end gap-2">
       <div className="flex items-center gap-2">
         <Input
-          className="w-64 font-mono text-[12px]"
+          className="w-64 font-mono text-xs"
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
         />
@@ -197,7 +197,7 @@ function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {
           variant="primary"
           onClick={() => push.mutate()}
           disabled={push.isPending || branch.trim() === ""}
-          icon={<IconExternal className="size-3.5" />}
+          icon={<IconExternal className="size-4" />}
         >
           {push.isPending ? "Gönderiliyor…" : "Gönder"}
         </Button>
@@ -206,7 +206,7 @@ function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {
         </Button>
       </div>
       {push.isError && (
-        <p className="max-w-md text-right text-[12px] text-danger">
+        <p className="max-w-md text-right text-xs text-danger">
           {describeError(push.error).message}
         </p>
       )}
@@ -258,7 +258,7 @@ function EventLog({
   if (items.length === 0) {
     return (
       <Well className="p-4">
-        <p className="text-[13px] text-ink-3">
+        <p className="text-sm text-ink-3">
           {active ? "Çalışma başlatılıyor…" : "Kayıtlı olay yok."}
         </p>
       </Well>
@@ -270,7 +270,7 @@ function EventLog({
       <div ref={boxRef} className="max-h-80 overflow-auto p-3.5">
         <ul className="space-y-1.5">
           {items.map((e) => (
-            <li key={e.seq} className="flex items-start gap-2.5 text-[12px]">
+            <li key={e.seq} className="flex items-start gap-2.5 text-xs">
               <span className="mt-1.5">
                 <StatusDot
                   tone={
@@ -322,7 +322,7 @@ function AgentOutput({ output }: { output: string }) {
     >
       <Card>
         {raw ? (
-          <pre className="overflow-x-auto font-mono text-[12px] leading-relaxed whitespace-pre-wrap">
+          <pre className="overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap">
             {output}
           </pre>
         ) : (
@@ -347,7 +347,7 @@ function DiffView({ run }: { run: Run }) {
       </div>
 
       <Well>
-        <pre className="max-h-[28rem] overflow-auto p-3.5 font-mono text-[12px] leading-relaxed">
+        <pre className="max-h-[28rem] overflow-auto p-3.5 font-mono text-xs leading-relaxed">
           {run.diff.split("\n").map((line, i) => (
             <div
               key={i}

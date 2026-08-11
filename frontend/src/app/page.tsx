@@ -8,6 +8,7 @@ import { IconCheck } from "@/components/ui/icons";
 import {
   Button,
   Card,
+  List,
   PageHeader,
   Section,
   Skeleton,
@@ -132,29 +133,39 @@ export default function DashboardPage() {
               <Skeleton rows={3} />
             ) : (runs.data?.items.length ?? 0) === 0 ? (
               <Card>
-                <p className="text-[13px] text-ink-2">
+                <p className="text-sm text-ink-2">
                   Henüz çalışma yok. Bir akış açıp <strong>Akışı çalıştır</strong>{" "}
                   deyin.
                 </p>
               </Card>
             ) : (
-              <div className="space-y-2">
+              /*
+               * Tek kap, ayraçlı satırlar — beş ayrı kart değil.
+               *
+               * Her satır kendi kenarlığı ve gölgesi olan bağımsız bir kart
+               * olarak duruyordu: listede beş kenarlık, beş gölge ve
+               * aralarında beş boşluk vardı. Bir liste tek bir şeydir; her
+               * satırı ayrı bir yüzey yapmak, aralarındaki ilişkiyi görsel
+               * olarak koparıyordu. Akış ekranındaki "Son çalışmalar" listesi
+               * zaten bu düzeni kullanıyordu — ikisi artık aynı.
+               */
+              <List>
                 {runs.data?.items.map((r) => (
                   <Link
                     key={r.id}
                     href={`/workflows/${r.workflowId}/runs/${r.id}`}
-                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-card border border-line bg-surface px-4 py-3 shadow-(--shadow-card) transition-colors hover:border-line-strong hover:bg-raised"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 transition-colors hover:bg-raised"
                   >
                     <WorkflowRunBadge status={r.status} />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {r.workflowName}
                     </span>
-                    <span className="text-[12px] text-ink-3">
+                    <span className="text-xs text-ink-3">
                       {formatRelative(r.createdAt)}
                     </span>
                   </Link>
                 ))}
-              </div>
+              </List>
             )}
           </Section>
         </>
@@ -189,17 +200,20 @@ function SetupStep({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span
-            className={`mt-px flex size-4.5 shrink-0 items-center justify-center rounded-full border ${
+            /* Daire 18px'ti; içine giren onay ikonu artık 16px olduğu için
+               20px'e çıktı. Tersini yapıp ikonu küçültmek, arayüzdeki tek
+               ikon boyutu kuralını tek bir yer için delmek olurdu. */
+            className={`mt-px flex size-5 shrink-0 items-center justify-center rounded-full border ${
               done ? "border-ok bg-ok text-white" : "border-line-strong text-ink-3"
             }`}
           >
-            {done && <IconCheck className="size-3" />}
+            {done && <IconCheck className="size-4" />}
           </span>
           <div className="min-w-0">
-            <p className={`text-[13px] font-medium ${done ? "line-through" : ""}`}>
+            <p className={`text-sm font-medium ${done ? "line-through" : ""}`}>
               {title}
             </p>
-            <p className="mt-0.5 text-[12px] text-ink-2">{help}</p>
+            <p className="mt-0.5 text-xs text-ink-2">{help}</p>
           </div>
         </div>
         {!done && (
@@ -217,13 +231,13 @@ function SetupStep({
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
     <Card>
-      <div className="text-[11px] font-medium tracking-wide text-ink-3 uppercase">
+      <div className="text-2xs font-medium tracking-wide text-ink-3 uppercase">
         {label}
       </div>
-      <div className="mt-2 text-[24px] leading-none font-semibold tracking-[-0.02em] tabular-nums">
+      <div className="mt-2 text-xl leading-none font-semibold tabular-nums">
         {value}
       </div>
-      <div className="mt-1.5 text-[12px] text-ink-3">{hint}</div>
+      <div className="mt-1.5 text-xs text-ink-3">{hint}</div>
     </Card>
   );
 }

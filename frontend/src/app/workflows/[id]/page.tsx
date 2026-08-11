@@ -30,6 +30,7 @@ import {
   Button,
   Card,
   Input,
+  List,
   Mono,
   Notice,
   PageHeader,
@@ -219,58 +220,91 @@ export default function WorkflowEditorPage() {
           </>
         }
         actions={
+          /*
+           * Araç çubuğu ÜÇ GRUP.
+           *
+           * Önce yedi düğme yan yana ve hepsi aynı ağırlıktaydı: gezinme
+           * ("Geri"), adım ekleme (dört tür), durum değiştirme ("Duraklat")
+           * ve kaydetme aynı yığında duruyordu. Hangi düğmenin akışı
+           * değiştirdiği, hangisinin sayfadan çıkardığı okunmuyordu.
+           */
           <>
+            {/* Gezinme — en sessiz: bir şey yapmıyor, sayfadan çıkarıyor. */}
             <Link href="/workflows">
               <Button>Geri</Button>
             </Link>
+
             {/* Palet: kullanıcı hangi tür adımı ekleyeceğini seçer.
-                Tek "Adım ekle" düğmesi, agent olmayan düğümleri gizlerdi. */}
-            <Button
-              icon={<IconAgent className="size-3.5" />}
-              onClick={() => addStep("agent", "Agent adımı")}
-            >
-              Agent
-            </Button>
-            <Button
-              icon={<IconPullRequest className="size-3.5" />}
-              onClick={() => addStep("github.pr", "PR aç")}
-            >
-              PR aç
-            </Button>
-            <Button
-              icon={<IconComment className="size-3.5" />}
-              onClick={() => addStep("jira.comment", "Jira yorumu")}
-            >
-              Jira yorumu
-            </Button>
-            <Button
-              icon={<IconPlug className="size-3.5" />}
-              onClick={() => addStep("mcp.call", "MCP aracı")}
-            >
-              MCP aracı
-            </Button>
-            <Button
-              disabled={toggleActive.isPending}
-              title={
-                wf.isActive
-                  ? "Otomatik tetikleme durur (Jira taraması, dış adres). Elle çalıştırma açık kalır."
-                  : "Otomatik tetikleme yeniden başlar."
-              }
-              onClick={() => toggleActive.mutate()}
-            >
-              {toggleActive.isPending
-                ? "…"
-                : wf.isActive
-                  ? "Duraklat"
-                  : "Etkinleştir"}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={save.isPending || nodes.length === 0}
-              onClick={() => save.mutate()}
-            >
-              {save.isPending ? "Kaydediliyor…" : dirty ? "Kaydet" : "Kayıtlı"}
-            </Button>
+                Tek "Adım ekle" düğmesi, agent olmayan düğümleri gizlerdi.
+                Dördü kendi kabında duruyor — tek bir araç olduklarını
+                gösteren şey artık yan yana olmaları değil, bu çerçeve. */}
+            <div className="flex items-center gap-0.5 rounded-lg border border-line bg-raised p-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<IconAgent className="size-4" />}
+                onClick={() => addStep("agent", "Agent adımı")}
+              >
+                Agent
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<IconPullRequest className="size-4" />}
+                onClick={() => addStep("github.pr", "PR aç")}
+              >
+                PR aç
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<IconComment className="size-4" />}
+                onClick={() => addStep("jira.comment", "Jira yorumu")}
+              >
+                Jira yorumu
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<IconPlug className="size-4" />}
+                onClick={() => addStep("mcp.call", "MCP aracı")}
+              >
+                MCP aracı
+              </Button>
+            </div>
+
+            {/* Akışın durumu — duraklatma ve kaydetme. */}
+            <div className="flex gap-2">
+              <Button
+                disabled={toggleActive.isPending}
+                title={
+                  wf.isActive
+                    ? "Otomatik tetikleme durur (Jira taraması, dış adres). Elle çalıştırma açık kalır."
+                    : "Otomatik tetikleme yeniden başlar."
+                }
+                onClick={() => toggleActive.mutate()}
+              >
+                {toggleActive.isPending
+                  ? "…"
+                  : wf.isActive
+                    ? "Duraklat"
+                    : "Etkinleştir"}
+              </Button>
+              {/*
+               * Birincil görünüm YALNIZCA kaydedilecek bir şey varken.
+               * "Kayıtlı" bir durum bildirimi — tıklanabilir olması onu
+               * sayfanın en baskın öğesi yapmayı gerektirmiyordu. Dolu mor
+               * bir düğme olarak dururken, ekranda göze ilk çarpan şey
+               * hiçbir iş yapmayan bir etiketti.
+               */}
+              <Button
+                variant={dirty ? "primary" : "secondary"}
+                disabled={save.isPending || nodes.length === 0}
+                onClick={() => save.mutate()}
+              >
+                {save.isPending ? "Kaydediliyor…" : dirty ? "Kaydet" : "Kayıtlı"}
+              </Button>
+            </div>
           </>
         }
       />
@@ -288,8 +322,27 @@ export default function WorkflowEditorPage() {
         <Notice tone="error">{describeError(save.error).message}</Notice>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+      {/*
+        Tuvalin asıl sorunu GENİŞLİKTİ, yükseklik değil.
+
+        Grafiğin kapladığı alan kabının beşte biri kadardı; ilk bakışta bu
+        "tuval kısa" gibi okundu ve yükseklik 660'a çıkarıldı — boşluk daha
+        da büyüdü. Soldan sağa dizilen bir zincir, kabına YATAYDA sığdığı
+        kadar büyür: yüksekliği artırmak grafiği büyütmez, yalnızca altına
+        ve üstüne boş zemin ekler.
+
+        Kazanç, kabuğun genişlemesiyle geldi (960px → ~795px tuval + panel).
+        Yükseklik bu yüzden kendi ölçüsünde bırakıldı.
+      */}
+      {/*
+        `items-start`: grid öğeleri varsayılan olarak satır yüksekliğine
+        UZAR. Denetim paneli bu yüzden tuvalin boyuna çekiliyordu ve hiçbir
+        adım seçili değilken dört satırlık yardım metninin altında yüzlerce
+        piksel boş kart kalıyordu. Artık içeriği kadar yer tutuyor.
+      */}
+      <div className="grid items-start gap-5 xl:grid-cols-[1fr_340px]">
         <FlowCanvas
+          height={520}
           nodes={viewNodes}
           edges={edges}
           selectedId={selected}
@@ -339,7 +392,7 @@ export default function WorkflowEditorPage() {
 
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <label className="block min-w-64 flex-1">
-              <span className="text-[11px] tracking-wide text-ink-2 uppercase">Görev</span>
+              <span className="text-2xs tracking-wide text-ink-2 uppercase">Görev</span>
               <Input
                 className="mt-1"
                 value={input}
@@ -369,32 +422,30 @@ export default function WorkflowEditorPage() {
       <Section title="Son çalışmalar">
         {runs.data?.total === 0 && (
           <Card>
-            <p className="text-[13px] text-ink-3">Bu akış henüz hiç çalışmadı.</p>
+            <p className="text-sm text-ink-3">Bu akış henüz hiç çalışmadı.</p>
           </Card>
         )}
         {runs.data && runs.data.items.length > 0 && (
-          <div className="overflow-hidden rounded-card border border-line">
-            {runs.data.items.map((r, i) => (
+          <List>
+            {runs.data.items.map((r) => (
               <Link
                 key={r.id}
                 href={`/workflows/${id}/runs/${r.id}`}
-                className={`flex items-center gap-4 bg-surface px-4 py-3 transition-colors hover:bg-raised ${
-                  i > 0 ? "border-t border-line" : ""
-                }`}
+                className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-raised"
               >
                 <div className="w-28 shrink-0">
                   <WorkflowRunBadge status={r.status} />
                 </div>
-                <div className="min-w-0 flex-1 truncate text-[13px]">
+                <div className="min-w-0 flex-1 truncate text-sm">
                   {r.input || <span className="text-ink-3">görev metni yok</span>}
                 </div>
                 <Badge>v{r.version}</Badge>
-                <span className="shrink-0 text-[12px] text-ink-3">
+                <span className="shrink-0 text-xs text-ink-3">
                   {TRIGGER_TEXT[r.triggerKind].short}
                 </span>
               </Link>
             ))}
-          </div>
+          </List>
         )}
 
         {runs.data && (
@@ -446,7 +497,7 @@ function HookCard({ workflowId, token }: { workflowId: string; token: string }) 
             {rotate.isPending ? "Yenileniyor…" : "Yenile"}
           </Button>
         </div>
-        <p className="mt-2 text-[12px] text-ink-3">
+        <p className="mt-2 text-xs text-ink-3">
           Gövdedeki metin alanları <Mono>{"{{ trigger.<alan> }}"}</Mono> ile,{" "}
           <Mono>input</Mono> alanı ise görev metni olarak kullanılır. Adres yenilenince
           eskisi anında geçersiz olur.

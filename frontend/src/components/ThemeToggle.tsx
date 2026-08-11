@@ -45,10 +45,15 @@ export function ThemeToggle() {
   }
 
   return (
+    /*
+     * Kompakt: `flex` + `flex-1` ile kenar çubuğunun tam genişliğini
+     * kaplıyordu. Nadiren dokunulan bir tercih, en sık kullanılan menü
+     * öğesiyle aynı görsel ağırlıktaydı. Artık içeriği kadar yer tutuyor.
+     */
     <div
       role="group"
       aria-label="Tema"
-      className="flex overflow-hidden rounded-lg border border-line"
+      className="inline-flex overflow-hidden rounded-lg border border-line"
     >
       {OPTIONS.map(({ mode: m, label, Icon }, i) => {
         const active = mode === m;
@@ -59,7 +64,7 @@ export function ThemeToggle() {
             onClick={() => choose(m)}
             aria-pressed={active}
             title={label}
-            className={`flex flex-1 items-center justify-center py-1.5 transition-colors duration-150 ${
+            className={`flex size-8 items-center justify-center transition-colors duration-150 ${
               i > 0 ? "border-l border-line" : ""
             } ${
               active
@@ -67,7 +72,7 @@ export function ThemeToggle() {
                 : "text-ink-3 hover:bg-raised hover:text-ink"
             }`}
           >
-            <Icon className="size-[15px]" />
+            <Icon className="size-4" />
             <span className="sr-only">{label}</span>
           </button>
         );

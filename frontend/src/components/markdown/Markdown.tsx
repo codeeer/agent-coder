@@ -18,7 +18,7 @@ export function Markdown({ source }: { source: string }) {
   const blocks = useMemo(() => parseMarkdown(source), [source]);
 
   return (
-    <div className="space-y-3 text-[13px] leading-relaxed">
+    <div className="space-y-3 text-sm leading-relaxed">
       {blocks.map((b, i) => (
         <BlockView key={i} block={b} />
       ))}
@@ -38,7 +38,7 @@ function BlockView({ block }: { block: Block }) {
       return (
         // Uzun satır sayfayı değil, kendi kabını kaydırır.
         <pre className="overflow-x-auto rounded-lg border border-line bg-raised p-3">
-          <code className="font-mono text-[12px] leading-relaxed">
+          <code className="font-mono text-xs leading-relaxed">
             {block.code}
           </code>
         </pre>
@@ -67,12 +67,12 @@ function Heading({ level, text }: { level: number; text: string }) {
   // başlığından küçüktür, onunla yarışmasın diye.
   const size =
     level <= 1
-      ? "text-[16px] font-semibold"
+      ? "text-base font-semibold"
       : level === 2
-        ? "text-[15px] font-semibold"
+        ? "text-base font-semibold"
         : level === 3
-          ? "text-[13px] font-semibold"
-          : "text-[13px] font-medium text-ink-2";
+          ? "text-sm font-semibold"
+          : "text-sm font-medium text-ink-2";
 
   const Tag = `h${Math.min(level + 1, 6)}` as "h2";
 
@@ -102,9 +102,9 @@ function List({ block }: { block: Extract<Block, { kind: "list" }> }) {
 function Table({ block }: { block: Extract<Block, { kind: "table" }> }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-line">
-      <table className="w-full text-[12px]">
+      <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-line bg-raised text-left text-[11px] tracking-wide text-ink-3 uppercase">
+          <tr className="border-b border-line bg-raised text-left text-2xs tracking-wide text-ink-3 uppercase">
             {block.header.map((cell, i) => (
               <th
                 key={i}
@@ -155,7 +155,7 @@ function renderTokens(tokens: InlineToken[]): ReactNode {
         return (
           <code
             key={i}
-            className="rounded border border-line bg-raised px-1 py-0.5 font-mono text-[12px]"
+            className="rounded border border-line bg-raised px-1 py-0.5 font-mono text-xs"
           >
             {t.text}
           </code>

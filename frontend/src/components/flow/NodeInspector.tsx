@@ -54,7 +54,7 @@ export function NodeInspector({
   if (!node) {
     return (
       <Card>
-        <p className="text-[13px] text-ink-2">
+        <p className="text-sm text-ink-2">
           Düzenlemek için tuvalden bir adım seçin. Yeni adım eklemek için{" "}
           <strong>Adım ekle</strong>, bağ kurmak için bir adımın sağ ucundan
           diğerinin sol ucuna sürükleyin.
@@ -116,7 +116,7 @@ export function NodeInspector({
         <Badge title="Şablon referanslarında bu kimlik kullanılır">
           <span className="font-mono">{node.id}</span>
         </Badge>
-        <Button size="sm" variant="danger" icon={<IconTrash className="size-3.5" />} onClick={onDelete}>
+        <Button size="sm" variant="danger" icon={<IconTrash className="size-4" />} onClick={onDelete}>
           Adımı sil
         </Button>
       </div>
@@ -132,7 +132,7 @@ export function NodeInspector({
       )}
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Ad</span>
         <Input
           className="mt-1"
           value={node.data.name}
@@ -142,7 +142,7 @@ export function NodeInspector({
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Agent</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Agent</span>
         <Select
           className="mt-1"
           value={node.data.config.agentId ?? ""}
@@ -160,7 +160,7 @@ export function NodeInspector({
       </label>
 
       <div className="mt-3">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Model</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Model</span>
         <div className="mt-1">
           <ModelPicker
             models={models}
@@ -191,9 +191,9 @@ export function NodeInspector({
             onChange({ config: { ...node.data.config, autoPush: e.target.checked } })
           }
         />
-        <span className="text-[12px]">
+        <span className="text-xs">
           Değişikliği branch&apos;e gönder
-          <span className="mt-0.5 block text-[11px] text-ink-3">
+          <span className="mt-0.5 block text-2xs text-ink-3">
             Bu adım kod değiştirirse yeni bir branch açılır. PR düğümü bu
             branch&apos;i kullanır.
           </span>
@@ -201,7 +201,7 @@ export function NodeInspector({
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Talimat</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Talimat</span>
         <Textarea
           className="mt-1 h-36"
           value={node.data.config.prompt ?? ""}
@@ -213,7 +213,7 @@ export function NodeInspector({
       </label>
 
       <Well className="mt-2 p-2.5">
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
+        <div className="flex flex-wrap items-center gap-1.5 text-2xs text-ink-2">
           <span>Ekle:</span>
           <RefButton label="{{ input }}" onClick={() => insert("{{ input }}")} />
           {refs.map((r) => (
@@ -273,7 +273,7 @@ function MCPFields({
         <Badge title="Şablon referanslarında bu kimlik kullanılır">
           <span className="font-mono">{node.id}</span>
         </Badge>
-        <Button size="sm" variant="danger" icon={<IconTrash className="size-3.5" />} onClick={onDelete}>
+        <Button size="sm" variant="danger" icon={<IconTrash className="size-4" />} onClick={onDelete}>
           Adımı sil
         </Button>
       </div>
@@ -289,7 +289,7 @@ function MCPFields({
       )}
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Ad</span>
         <Input
           className="mt-1"
           value={node.data.name}
@@ -299,7 +299,7 @@ function MCPFields({
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Sunucu</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Sunucu</span>
         <Select
           className="mt-1"
           value={cfg.mcpServerId ?? ""}
@@ -313,14 +313,14 @@ function MCPFields({
           ))}
         </Select>
         {servers.data?.length === 0 && (
-          <span className="mt-1 block text-[11px] text-ink-3">
+          <span className="mt-1 block text-2xs text-ink-3">
             Tanımlı sunucu yok — Ayarlar → Dış araçlar bölümünden ekleyin.
           </span>
         )}
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Araç</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Araç</span>
         <Select
           className="mt-1"
           value={cfg.toolName ?? ""}
@@ -337,23 +337,23 @@ function MCPFields({
       </label>
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">
           Argümanlar (JSON)
         </span>
         <Textarea
-          className="mt-1 h-28 font-mono text-[12px]"
+          className="mt-1 h-28 font-mono text-xs"
           value={cfg.arguments ?? ""}
           placeholder={'{\n  "soru": "{{ input }}"\n}'}
           onChange={(e) => set({ arguments: e.target.value })}
         />
-        <span className="mt-1 block text-[11px] text-ink-3">
+        <span className="mt-1 block text-2xs text-ink-3">
           Şablonlar tırnak içinde yazılır. Önce JSON okunur, sonra değerler
           çözümlenir — böylece çıktıdaki tırnaklar JSON&apos;u bozmaz.
         </span>
       </label>
 
       <Well className="mt-2 p-2.5">
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
+        <div className="flex flex-wrap items-center gap-1.5 text-2xs text-ink-2">
           <span>Ekle:</span>
           <RefButton label="{{ input }}" onClick={() => insert("{{ input }}")} />
           {refs.map((r) => (
@@ -408,8 +408,8 @@ function TriggerFields({
 
   return (
     <Card>
-      <p className="text-[13px] font-medium">Başlangıç</p>
-      <p className="mt-1.5 text-[13px] text-ink-2">
+      <p className="text-sm font-medium">Başlangıç</p>
+      <p className="mt-1.5 text-sm text-ink-2">
         Akışın giriş noktası. Buraya bağ girmez; buradan çıkan adımlar ilk
         çalışanlardır.
       </p>
@@ -425,7 +425,7 @@ function TriggerFields({
       )}
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Nasıl başlar</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Nasıl başlar</span>
         <Select
           className="mt-1"
           value={kind}
@@ -439,14 +439,14 @@ function TriggerFields({
       {kind === "trigger.jira" ? (
         <>
           <label className="mt-3 block">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">JQL sorgusu</span>
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">JQL sorgusu</span>
             <Textarea
-              className="mt-1 h-20 font-mono text-[12px]"
+              className="mt-1 h-20 font-mono text-xs"
               value={node.data.config.jql ?? ""}
               placeholder={`project = SCRUM AND status = "Yapılacaklar"`}
               onChange={(e) => onChange({ config: { ...node.data.config, jql: e.target.value } })}
             />
-            <span className="mt-1 block text-[11px] text-ink-3">
+            <span className="mt-1 block text-2xs text-ink-3">
               Eşleşen her task akışı bir kez başlatır. Task Jira&apos;da
               güncellenirse yeniden çalışır; akışın kendi yazdığı yorum
               tetikleyici sayılmaz.
@@ -454,20 +454,20 @@ function TriggerFields({
           </label>
 
           <div className="mt-3">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
               Jira webhook adresi
             </span>
             <Well className="mt-1 p-2">
               <Mono className="break-all">{api.workflowRuns.jiraHookUrl(hookToken)}</Mono>
             </Well>
-            <span className="mt-1 block text-[11px] text-ink-3">
+            <span className="mt-1 block text-2xs text-ink-3">
               İsteğe bağlı: Jira&apos;ya tanımlanırsa task anında işlenir.
               Tanımlanmazsa tarama yine yakalar — ikisi aynı korumadan geçer.
             </span>
           </div>
 
           <div className="mt-3">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">Son tarama</span>
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">Son tarama</span>
             {/* Duraklatılmış akış taranmaz; "son tarama" satırının eski bir
                 zaman göstermesi, tarama sürüyormuş izlenimi verirdi. */}
             {workflowActive ? (
@@ -481,7 +481,7 @@ function TriggerFields({
           </div>
 
           <Well className="mt-2 p-2.5">
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
+            <div className="flex flex-wrap items-center gap-1.5 text-2xs text-ink-2">
               <span>Task alanları:</span>
               {["key", "summary", "description", "status", "issueType", "url"].map((f) => (
                 <span key={f} className="rounded border border-line bg-surface px-1.5 py-0.5 font-mono">
@@ -492,7 +492,7 @@ function TriggerFields({
           </Well>
         </>
       ) : (
-        <p className="mt-3 text-[13px] text-ink-2">
+        <p className="mt-3 text-sm text-ink-2">
           Verdiğiniz görev metni <Mono>{"{{ input }}"}</Mono> ile okunur.
         </p>
       )}
@@ -504,7 +504,7 @@ function TriggerFields({
 function ScanSummary({ state }: { state?: JiraScanState }) {
   if (!state?.scannedAt) {
     return (
-      <p className="mt-1 text-[12px] text-ink-3">
+      <p className="mt-1 text-xs text-ink-3">
         Henüz taranmadı. Akış kaydedilip etkinleştirildikten sonra tarama
         kendiliğinden başlar.
       </p>
@@ -513,7 +513,7 @@ function ScanSummary({ state }: { state?: JiraScanState }) {
 
   return (
     <div className="mt-1 space-y-1">
-      <p className="text-[12px] text-ink-2">
+      <p className="text-xs text-ink-2">
         {formatDate(state.scannedAt)} · {state.found} task eşleşti,{" "}
         {state.started} akış başlatıldı
       </p>
@@ -558,7 +558,7 @@ function ActionFields({
         <Badge title="Şablon referanslarında bu kimlik kullanılır">
           <span className="font-mono">{node.id}</span>
         </Badge>
-        <Button size="sm" variant="danger" icon={<IconTrash className="size-3.5" />} onClick={onDelete}>
+        <Button size="sm" variant="danger" icon={<IconTrash className="size-4" />} onClick={onDelete}>
           Adımı sil
         </Button>
       </div>
@@ -574,7 +574,7 @@ function ActionFields({
       )}
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">Ad</span>
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">Ad</span>
         <Input
           className="mt-1"
           value={node.data.name}
@@ -586,7 +586,7 @@ function ActionFields({
       {isPR ? (
         <>
           <label className="mt-3 block">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">PR başlığı</span>
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">PR başlığı</span>
             <Input
               className="mt-1"
               value={cfg.title ?? ""}
@@ -596,7 +596,7 @@ function ActionFields({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
               Hedef branch
             </span>
             <Input
@@ -608,27 +608,27 @@ function ActionFields({
           </label>
 
           <label className="mt-3 block">
-            <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
               Kaynak branch
             </span>
             <Input
-              className="mt-1 font-mono text-[12px]"
+              className="mt-1 font-mono text-xs"
               value={cfg.headBranch ?? ""}
               placeholder="boş bırakın — gönderim yapan adımdan alınır"
               onChange={(e) => set({ headBranch: e.target.value })}
             />
-            <span className="mt-1 block text-[11px] text-ink-3">
+            <span className="mt-1 block text-2xs text-ink-3">
               Birden fazla adım gönderim yapıyorsa hangisi olduğu belirtilmeli.
             </span>
           </label>
         </>
       ) : (
         <label className="mt-3 block">
-          <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">
             Issue anahtarı
           </span>
           <Input
-            className="mt-1 font-mono text-[12px]"
+            className="mt-1 font-mono text-xs"
             value={cfg.issueKey ?? ""}
             placeholder="SCRUM-1 veya {{ trigger.key }}"
             onChange={(e) => set({ issueKey: e.target.value })}
@@ -637,7 +637,7 @@ function ActionFields({
       )}
 
       <label className="mt-3 block">
-        <span className="text-[11px] tracking-wide text-ink-2 uppercase">
+        <span className="text-2xs tracking-wide text-ink-2 uppercase">
           {isPR ? "PR açıklaması" : "Yorum metni"}
         </span>
         <Textarea
@@ -649,7 +649,7 @@ function ActionFields({
       </label>
 
       <Well className="mt-2 p-2.5">
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-2">
+        <div className="flex flex-wrap items-center gap-1.5 text-2xs text-ink-2">
           <span>Ekle:</span>
           <RefButton label="{{ input }}" onClick={() => set({ body: (cfg.body ?? "") + "{{ input }}" })} />
           {refs.map((r) => (
