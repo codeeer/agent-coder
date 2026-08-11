@@ -510,6 +510,22 @@ OpenRouter varsayılan yolmuş gibi sunulmaz. Kurum içi kurulumlarda dışarıy
 içinde zaten düz metin duruyor ve agent okuyabiliyor; şifrelemek yanlış bir güvenlik hissi
 verirdi. Gizli değer betiğe değil ortam değişkenine konur.
 
+**Yayınlanan imaj main'in gerisinde KALMAZ.** `latest` main'in ucudur ve her main
+commit'i imaj üretir (`.github/workflows/release-images.yml`). Yayını yalnızca `v*`
+etiketine bağlamak bir kez denendi ve düzeltmeler aylarca yayına çıkmadı: kod doğruydu,
+kullanıcıların çalıştırdığı imaj değildi. Belirti de kök nedeni işaret etmiyordu — "git
+kimlik bilgisi yok" diyordu, oysa eksik olan güncel backend'di. **Bayat imaj, hareketli
+`latest`ten tehlikelidir**; birincisi sessizdir. Ayrıntı:
+[plans/02-imaj-yayini-ve-surum-kaymasi-2026-08-11.md](plans/02-imaj-yayini-ve-surum-kaymasi-2026-08-11.md)
+
+**İmaj hangi commit'ten geldiğini üzerinde taşır.** `org.opencontainers.image.revision`
+her imaja yazılır, `make quickstart` ekrana basar, duman testi commit ile eşleştiğini
+doğrular. Sürüm görünmezse kayma aylarca fark edilmez — `docker pull`un "up to date"
+demesi güven verici ve yanıltıcıdır.
+
+**Aynı registry etiketini iki iş akışı basmaz.** Yeni bir yayın iş akışı eklenirken
+eskisi silinir; ikisi birlikte kalırsa bir `v*` etiketinde yarışırlar.
+
 **compose `--project-directory` zorunlu.** Compose dosyaları `deploy/` altında ama `.env`
 proje kökünde. Bu bayrak olmadan compose `.env`'i `deploy/` altında arar, bulamaz ve tüm
 port ayarları **sessizce** varsayılana düşer. Makefile bunu zaten geçiriyor; compose'u elle
