@@ -76,4 +76,16 @@ değişti. Sebep: değerler gözle seçilmişti ve ölçülünce bir kısmı eş
 bir jeton (`control-line`) eklendi.
 
 Kural da oradan geldi: **açık tema, koyu temanın tersi değildir** — her bileşenin
-her temadaki kontrastı bağımsız değerlendirilir (`AGENTS.md`, Tema bölümü).
+her temadaki kontrastı bağımsız değerlendirilir. Kuralın bugünkü yeri:
+[.claude/rules/ui.md](../../.claude/rules/ui.md) → "Açık ve koyu tema".
+
+### 2026-08-12 — anahtar kenar çubuğundan sayfa başlığına taşındı
+
+Arayüz yeniden tasarlanırken kabuk tek bir üst şeride indirildi ve tema
+anahtarı sayfa başlığının sağ ucuna geçti; kenar çubuğunun dibi sistem
+durumuna ayrıldı.
+
+**Mekanizma değişmedi** — üç durum, `data-theme`, `localStorage` anahtarı ve
+ilk boyamadan önce çalışan betik aynı. Değişen yalnızca anahtarın ekrandaki
+yeri. "Tema anahtarı her sayfadan erişilebilir" kriteri hâlâ karşılanıyor:
+`PageHeader` her ekranda çiziliyor, dolayısıyla anahtar da her ekranda.
