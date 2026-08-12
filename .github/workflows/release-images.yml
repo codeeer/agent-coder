@@ -17,6 +17,35 @@
 # NEDEN İKİ MİMARİ: geliştirme çoğunlukla arm64 Mac'te, sunucular çoğunlukla
 # amd64. Tek mimarili imaj, kullanıcıların yarısına "exec format error" demektir.
 #
+# ─── ÜÇ YAPISAL KARAR ───────────────────────────────────────────────────────
+#
+# 1. HER MİMARİ KENDİ KOŞUCUSUNDA DERLENİR, emülasyonla değil.
+#
+#    Önce iki mimari de amd64 koşucuda, QEMU altında derleniyordu. Frontend'in
+#    arm64 derlemesi 10 dk 23 sn sürüyor ve KIRILGAN: iki ardışık koşu orada
+#    düştü — biri `Next.js build worker exited with signal: SIGILL`, diğeri
+#    `next/font` Google Fonts zaman aşımı. Emülasyon altında SWC'nin çökmesi
+#    bilinen bir sorun.
+#
+#    `--platform=$BUILDPLATFORM` ile çapraz derleme DENENMEDİ çünkü ÖLÇÜLDÜ:
+#    `.next/standalone` içine native modül giriyor —
+#    `@img/sharp-linux-arm64/lib/sharp-linux-arm64.node`. amd64'te derlenip
+#    arm64 imajına kopyalansaydı imaj yanlış mimarinin ikilisini taşırdı.
+#
+#    Bu yüzden matris mimariye bölündü: arm64 `ubuntu-24.04-arm` üzerinde
+#    yerel koşuyor. Depo public olduğu için bu koşucular ücretsiz.
+#
+# 2. ÖNCE ETİKETSİZ (digest) PUSH, SONRA MANİFEST BİRLEŞTİRME.
+#    Her mimari kendi digest'ini yazar; `birlestir` işi ikisini tek manifest'e
+#    bağlar. buildx'in çok mimarili çıktısını tek koşucuda üretmenin tek
+#    alternatifi emülasyondu.
+#
+# 3. `latest` TESTTEN SONRA TERFİ EDER.
+#    Önce yalnızca `sha-<kısa>` yayınlanır, duman testi ONU sınar, geçerse
+#    `latest`/semver aynı digest'e etiket olarak eklenir. Öncesinde `latest`
+#    test edilmeden yayınlanıyordu: bozuk bir imaj, testi düşmeden önce
+#    `make quickstart` kullanan herkese gitmiş oluyordu.
+#
 # Bu dosya eski `yayin.yml`in yerine geçti; ikisi birlikte dursaydı bir `v*`
 # etiketinde iki iş akışı aynı registry etiketlerine yarışırdı.
 
@@ -42,20 +71,56 @@ concurrency:
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
-  imaj:
+  # ─── Ortak bilgiler ───────────────────────────────────────────────────────
+  #
+  # Desteklenen Node sürümleri TEK listeden okunur: backend aynı dosyayı
+  # `go:embed` ile, Makefile de derlerken okuyor. Liste burada tekrarlansaydı
+  # yeni bir sürüm eklemek iki yeri birden güncellemek olurdu ve biri
+  # unutulduğunda arayüz, yayınlanmamış bir imajı seçtirirdi.
+  hazirlik:
     runs-on: ubuntu-latest
+    outputs:
+      surumler: ${{ steps.oku.outputs.surumler }}
+      kisa_sha: ${{ steps.oku.outputs.kisa_sha }}
+      surum: ${{ steps.oku.outputs.surum }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: oku
+        run: |
+          set -euo pipefail
+          surumler=$(grep -vE '^[[:space:]]*(#|$)' backend/internal/runner/node-versions.txt \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "surumler=$surumler" >> "$GITHUB_OUTPUT"
+          kisa="$(echo '${{ github.sha }}' | cut -c1-7)"
+          echo "kisa_sha=$kisa" >> "$GITHUB_OUTPUT"
+
+          # Backend ikilisine gömülen sürüm: etiketli yayında semver, main'de
+          # sha. `/health` bunu döndürüyor, yani kullanıcı elindeki imajın ne
+          # olduğunu buradan okuyor — sürüm etiketinde "sha-abc1234" yazsaydı
+          # o bilgi işe yaramazdı.
+          case "${{ github.ref }}" in
+            refs/tags/v*) echo "surum=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT" ;;
+            *)            echo "surum=sha-$kisa" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+          echo "Node sürümleri: $surumler"
+
+  # ─── Derleme: imaj × mimari ───────────────────────────────────────────────
+  imaj:
+    needs: hazirlik
+    runs-on: ${{ matrix.kosucu }}
     strategy:
       fail-fast: false
       matrix:
+        # Bağlam ve dockerfile yolları compose/Makefile ile BİREBİR aynı.
+        # runner'ın bağlamı proje köküdür (COPY yolları `runner/…` önekli).
+        ad: [runner, backend, frontend]
+        platform: [amd64, arm64]
         include:
-          # Bağlam ve dockerfile yolları compose/Makefile ile BİREBİR aynı.
-          # runner'ın bağlamı proje köküdür: imaj .opencode/ altındaki agent
-          # tanımlarını da kopyalıyor (Makefile: docker build -f runner/Dockerfile .).
           - ad: runner
             dockerfile: runner/Dockerfile
             baglam: .
             surum_argi: false
-          # compose: context ./backend, dockerfile Dockerfile
           - ad: backend
             dockerfile: backend/Dockerfile
             baglam: backend
@@ -63,17 +128,18 @@ jobs:
             # görünüyor. Diğerlerine geçirmek BuildKit'te "kullanılmayan
             # build-arg" uyarısı üretirdi.
             surum_argi: true
-          # compose: context ./frontend, dockerfile Dockerfile
           - ad: frontend
             dockerfile: frontend/Dockerfile
             baglam: frontend
             surum_argi: false
-
+          - platform: amd64
+            kosucu: ubuntu-latest
+          - platform: arm64
+            kosucu: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
-      # amd64 dışındaki mimariyi emülasyonla derlemek için.
-      - uses: docker/setup-qemu-action@v3
+      # QEMU YOK: her mimari kendi koşucusunda derleniyor.
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -82,60 +148,196 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}-${{ matrix.ad }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short,prefix=sha-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-          # metadata-action bu üçünü zaten üretiyor; AÇIKÇA yazılmalarının
-          # sebebi kullanıcının `docker inspect` ile imajın hangi commit'ten
-          # geldiğini görebilmesi — bu iş akışının var olma sebebi tam da
-          # imaj/kod kaymasını görünür kılmak.
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
-
+      # Etiketsiz push: manifest'i `birlestir` kuruyor. Buraya etiket
+      # yazılsaydı iki mimari aynı etikete yazıp birbirini ezerdi.
       - id: push
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.baglam }}
           file: ${{ matrix.dockerfile }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Sürüm ikiliye gömülür; imajın hangi commit'ten geldiği çalışırken de
-          # `/health` üzerinden sorulabilir olur.
-          build-args: ${{ matrix.surum_argi && format('VERSION={0}', steps.meta.outputs.version) || '' }}
-          cache-from: type=gha,scope=${{ matrix.ad }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.ad }}
-          provenance: true
-          sbom: true
+          platforms: linux/${{ matrix.platform }}
+          build-args: ${{ matrix.surum_argi && format('VERSION={0}', needs.hazirlik.outputs.surum) || '' }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }}-${{ matrix.ad }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.ad }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.ad }}-${{ matrix.platform }}
+          # Mimari başına push'ta KAPALI: provenance açıkken buildx imajı bir
+          # index içine sarıyor ve `push-by-digest` o index'in digest'ini
+          # veriyor; `imagetools create` bunları birleştirmeye çalışınca
+          # attestation manifest'leri platform girdisi sanılıyor. Kanıt
+          # birleştirmeden SONRA, tek manifest'e ekleniyor (birlestir işi).
+          provenance: false
+          sbom: false
+
+      - name: Digest'i sakla
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digest
+          echo "${{ steps.push.outputs.digest }}" > "/tmp/digest/${{ matrix.platform }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.ad }}-${{ matrix.platform }}
+          path: /tmp/digest/*
+          retention-days: 1
+
+  # ─── Node sürüm varyantları: sürüm × mimari ──────────────────────────────
+  #
+  # Ayrı iş, `imaj` matrisine satır olarak DEĞİL: orada imaj adı `matrix.ad`
+  # ile ayrışıyor ve ikinci bir `runner` girdisi aynı digest artefaktlarına
+  # yazardı.
+  runner-node:
+    needs: hazirlik
+    runs-on: ${{ matrix.kosucu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        surum: ${{ fromJSON(needs.hazirlik.outputs.surumler) }}
+        platform: [amd64, arm64]
+        include:
+          - platform: amd64
+            kosucu: ubuntu-latest
+          - platform: arm64
+            kosucu: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: runner/Dockerfile
+          platforms: linux/${{ matrix.platform }}
+          build-args: NODE_VERSION=${{ matrix.surum }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          outputs: type=image,name=ghcr.io/${{ github.repository }}-runner,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=runner-node-${{ matrix.surum }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=runner-node-${{ matrix.surum }}-${{ matrix.platform }}
+          provenance: false
+          sbom: false
+
+      - name: Digest'i sakla
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/digest
+          echo "${{ steps.push.outputs.digest }}" > "/tmp/digest/${{ matrix.platform }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-node-${{ matrix.surum }}-${{ matrix.platform }}
+          path: /tmp/digest/*
+          retention-days: 1
+
+  # ─── Manifest birleştirme: yalnızca sha- etiketi ─────────────────────────
+  #
+  # `latest` ve semver BURADA YAZILMAZ; duman testi geçtikten sonra terfi
+  # ediyorlar. Test edilmemiş bir imajın `latest` olması, `make quickstart`
+  # kullanan herkese bozuk imaj göndermek demekti.
+  birlestir:
+    needs: [hazirlik, imaj, runner-node]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digest
+          pattern: digest-*
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: manifest
+        name: Üç imajın manifest'i
+        run: |
+          set -euo pipefail
+          SHA_ET="sha-${{ needs.hazirlik.outputs.kisa_sha }}"
+
+          for ad in runner backend frontend; do
+            AD="ghcr.io/${{ github.repository }}-$ad"
+            KAYNAK=""
+            for p in amd64 arm64; do
+              d=$(cat "/tmp/digest/digest-$ad-$p/$p")
+              KAYNAK="$KAYNAK $AD@$d"
+            done
+            # shellcheck disable=SC2086
+            docker buildx imagetools create -t "$AD:$SHA_ET" $KAYNAK
+            digest=$(docker buildx imagetools inspect "$AD:$SHA_ET" \
+              --format '{{json .Manifest}}' | jq -r .digest)
+            echo "$ad=$digest" >> "$GITHUB_OUTPUT"
+            echo "$AD:$SHA_ET yayınlandı ($digest)"
+          done
+
+      - name: Node varyantlarının manifest'i
+        run: |
+          set -euo pipefail
+          SHA_ET="sha-${{ needs.hazirlik.outputs.kisa_sha }}"
+          AD="ghcr.io/${{ github.repository }}-runner"
+
+          for s in $(echo '${{ needs.hazirlik.outputs.surumler }}' | jq -r '.[]'); do
+            KAYNAK=""
+            for p in amd64 arm64; do
+              d=$(cat "/tmp/digest/digest-node-$s-$p/$p")
+              KAYNAK="$KAYNAK $AD@$d"
+            done
+            # Sürüm etiketinin sha'lı hali: bir sürümün HANGİ commit'ten
+            # geldiği sabitlenebilsin. `node-<sürüm>` terfi adımında yazılır.
+            # shellcheck disable=SC2086
+            docker buildx imagetools create -t "$AD:node-$s-$SHA_ET" $KAYNAK
+            echo "$AD:node-$s-$SHA_ET yayınlandı"
+          done
+
+      # Kanıt (provenance attestation) BİRLEŞTİRİLMİŞ manifest'e bağlanır:
+      # kullanıcı `docker pull` ederken o digest'i alıyor, mimari başına
+      # olanları değil. Üç adım ayrı ayrı yazılı çünkü bu bir action ve
+      # kabuk döngüsüyle çağrılamıyor.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}-runner
+          subject-digest: ${{ steps.manifest.outputs.runner }}
+          push-to-registry: true
 
       - uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ghcr.io/${{ github.repository }}-${{ matrix.ad }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-name: ghcr.io/${{ github.repository }}-backend
+          subject-digest: ${{ steps.manifest.outputs.backend }}
           push-to-registry: true
 
-  # Yayınlanan imaj GERÇEKTEN çalışıyor mu?
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}-frontend
+          subject-digest: ${{ steps.manifest.outputs.frontend }}
+          push-to-registry: true
+
+  # ─── Duman testi: sha- etiketleri üzerinde ───────────────────────────────
   #
   # "İmaj bozuk" geri bildirimi kullanıcıdan gelmemeli — bu iş akışının kendisi
   # zaten bayat imaj sorunundan doğdu, bir de bozuk imaj yayınlamayalım.
   duman-testi:
-    needs: imaj
+    needs: [hazirlik, birlestir]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       # sha- etiketi ÜÇ olay türünde de üretilir (main push, tag, elle
       # tetikleme). `latest` yalnızca main'de, semver yalnızca etikette var;
-      # onlardan birini kullanmak testi kendi hatasıyla düşürürdü.
+      # onlardan birini kullanmak testi kendi hatasıyla düşürürdü — üstelik
+      # artık ikisi de bu test geçmeden yayınlanmıyor.
       - id: etiket
-        run: echo "deger=sha-$(echo '${{ github.sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+        run: echo "deger=sha-${{ needs.hazirlik.outputs.kisa_sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Runner imajı
         run: |
@@ -156,12 +358,46 @@ jobs:
       # olmuyordu (spec 003, 2026-08-12). Test tamamen kapalı bir ağda
       # (internal: true) koşuyor; isteğin sahte sağlayıcıya ULAŞMASI
       # sürücünün imajdan geldiğini kanıtlıyor.
-      - uses: actions/checkout@v4
+      #
+      # 7 saniye sürüyor — ölçüldü. Bu özelliğin tek otomatik bekçisi.
       - name: Kapalı ağda sağlayıcı sürücüsü
         run: |
           set -euo pipefail
           bash runner/offline_test.sh \
             "ghcr.io/${{ github.repository }}-runner:${{ steps.etiket.outputs.deger }}"
+
+      # Sürümlü imajlar GERÇEKTEN o sürümü mü taşıyor?
+      #
+      # `--build-arg` sessizce yok sayılsaydı (yanlış ARG adı, taban imajın
+      # değişmesi) etiket `node-24.13.0` derken içeride başka bir sürüm
+      # bulunurdu ve kullanıcı bunu ancak build komutu patlayınca anlardı.
+      #
+      # Sürücülerin o sürümde yüklendiği de sınanıyor: 24 hattında sürücülerin
+      # ilan ettiği taban 24.15.0 ve altındaki sürümler EBADENGINE uyarısı
+      # alıyor (bkz. node-versions.txt). Uyarı kabul edildi ama sessiz
+      # kalmasın diye her yayında ölçülüyor.
+      - name: Sürümlü runner imajları
+        run: |
+          set -euo pipefail
+          for s in $(echo '${{ needs.hazirlik.outputs.surumler }}' | jq -r '.[]'); do
+            IMAJ="ghcr.io/${{ github.repository }}-runner:node-$s-${{ steps.etiket.outputs.deger }}"
+            echo "── $IMAJ"
+            docker pull "$IMAJ"
+
+            bulunan=$(docker run --rm --entrypoint node "$IMAJ" --version)
+            if [ "$bulunan" != "v$s" ]; then
+              echo "HATA: etiket node-$s ama imajdaki sürüm $bulunan"; exit 1
+            fi
+
+            docker run --rm --entrypoint opencode "$IMAJ" --version
+            docker run --rm --entrypoint ls "$IMAJ" \
+              /home/agent/.config/opencode/node_modules/@ai-sdk/openai-compatible
+            docker buildx imagetools inspect "$IMAJ" | grep -q "linux/amd64"
+            docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
+
+            bash runner/offline_test.sh "$IMAJ"
+          done
+          echo "Sürümlü runner imajları doğrulandı."
 
       - name: Backend imajı
         run: |
@@ -213,3 +449,80 @@ jobs:
 
           docker rm -f fe
           echo "Frontend imajı taşınabilir."
+
+      # arm64 imajı GERÇEKTEN açılıyor mu?
+      #
+      # Manifest'te `linux/arm64` yazması yeterli değil: yanlış mimarinin
+      # ikilisini taşıyan bir imaj da öyle görünür. Çapraz derleme bu yüzden
+      # elenmişti (`.next/standalone` içinde native `sharp` var); burası o
+      # kararın bekçisi. Yalnızca AÇILIŞ sınanıyor — emülasyon yavaş.
+      - name: arm64 frontend açılıyor mu
+        run: |
+          set -euo pipefail
+          docker run --privileged --rm tonistiigi/binfmt --install arm64
+          IMAJ="ghcr.io/${{ github.repository }}-frontend:${{ steps.etiket.outputs.deger }}"
+          docker run -d --name fe-arm --platform linux/arm64 -p 3098:3000 \
+            -e API_URL=http://x:9999 "$IMAJ"
+          for _ in $(seq 1 45); do
+            curl -sf http://localhost:3098 >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:3098 >/dev/null || {
+            echo "HATA: arm64 frontend açılmadı"; docker logs fe-arm; exit 1; }
+          docker rm -f fe-arm
+          echo "arm64 frontend açıldı."
+
+  # ─── Terfi: test geçtikten SONRA latest / semver / node-<sürüm> ──────────
+  #
+  # Yeniden derleme YOK: `imagetools create` test edilen digest'e yeni bir
+  # etiket bağlar. Yani `latest` ile `sha-<kısa>` bit bit aynı imajdır.
+  terfi:
+    needs: [hazirlik, duman-testi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Etiketleri terfi ettir
+        run: |
+          set -euo pipefail
+          SHA_ET="sha-${{ needs.hazirlik.outputs.kisa_sha }}"
+
+          # Hangi etiketler yazılacak: main → latest, v* → semver.
+          HEDEFLER=""
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            HEDEFLER="latest"
+          fi
+          case "${{ github.ref }}" in
+            refs/tags/v*)
+              SURUM="${GITHUB_REF#refs/tags/v}"
+              HEDEFLER="$HEDEFLER $SURUM ${SURUM%.*}"
+              ;;
+          esac
+
+          # Node varyantları ÖNCE ve HER ZAMAN — elle tetiklemede bile.
+          # Arayüzdeki sürüm seçicisi tam olarak `node-<sürüm>` etiketini
+          # arıyor, sha'lısını değil; o etiket yayınlanmazsa kullanıcı
+          # seçebildiği ama var olmayan bir imaja çarpar.
+          AD="ghcr.io/${{ github.repository }}-runner"
+          for s in $(echo '${{ needs.hazirlik.outputs.surumler }}' | jq -r '.[]'); do
+            docker buildx imagetools create -t "$AD:node-$s" "$AD:node-$s-$SHA_ET"
+            echo "$AD:node-$s → node-$s-$SHA_ET"
+          done
+
+          if [ -z "$(echo "$HEDEFLER" | tr -d ' ')" ]; then
+            echo "Ana imajlarda terfi edilecek etiket yok (elle tetikleme) — sha- yayında."
+            exit 0
+          fi
+
+          for ad in runner backend frontend; do
+            AD="ghcr.io/${{ github.repository }}-$ad"
+            for t in $HEDEFLER; do
+              docker buildx imagetools create -t "$AD:$t" "$AD:$SHA_ET"
+              echo "$AD:$t → $SHA_ET"
+            done
+          done
