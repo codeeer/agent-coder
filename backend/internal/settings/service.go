@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -219,10 +220,14 @@ func Validate(def Definition, value string) error {
 		return nil
 
 	case KindText:
+		// Opsiyonel ayarda boş, "kapalı" demektir — hata değil.
 		if value == "" {
+			if def.Optional {
+				return nil
+			}
 			return fmt.Errorf("%w: boş olamaz", ErrInvalidValue)
 		}
-		return nil
+		return validateText(def, value)
 
 	default:
 		return fmt.Errorf("%w: tanımsız tip %q", ErrInvalidValue, def.Kind)
@@ -241,4 +246,33 @@ func rangeError(def Definition) error {
 	default:
 		return ErrOutOfRange
 	}
+}
+
+/*
+ * validateText, metin ayarlarına anahtar bazında ek kural uygular.
+ *
+ * Kayıt defteri her ayara özel doğrulama taşımıyor (Kind + Min/Max yeterliydi)
+ * ama paket deposu adresi bir istisna: kimlik bilgisi gömülü bir URL hem
+ * veritabanına hem LOG'a düz metin olarak düşerdi — `putSetting` değeri
+ * loglar. Aynı kural projelerin depo adresinde de var.
+ */
+func validateText(def Definition, value string) error {
+	switch def.Key {
+	case KeyNPMRegistry:
+		u, err := url.Parse(value)
+		if err != nil {
+			return fmt.Errorf("%w: adres ayrıştırılamadı", ErrInvalidValue)
+		}
+		if u.Scheme != "https" && u.Scheme != "http" {
+			return fmt.Errorf("%w: https:// ile başlamalı", ErrInvalidValue)
+		}
+		if u.Host == "" {
+			return fmt.Errorf("%w: sunucu adı yok", ErrInvalidValue)
+		}
+		if u.User != nil {
+			return fmt.Errorf("%w: adres kullanıcı adı/parola içermemeli — "+
+				"kimlik doğrulama bölümünü kullanın", ErrInvalidValue)
+		}
+	}
+	return nil
 }

@@ -119,7 +119,11 @@ function SettingRow({ setting }: { setting: SettingValue }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <div className="w-28">
+          {/* Sayı 112px'e sığar, ADRES SIĞMAZ. Kayıt defteri adresi gibi metin
+              ayarlarında kutu geniş: dar bir kutuda kullanıcı yazdığının
+              tamamını göremiyor ve yanlışı ancak kaydettikten sonra fark
+              ediyor. `max-w-full` dar ekranda taşmayı önlüyor. */}
+          <div className={setting.kind === "int" ? "w-28" : "w-full max-w-96 sm:w-96"}>
             <Input
               type={setting.kind === "int" ? "number" : "text"}
               /* Etiket ayrı bir kutuda duruyor; ekran okuyucu kutuyu tek
@@ -157,8 +161,15 @@ function SettingRow({ setting }: { setting: SettingValue }) {
         </div>
       </div>
 
+      {/* Opsiyonel ayarların varsayılanı YOK: "Varsayılan:" yazıp arkasını
+          boş bırakmak, kullanıcıya okunamayan bir satır göstermek olurdu.
+          Onun yerine boş bırakmanın ne demek olduğu yazılıyor. */}
       <p className="mt-1.5 text-2xs text-ink-3">
-        Varsayılan: {setting.default}
+        {setting.default === "" ? (
+          <>Boş bırakılabilir</>
+        ) : (
+          <>Varsayılan: {setting.default}</>
+        )}
         {setting.min !== undefined && setting.max !== undefined && (
           <> · İzin verilen aralık: {setting.min}–{setting.max}</>
         )}

@@ -24,14 +24,20 @@ import (
 type Kind string
 
 const (
-	// KindJira, spec 002'den sonra bu paketin ilgilendiği tek tür.
+	// KindJira, spec 002'den sonra bu paketin ilgilendiği ilk tür.
 	// LLM sağlayıcılar internal/llm, kod deposu erişimleri internal/gitprovider
 	// altına taşındı; veritabanı enum'unda eski değerler durur ama kullanılmaz.
 	KindJira Kind = "jira"
+
+	// KindNexus, kurumsal paket deposunun token'ı.
+	//
+	// Adres ve kullanıcı adı ayarlarda (packages.npm_*); burada YALNIZCA sır
+	// durur. Kimlik doğrulama opsiyonel olduğu için kayıt hiç olmayabilir.
+	KindNexus Kind = "nexus"
 )
 
 // AllKinds, bu paketin yönettiği türler.
-var AllKinds = []Kind{KindJira}
+var AllKinds = []Kind{KindJira, KindNexus}
 
 // Valid, türün bilinen bir değer olup olmadığını söyler.
 func (k Kind) Valid() bool {

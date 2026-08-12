@@ -34,6 +34,7 @@ import (
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
+	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runner/opencode"
 	"github.com/agent-coder/backend/internal/runner/sandbox"
 	"github.com/agent-coder/backend/internal/runs"
@@ -165,6 +166,29 @@ func run() error {
 		CPUCores:   func() int { return settingsSvc.Int(settings.KeyRunnerCPULimit) },
 		MemoryGB:   func() int { return settingsSvc.Int(settings.KeyRunnerMemoryLimitG) },
 		CloneDepth: func() int { return settingsSvc.Int(settings.KeyCloneDepth) },
+
+		// Paket deposu: adres ve kullanıcı adı ayarlardan, token şifreli
+		// kimlik bilgisi deposundan. Token okunamazsa çalıştırma DURMAZ —
+		// anonim okumaya açık depolarda kayıt zaten yoktur ve olmayan bir
+		// kimlik bilgisi hata değildir.
+		Packages: func() runner.PackageRegistry {
+			pkg := runner.PackageRegistry{
+				NPMRegistry: settingsSvc.Text(settings.KeyNPMRegistry),
+				Username:    settingsSvc.Text(settings.KeyNPMUsername),
+			}
+			if pkg.NPMRegistry == "" || pkg.Username == "" {
+				return pkg
+			}
+			token, _, err := credStore.Reveal(ctx, credentials.KindNexus)
+			if err != nil {
+				if !errors.Is(err, credentials.ErrNotConfigured) {
+					slog.WarnContext(ctx, "paket deposu kimlik bilgisi okunamadı", "error", err)
+				}
+				return pkg
+			}
+			pkg.Token = token
+			return pkg
+		},
 	})
 	defer runManager.Shutdown()
 

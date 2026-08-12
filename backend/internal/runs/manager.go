@@ -27,6 +27,11 @@ type Limits struct {
 	CPUCores      func() int
 	MemoryGB      func() int
 	CloneDepth    func() int
+
+	// Packages, kurumsal paket deposu yapılandırması. Diğerleri gibi FONKSİYON:
+	// ayar değişince yeniden başlatma gerekmesin diye her koşuda okunur.
+	// Token da buradan gelir — ayarda değil, şifreli kimlik bilgisi deposunda.
+	Packages func() runner.PackageRegistry
 }
 
 // Manager, çalıştırmaları yürütür ve eşzamanlılığı sınırlar.
@@ -183,6 +188,7 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 	req := runner.Request{
 		RunID:       run.ID,
 		NodeVersion: in.NodeVersion,
+		Packages:    m.packages(),
 		Repo:        in.Repo,
 		Agent:       in.Agent,
 		Provider:    in.Provider,
@@ -407,4 +413,15 @@ func (m *Manager) Shutdown() {
 	case <-time.After(45 * time.Second):
 		slog.Error("çalıştırmalar zamanında temizlenmedi — sahipsiz container kalmış olabilir")
 	}
+}
+
+// packages, paket deposu yapılandırmasını okur.
+//
+// Limits.Packages tanımsız olabilir (testler onu doldurmuyor); o durumda
+// özellik kapalıdır ve container bugünküyle aynı davranır.
+func (m *Manager) packages() runner.PackageRegistry {
+	if m.limits.Packages == nil {
+		return runner.PackageRegistry{}
+	}
+	return m.limits.Packages()
 }

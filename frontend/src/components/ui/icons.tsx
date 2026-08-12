@@ -38,6 +38,7 @@ import {
   CirclePlay,
   CodeXml,
   Cpu,
+  Package,
   ExternalLink,
   Eye,
   EyeOff,
@@ -114,6 +115,8 @@ export const IconUndo = icon(Undo2);
 export const IconSearch = icon(Search);
 export const IconExternal = icon(ExternalLink);
 export const IconPlay = icon(CirclePlay);
+// Kurumsal paket deposu (Nexus, Artifactory…).
+export const IconPackage = icon(Package);
 
 // ─── Durum ──────────────────────────────────────────────────────────────────
 

@@ -212,8 +212,13 @@ export const SCRIPT_DIR = "/home/agent/scripts";
 
 // ─── Jira (credentials) ─────────────────────────────────────────────────────
 
-/** Spec 002'den sonra bu uç yalnızca Jira ile ilgilenir. */
-export type CredentialKind = "jira";
+/**
+ * Şifreli saklanan kimlik bilgisi türleri.
+ *
+ * LLM sağlayıcılar ve kod deposu erişimleri kendi uçlarına taşındı; burada
+ * yalnızca tekil, kurulum başına bir tane olan sırlar kalıyor.
+ */
+export type CredentialKind = "jira" | "nexus";
 
 export interface Credential {
   kind: CredentialKind;

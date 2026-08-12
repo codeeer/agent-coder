@@ -28,7 +28,11 @@ func TestRegistry_ZorunluAlanlarDolu(t *testing.T) {
 			require.NotEmpty(t, def.Group, "grup boş olamaz — arayüz başlığa göre gruplar")
 			require.NotEmpty(t, def.Label, "etiket boş olamaz — arayüzde gösterilir")
 			require.NotEmpty(t, def.Help, "açıklama boş olamaz — spec H7 gereği")
-			require.NotEmpty(t, def.Default)
+			// Opsiyonel ayarın varsayılanı boş olabilir: "kapalı" durumu
+			// bir değerle değil, değerin yokluğuyla anlatılıyor.
+			if !def.Optional {
+				require.NotEmpty(t, def.Default, "zorunlu ayarın varsayılanı olmalı")
+			}
 			require.Contains(t, GroupLabels, def.Group, "grubun insan okunur karşılığı olmalı")
 		})
 	}
@@ -144,4 +148,38 @@ func TestService_SiralamaKayitDefteriyleAyni(t *testing.T) {
 	for i, def := range Registry {
 		require.Equal(t, def.Key, all[i].Key, "arayüz sırası kayıt defteriyle aynı olmalı")
 	}
+}
+
+// TestValidate_OpsiyonelMetinBosOlabilir — "kapalı" bir yapılandırma hata değil.
+func TestValidate_OpsiyonelMetinBosOlabilir(t *testing.T) {
+	opsiyonel, ok := Lookup(KeyNPMRegistry)
+	require.True(t, ok)
+	require.NoError(t, Validate(opsiyonel, ""), "opsiyonel ayar boş bırakılabilmeli")
+
+	zorunlu, ok := Lookup(KeyReportTimezone)
+	require.True(t, ok)
+	require.Error(t, Validate(zorunlu, ""), "zorunlu metin ayarı hâlâ boş kabul etmemeli")
+}
+
+/*
+ * TestValidate_KayitDefteriAdresi — kimlik bilgisi adrese GÖMÜLEMEZ.
+ *
+ * `putSetting` ayarın değerini log'a yazıyor; `https://kullanici:token@…`
+ * biçiminde bir adres token'ı düz metin olarak loga ve veritabanına
+ * düşürürdü. Aynı kural projelerin depo adresinde de var.
+ */
+func TestValidate_KayitDefteriAdresi(t *testing.T) {
+	def, ok := Lookup(KeyNPMRegistry)
+	require.True(t, ok)
+
+	require.NoError(t, Validate(def, "https://nexus.sirket.local/repository/npm-group/"))
+	require.NoError(t, Validate(def, "http://nexus.local:8081/repository/npm/"))
+
+	require.Error(t, Validate(def, "nexus.sirket.local"), "şema zorunlu")
+	require.Error(t, Validate(def, "ftp://nexus.sirket.local"), "yalnızca http(s)")
+	require.Error(t, Validate(def, "https://"), "sunucu adı zorunlu")
+
+	err := Validate(def, "https://kullanici:gizlitoken@nexus.sirket.local/repository/npm/")
+	require.Error(t, err, "kimlik gömülü adres reddedilmeli")
+	require.NotContains(t, err.Error(), "gizlitoken", "hata mesajı sırrı tekrarlamamalı")
 }

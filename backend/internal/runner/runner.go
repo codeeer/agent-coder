@@ -51,6 +51,10 @@ type Request struct {
 	Model    string
 	Task     string
 
+	// Packages, kurumsal paket deposu yapılandırması. Boşsa agent npm'in
+	// kendi kayıt defterini kullanır.
+	Packages PackageRegistry
+
 	// NodeVersion, sandbox'ın koşacağı Node sürümü. Boşsa taban imaj kullanılır.
 	//
 	// Sürüm KOŞU ANINDA İNDİRİLMEZ: her desteklenen sürümün imajı derleme
@@ -63,6 +67,31 @@ type Request struct {
 	// Limits, container kaynak sınırları. Ayarlardan gelir.
 	Limits Limits
 }
+
+/*
+ * PackageRegistry, agent'ın bağımlılıkları nereden çekeceği.
+ *
+ * Kurumsal ağlarda paketler internet yerine iç bir depodan (Nexus,
+ * Artifactory…) gelir. Adres boşsa özellik kapalıdır ve hiçbir yapılandırma
+ * yazılmaz — bugünkü davranış.
+ *
+ * Kimlik doğrulama OPSİYONEL: anonim okumaya açık depolarda kullanıcı adı ve
+ * token boş kalır.
+ */
+type PackageRegistry struct {
+	// NPMRegistry, npm kayıt defterinin tam adresi.
+	NPMRegistry string
+	Username    string
+	// Token, parola veya erişim anahtarı. Dosyaya yazılır, ORTAM DEĞİŞKENİNE
+	// KONMAZ — agent `env` yazdırdığında görünmemeli.
+	Token string
+}
+
+// HasAuth, kimlik doğrulama bilgisi verilmiş mi.
+func (p PackageRegistry) HasAuth() bool { return p.Username != "" && p.Token != "" }
+
+// Enabled, kurumsal depo tanımlı mı.
+func (p PackageRegistry) Enabled() bool { return p.NPMRegistry != "" }
 
 // RepoSpec, üzerinde çalışılacak depo.
 type RepoSpec struct {

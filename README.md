@@ -229,6 +229,34 @@ kök listesine **ekleme** yapar; genel sertifikalar geçerli kalır.
 > ve bu imaj başka kurumlarda da çalışıyor. Kurumun kök sertifikası da imaja
 > **gömülmez**: imaj herkese dağıtılıyor.
 
+### Kurumsal paket deposu (Nexus)
+
+**Ev/ofis ağındaysanız bu bölümü atlayın.**
+
+Agent, üzerinde çalıştığı depoda `npm install` çalıştırabilir. Kurumsal ağlarda
+npm'in genel deposuna erişim kapalıysa bu adım düşer. Çözüm: **Ayarlar → Paket
+deposu** bölümüne iç kayıt defterinizin adresini yazın.
+
+```
+https://nexus.sirket.local/repository/npm-group/
+```
+
+Kayıt defteri kimlik doğrulama istiyorsa kullanıcı adını aynı bölüme, parola
+veya token'ı hemen altındaki **Kimlik doğrulama** kartına girin. Anonim
+okumaya açık depolarda ikisi de boş bırakılır.
+
+Adres tanımlıysa her çalıştırmada container'a `~/.npmrc` yazılır ve agent'ın
+talimatına "paketler şu depodan geliyor, adresi değiştirme" notu eklenir —
+model yapılandırmayı görmediği için, söylenmezse kurulum başarısız olunca
+registry'yi değiştirmeye kalkışıyor.
+
+> **Token ortam değişkenine KONMAZ.** `~/.npmrc` dosyasına 0600 izinle yazılır;
+> agent `env` yazdırdığında görünmez. Dosya `$HOME` altında, klonlanan deponun
+> dışında — yani kullanıcının diff'ine de düşmez.
+>
+> Adrese kimlik gömülmesine izin verilmez (`https://kullanici:token@…`
+> reddedilir): ayar değeri log'a yazılıyor.
+
 ### Node sürümü
 
 Agent'ın koşturduğu build komutları belirli bir Node sürümü isteyebilir.

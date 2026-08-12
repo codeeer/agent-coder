@@ -36,10 +36,20 @@ type Definition struct {
 	Unit    string `json:"unit,omitempty"`
 	Min     *int   `json:"min,omitempty"`
 	Max     *int   `json:"max,omitempty"`
+
+	// Optional true ise BOŞ değer geçerlidir ve "bu özellik kapalı" demektir.
+	//
+	// Zorunlu bir ayarın boş bırakılması yapılandırma hatasıdır; kapalı bir
+	// özellik ise normal bir durum. İkisi ayrı şeyler ve tek bir "boş olamaz"
+	// kuralı ikisini birbirine karıştırıyordu.
+	Optional bool `json:"optional,omitempty"`
 }
 
 // Ayar anahtarları. Kod bu sabitleri kullanır, düz metin yazmaz.
 const (
+	KeyNPMRegistry = "packages.npm_registry"
+	KeyNPMUsername = "packages.npm_username"
+
 	KeyRunTimeoutMinutes  = "runner.timeout_minutes"
 	KeyMaxConcurrentRuns  = "runner.max_concurrent"
 	KeyRunnerCPULimit     = "runner.cpu_limit"
@@ -56,20 +66,22 @@ const (
 
 // Gruplar — arayüzde başlık olarak kullanılır.
 const (
-	GroupRunner  = "runner"
-	GroupCatalog = "catalog"
-	GroupReports = "reports"
-	GroupJira    = "jira"
-	GroupMCP     = "mcp"
+	GroupRunner   = "runner"
+	GroupCatalog  = "catalog"
+	GroupReports  = "reports"
+	GroupJira     = "jira"
+	GroupMCP      = "mcp"
+	GroupPackages = "packages"
 )
 
 // GroupLabels, grup kimliklerinin insan okunur karşılıkları.
 var GroupLabels = map[string]string{
-	GroupRunner:  "Çalıştırma",
-	GroupCatalog: "Model kataloğu",
-	GroupReports: "Rapor",
-	GroupJira:    "Jira tetikleyici",
-	GroupMCP:     "Dış araçlar (MCP)",
+	GroupRunner:   "Çalıştırma",
+	GroupCatalog:  "Model kataloğu",
+	GroupReports:  "Rapor",
+	GroupJira:     "Jira tetikleyici",
+	GroupMCP:      "Dış araçlar (MCP)",
+	GroupPackages: "Paket deposu",
 }
 
 func p(v int) *int { return &v }
@@ -160,6 +172,35 @@ var Registry = []Definition{
 			"Değer her sunucuya AÇIKÇA yazılır; çalıştırma motorunun kendi " +
 			"varsayılanı sürümden sürüme değişebiliyor.",
 		Default: "30", Min: p(5), Max: p(300),
+	},
+
+	/*
+	 * Kurumsal paket deposu (Nexus, Artifactory, Verdaccio…).
+	 *
+	 * Boş = kapalı: agent npm'in kendi kayıt defterini kullanır. Doluysa
+	 * container'a `~/.npmrc` yazılır ve agent'ın talimatına da yazılır —
+	 * modelin bilmediği bir yapılandırmayı bozması işten değil.
+	 *
+	 * Kimlik bilgisi BURADA DEĞİL: token bir sırdır, `credentials` tablosunda
+	 * şifreli durur (kind: nexus). Anonim okumaya açık depolarda hiç
+	 * tanımlanmaz.
+	 */
+	{
+		Key: KeyNPMRegistry, Group: GroupPackages, Kind: KindText, Optional: true,
+		Label: "npm kayıt defteri adresi",
+		Help: "Kurumsal paket deposunun npm adresi " +
+			"(örn. https://nexus.sirket.local/repository/npm-group/). " +
+			"Boş bırakılırsa npm'in kendi kayıt defteri kullanılır. " +
+			"Kimlik bilgisi adrese GÖMÜLMEZ; aşağıdaki kimlik doğrulama " +
+			"bölümünden girilir.",
+		Default: "",
+	},
+	{
+		Key: KeyNPMUsername, Group: GroupPackages, Kind: KindText, Optional: true,
+		Label: "Kullanıcı adı",
+		Help: "Kayıt defteri kimlik doğrulama istiyorsa kullanıcı adı. " +
+			"Parola/token buraya değil, kimlik doğrulama bölümüne girilir.",
+		Default: "",
 	},
 }
 

@@ -230,6 +230,13 @@ export default function HowItWorksPage() {
           <Decision title="Container'lar izole">
             Runner&apos;lar ayrı bir ağda çalışır, dışarıya port açmaz, CPU ve bellek sınırlıdır.
           </Decision>
+
+          <Decision title="Paketler kurumsal depodan">
+            Bir npm kayıt defteri tanımlarsanız agent bağımlılıkları oradan çeker; adres ve
+            kimlik container&apos;a dosya olarak girer, ortam değişkenine değil — agent
+            &lt;code&gt;env&lt;/code&gt; yazdırdığında token görünmez. Tanımlanmazsa npm&apos;in genel
+            deposu kullanılır.
+          </Decision>
           <Decision title="Dış araçlar agent başına açılır">
             Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi agent&apos;ın
             kullanabileceği ayrı seçilir; seçilmeyenlere araçlar <b>hiç sunulmaz</b>.

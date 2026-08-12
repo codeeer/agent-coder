@@ -34,12 +34,24 @@ func NewValidator() *Validator {
 	return &Validator{http: &http.Client{Timeout: 15 * time.Second}}
 }
 
-// Validate, türe uygun doğrulamayı çalıştırır.
+/*
+ * Validate, türe uygun doğrulamayı çalıştırır.
+ *
+ * HER TÜRÜN DOĞRULANABİLİR BİR UCU YOKTUR. Jira'nın `myself` ucu var ve
+ * anahtarın gerçekten çalıştığını söylüyor; paket deposu token'ı için böyle
+ * bir uç yok — Nexus kurulumları farklı yollar sunuyor ve yanlış tahmin
+ * edilen bir uç, çalışan bir token'ı reddederdi. Doğrulanamayan tür sessizce
+ * kabul edilir; hata ilk koşuda npm'in kendi mesajıyla görünür.
+ */
 func (v *Validator) Validate(ctx context.Context, kind Kind, secret string, meta map[string]string) error {
-	if kind != KindJira {
+	switch kind {
+	case KindJira:
+		return v.validateJira(ctx, secret, meta)
+	case KindNexus:
+		return nil
+	default:
 		return fmt.Errorf("%w: %q", ErrInvalidKind, kind)
 	}
-	return v.validateJira(ctx, secret, meta)
 }
 
 func (v *Validator) validateJira(ctx context.Context, secret string, meta map[string]string) error {

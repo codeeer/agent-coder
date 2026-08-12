@@ -18,6 +18,7 @@ import {
   IconChip,
   IconComment,
   IconFolder,
+  IconPackage,
   IconPlay,
   IconPlug,
   IconReport,
@@ -58,12 +59,29 @@ const JIRA_SPEC: CredentialSpec = {
  *    bölümle uzuyordu; en alttaki (Jira) neredeyse görünmüyordu. Yeni bölüm
  *    eklemek artık listeye bir satır — kimsenin kaydırma mesafesi artmıyor.
  */
+/*
+ * Kurumsal paket deposu kimliği.
+ *
+ * Adres ve kullanıcı adı BURADA DEĞİL, ayarlarda: onlar sır değil ve kayıt
+ * defteri kalıbı (etiket, açıklama, doğrulama) zaten onları çiziyor. Burada
+ * yalnızca token durur — bu kartın tamamı "bir sır sakla" için var.
+ */
+const NEXUS_SPEC: CredentialSpec = {
+  kind: "nexus",
+  title: "Paket deposu kimliği",
+  description:
+    "Kayıt defteri kimlik doğrulama istiyorsa parola veya erişim token'ı. Anonim okumaya açık depolarda gerekmez.",
+  secretLabel: "Parola / token",
+  placeholder: "NpmToken.abc…",
+};
+
 const TABS = [
   { id: "models", label: "Modeller", Icon: IconChip },
   { id: "repos", label: "Kod depoları", Icon: IconFolder },
   { id: "jira", label: "Jira", Icon: IconComment },
   { id: "mcp", label: "Dış araçlar", Icon: IconPlug },
   { id: "scripts", label: "Betikler", Icon: IconTerminal },
+  { id: "packages", label: "Paket deposu", Icon: IconPackage },
   { id: "runner", label: "Çalıştırma", Icon: IconPlay },
   { id: "reports", label: "Rapor", Icon: IconReport },
 ] as const;
@@ -145,6 +163,9 @@ function TabContent({ tab }: { tab: TabID }) {
     case "scripts":
       return <ScriptSection />;
 
+    case "packages":
+      return <PackagesTab />;
+
     case "runner":
       return (
         <Panel
@@ -219,6 +240,46 @@ function SettingsNav({
         );
       })}
     </nav>
+  );
+}
+
+/*
+ * Paket deposu sekmesi.
+ *
+ * Jira sekmesiyle aynı şekil: yapılandırma ayarlardan, sır kimlik bilgisi
+ * deposundan. İkisi ayrı yerlerde saklanıyor ama kullanıcı için tek bir karar
+ * olduğu için tek sekmede duruyorlar.
+ */
+function PackagesTab() {
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: ["credentials"],
+    queryFn: api.credentials.list,
+  });
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title="npm kayıt defteri"
+        description="Agent'ın bağımlılıkları nereden çekeceği. Boş bırakılırsa npm'in genel deposu kullanılır — kurumsal ağlarda oraya erişilemeyebilir."
+        padded={false}
+      >
+        <RuntimeSettings groups={["packages"]} showHeadings={false} />
+      </Panel>
+
+      <Panel
+        title="Kimlik doğrulama"
+        description="Yalnızca kayıt defteri kimlik istiyorsa gerekir; anonim okumaya açık depolarda boş bırakın."
+      >
+        {isPending && <Notice>Yükleniyor…</Notice>}
+        {isError && <Notice tone="error">{describeError(error).message}</Notice>}
+        {!isPending && !isError && (
+          <CredentialCard
+            spec={NEXUS_SPEC}
+            credential={data?.find((c) => c.kind === "nexus")}
+          />
+        )}
+      </Panel>
+    </div>
   );
 }
 

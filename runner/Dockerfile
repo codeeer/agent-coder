@@ -82,19 +82,31 @@ ENV HOME=/home/agent
 # klonlama hedefi ve boş olmak zorunda.
 RUN mkdir -p /home/agent/.config/opencode/agents /home/agent/scripts
 
-# Motorun paket deposuna çıkmasını engelleyen ayar.
+# Motorun paket deposuna çıkmasını engelleyen ayar — YALNIZCA MOTOR İÇİN.
 #
 # Sürücüler yukarıda kuruldu; yine de motor kendi `package.json`'ını yazıp
-# kurulumu tetikleyebiliyor. `--offline` ile npm ağa HİÇ çıkmaz, yalnızca
-# yerel önbelleğe ve mevcut node_modules'e bakar. Kurulu olan bir bağımlılık
-# için bu bir no-op; kurulu olmayan için hızlı ve net bir hata.
+# kurulumu tetikleyebiliyor. `offline` ile npm ağa HİÇ çıkmaz, yalnızca yerel
+# önbelleğe ve mevcut node_modules'e bakar. Kurulu olan bir bağımlılık için bu
+# bir no-op; kurulu olmayan için hızlı ve net bir hata.
+#
+# NEDEN ENV DEĞİL .npmrc: bayrak `ENV NPM_CONFIG_OFFLINE=true` olarak
+# konmuştu ve AGENT'IN KABUĞUNA DA GEÇİYORDU. Sonuç ölçüldü: agent kullanıcının
+# deposunda `npm install` çalıştırdığında `ENOTCACHED` alıyordu — imajda
+# önbellek de temizlendiği için kaçış yoktu. Yani kapalı ağ düzeltmesi,
+# agent'ın bağımlılık kurmasını her ortamda imkânsız kılmıştı.
+#
+# `.npmrc` motorun ÇALIŞMA DİZİNİNDE: npm proje yapılandırmasını cwd'den
+# yukarı doğru arar. Motor burada kurulum yapıyor, agent ise /work altında —
+# ölçüldü: bu dizinde `offline=true`, /work altında `false`.
 #
 # TLS DOĞRULAMASI KAPATILMIYOR. `strict-ssl=false` burada işi "çözerdi" ama
 # çözmüş olmazdı: imaj başka kurumlarda da koşuyor ve doğrulamayı kaldırmak
 # sorunu görünmez yapar, ortadan kaldırmaz. Kurumsal CA'nın yolu
 # RUNNER_EXTRA_CA_CERT (bkz. README).
-ENV NPM_CONFIG_OFFLINE=true \
-    NPM_CONFIG_AUDIT=false \
+RUN printf 'offline=true\n' > /home/agent/.config/opencode/.npmrc
+
+# Bunlar imaj geneli kalabilir: gürültü kırpıyorlar, hiçbir şeyi engellemiyorlar.
+ENV NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false
 
 COPY --chmod=755 runner/entrypoint.sh /usr/local/bin/entrypoint.sh

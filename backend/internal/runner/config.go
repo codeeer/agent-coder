@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -49,7 +50,7 @@ const scriptMode int64 = 0o755
 //
 // Dosyalar container BAŞLATILMADAN ÖNCE kopyalanır: çalıştırma motoru agent
 // tanımlarını yalnızca açılışta okur, sonradan yazılan dosyayı görmez (ölçüldü).
-func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string) ([]ConfigFile, error) {
+func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegistry) ([]ConfigFile, error) {
 	if a.Slug == "" {
 		return nil, fmt.Errorf("agent slug boş olamaz")
 	}
@@ -64,7 +65,22 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string) ([]ConfigFile, 
 
 	files := []ConfigFile{
 		{Path: configDir + "/opencode.json", Content: providerCfg, Mode: 0o600},
-		{Path: configDir + "/agents/" + a.Slug + ".md", Content: buildAgentFile(a), Mode: 0o600},
+		{Path: configDir + "/agents/" + a.Slug + ".md",
+			Content: buildAgentFile(a, pkg), Mode: 0o600},
+	}
+
+	/*
+	 * Kurumsal paket deposu.
+	 *
+	 * Dosya olarak yazılıyor, ORTAM DEĞİŞKENİ OLARAK DEĞİL: token `env`
+	 * çıktısında görünmemeli ve agent o çıktıyı okuyabiliyor. `$HOME` altında,
+	 * `/work`'ün dışında — yani kullanıcının diff'ine de düşmez.
+	 *
+	 * Aynı kalıp git token'ında da var: `git-credentials.sh` onu
+	 * `~/.git-credentials` dosyasına yazıyor.
+	 */
+	if npmrc := buildNPMRC(pkg); npmrc != nil {
+		files = append(files, ConfigFile{Path: npmrcPath, Content: npmrc, Mode: 0o600})
 	}
 
 	/*
@@ -230,7 +246,7 @@ func MCPEnvVar(name string) string {
 //
 // Yetkiler burada YAZILMAZ; session açılışında permission kuralı olarak gönderilir
 // (ölçüldü: o yol çalışıyor ve tek kaynak olması karışıklığı önlüyor).
-func buildAgentFile(a AgentSpec) []byte {
+func buildAgentFile(a AgentSpec, pkg PackageRegistry) []byte {
 	var b strings.Builder
 
 	b.WriteString("---\n")
@@ -242,6 +258,7 @@ func buildAgentFile(a AgentSpec) []byte {
 		b.WriteString("\n")
 	}
 	b.WriteString(scriptSection(a))
+	b.WriteString(packageSection(pkg))
 
 	return []byte(b.String())
 }
@@ -367,4 +384,76 @@ func defaultIfEmpty(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// npmrcPath, agent'ın npm yapılandırması.
+//
+// Kullanıcı seviyesinde (`$HOME/.npmrc`): agent nerede çalışırsa çalışsın
+// geçerli. Motorun kendi çevrimdışı bayrağı ise imajda, motorun dizinine
+// kapsanmış durumda (`runner/Dockerfile`) — ikisi çakışmaz.
+const npmrcPath = "/home/agent/.npmrc"
+
+/*
+ * buildNPMRC, kurumsal paket deposu yapılandırması.
+ *
+ * Adres yoksa nil döner ve dosya HİÇ yazılmaz: özellik kapalıyken container
+ * bugünküyle birebir aynı davranır.
+ *
+ * Kimlik doğrulama opsiyonel — anonim okumaya açık depolar için yalnızca
+ * registry satırı yazılır.
+ */
+func buildNPMRC(p PackageRegistry) []byte {
+	if !p.Enabled() {
+		return nil
+	}
+
+	var b strings.Builder
+	b.WriteString("registry=" + p.NPMRegistry + "\n")
+
+	if p.HasAuth() {
+		/*
+		 * `_auth` anahtarı ADRESE göre yazılır: npm kimlik bilgisini
+		 * host+yol eşleşmesiyle seçer, genel bir `_auth` satırı başka
+		 * kayıt defterlerine de gönderilirdi.
+		 *
+		 * Şema atılır ve sondaki `/` korunur — npm'in beklediği biçim bu.
+		 */
+		anahtar := strings.TrimPrefix(strings.TrimPrefix(p.NPMRegistry, "https:"), "http:")
+		if !strings.HasSuffix(anahtar, "/") {
+			anahtar += "/"
+		}
+		kimlik := base64.StdEncoding.EncodeToString([]byte(p.Username + ":" + p.Token))
+		b.WriteString(anahtar + ":_auth=" + kimlik + "\n")
+		b.WriteString(anahtar + ":always-auth=true\n")
+	}
+
+	return []byte(b.String())
+}
+
+/*
+ * packageSection, agent'a paketlerin nereden geldiğini anlatan blok.
+ *
+ * Yapılandırmayı container'a koymak YETMEZ: model `.npmrc`'yi görmediği için
+ * "kurulum başarısız, registry'yi değiştireyim" diyebilir ve kurumsal ağda
+ * asla ulaşamayacağı bir adrese yönelir. Betiklerdeki karar burada da geçerli
+ * (bkz. scriptSection): modele NE YAPMAYACAĞINI da söylüyoruz.
+ *
+ * Adres yoksa blok hiç yazılmaz — boş bir başlık modelin dikkatini harcar.
+ */
+func packageSection(p PackageRegistry) string {
+	if !p.Enabled() {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n## Paket deposu\n\n")
+	b.WriteString("Bu ortamda npm paketleri kurumsal depodan çekiliyor: ")
+	b.WriteString(p.NPMRegistry + "\n\n")
+	b.WriteString("Yapılandırma `~/.npmrc` içinde hazır. `--registry` bayrağı verme, ")
+	b.WriteString("`.npmrc` yazma veya değiştirme, kayıt defteri adresini değiştirme — ")
+	b.WriteString("bu ağdan npm'in genel deposuna erişilemez. ")
+	b.WriteString("Bir paket bulunamıyorsa kurumsal depoda gerçekten yok demektir; ")
+	b.WriteString("başka bir kaynak denemek yerine bunu bildir.\n")
+
+	return b.String()
 }

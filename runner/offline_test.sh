@@ -10,6 +10,11 @@
 # bir OpenAI-uyumlu sunucu koşar. İsteğin o sunucuya ULAŞMASI, sürücünün
 # yüklenebildiği anlamına gelir; ulaşmazsa sürücü yok demektir.
 #
+# KAPSAM: bu test MOTORUN davranışını ölçer, agent'ınkini değil. Agent
+# kullanıcının deposunda `npm install` çalıştırabilir ve bir paket deposu
+# tanımlıysa oraya çıkar — bu bilinçli. Motorun çevrimdışı kalması ise
+# `~/.config/opencode/.npmrc` ile o dizine kapsanmıştır.
+#
 # Kullanım: runner/offline_test.sh [imaj]
 set -euo pipefail
 
