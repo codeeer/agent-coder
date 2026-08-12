@@ -46,6 +46,37 @@ kullanıcı deneyimiyle yeniden sunmaktır.**
 
 ---
 
+## Görsel referans
+
+Kullanıcı bir ekran görüntüsü, mockup veya görsel referans verip bunu
+tasarım hedefi olarak belirttiğinde, o görsel **birincil referanstır.**
+
+**İlham kaynağı değildir.** "Şuna benzer bir şey" değil, "şu" demektir.
+
+Önce mevcut ekranla referans arasındaki farklar çıkarılır — göz kararıyla
+değil, madde madde:
+
+- düzen (layout) ve boşluk
+- tipografi ve bilgi hiyerarşisi
+- bileşen hiyerarşisi
+- renkler, yüzeyler, kenarlıklar
+- denetimler (düğme, süzgeç, arama, sayfalama)
+- bilgi yoğunluğu
+
+Sonra referansın **görsel dili ve tasarım yaklaşımı** uygulanır; mevcut
+işlevsellik ve gerçek veri korunarak.
+
+Birebir kopyalamak gerekmez. Ama sonuç referanstan **belirgin biçimde daha
+basit, daha eski veya daha düşük kaliteli olmamalıdır** — "yaklaştım" demek
+için ölçüt budur.
+
+**Referansta olup üründe karşılığı olmayan şey uydurulmaz:** veri,
+istatistik, kullanıcı, kota, bildirim, eylem. Referansta olması gerekçe
+değildir (bkz. [Uydurulmayacaklar](#uydurulmayacaklar)). O kutunun yerine
+üründe gerçekten var olan bir bilgi konur ya da kutu hiç konmaz.
+
+---
+
 ## Sıra
 
 Kod yazmadan önce:
@@ -223,6 +254,23 @@ görüntüsü alınır ve şunlar tek tek kontrol edilir:
 - responsive davranış — en az geniş masaüstü, dar masaüstü ve telefon
 - açık tema ve koyu tema **ayrı ayrı**
 - hover, focus, yükleniyor, boş ve hata durumları
+
+### Tarayıcı yalnızca ekran görüntüsü için değildir
+
+DevTools'un işi resim çekmek değil, **iddiaları sınamaktır.** Gerektiğinde:
+
+- DOM yapısını incele — beklediğin ağaç gerçekten o mu
+- hesaplanmış stilleri kontrol et
+- eleman boyutlarını ölç
+- taşma (`overflow`) sorunlarını tespit et
+- konsol hatalarına bak
+- farklı viewport genişliklerini dene
+- hover ve focus durumlarını tetikle
+- iki temanın davranışını ayrı ayrı doğrula
+
+**Tarayıcı doğrulaması kod incelemesinin yerine geçmez; ikisi birlikte
+kullanılır.** Ekran görüntüsü bir şeyin yanlış olduğunu gösterir, nedenini
+söylemez; kod nedenini söyler ama ekranda ne çıktığını söylemez.
 
 ### Renk ve kontrast iddiaları ölçülür
 

@@ -592,69 +592,29 @@ Faz listesi ve doğrulama adımları:
 
 ## Visual Design / UI Redesign
 
-> **Bir ekranı yeniden tasarlarken önce şunu okuyun:**
-> [.claude/rules/ui.md](.claude/rules/ui.md) — süreç, tasarım ilkeleri,
-> bileşen ve ikon kuralları, iki temanın ayrı ayrı değerlendirilmesi,
-> uydurulmayacak veriler ve doğrulama listesi.
->
-> Buradaki bölüm ne zaman devreye girdiğini söyler; o dosya nasıl
-> yapılacağını.
+Bu bölüm kuralın **ne zaman** devreye girdiğini söyler. **Nasıl** yapılacağı
+tek bir yerdedir: [.claude/rules/ui.md](.claude/rules/ui.md) — süreç, görsel
+referansın nasıl ele alınacağı, tasarım ilkeleri, bileşen ve ikon kuralları,
+iki temanın ayrı değerlendirilmesi, uydurulmayacak veriler ve doğrulama.
 
-Kullanıcı bir screenshot, mockup veya visual reference sağladığında
-ve bunu mevcut UI'ın tasarım referansı olarak verdiğinde, bu referansı
-uygulanması gereken tasarım hedefi olarak kabul et.
+**Devreye girdiği durumlar:**
 
-Screenshot yalnızca "inspiration" değildir.
+- Kullanıcı bir ekran görüntüsü, mockup veya görsel referans verip bunu
+  tasarım hedefi olarak belirtir — o görsel ilham değil, **birincil
+  referanstır.**
+- Kullanıcı bir ekranın yeniden tasarlanmasını ister.
 
-Referans görseli analiz et:
+**Değişmeyecek olan:** iş mantığı, API sözleşmesi, veri modeli ve mevcut
+işlevsellik.
 
-- layout
-- spacing
-- typography
-- visual hierarchy
-- component hierarchy
-- colors
-- borders
-- surfaces
-- buttons
-- navigation
-- tables
-- cards
-- status indicators
-- information density
-- responsive behavior
+**Değişebilecek olan:** görsel yapının tamamı — düzen, bileşen hiyerarşisi,
+bilgi mimarisi. Görsel kalite için bileşen yapısını değiştirmek serbesttir;
+"mevcut tasarım çalışıyor" bir gerekçe değildir.
 
-Mevcut ekran ile referans arasındaki önemli görsel farkları belirle
-ve bunları implementation sırasında düzelt.
+**İlk çalışan implementasyon final değildir.** Sonuç gerçek tarayıcıda, iki
+temada ve birden fazla genişlikte doğrulanır; hedeften belirgin biçimde
+uzaksa tekrar düzenlenir.
 
-Business logic, API contract, data model veya mevcut functionality
-gereksiz yere değiştirilmemelidir.
-
-Ancak görsel tasarımın uygulanması için mevcut component yapısının
-değiştirilmesi gerekiyorsa component yapısını değiştirmek serbesttir.
-
-### Visual Verification
-
-UI değişikliği yapıldıktan sonra mümkünse gerçek browser üzerinde
-ekranı kontrol et.
-
-Özellikle:
-
-- desktop
-- light mode
-- dark mode
-- hover/focus states
-- loading
-- error
-- empty state
-
-kontrol edilmelidir.
-
-Screenshot'taki tasarım ile gerçek uygulama arasında belirgin
-görsel fark varsa implementation'ı tekrar düzenle.
-
-İlk çalışan implementation'ı final kabul etme.
-Visual result yeterince kaliteli değilse iterate et.
 ### İkon sistemi
 
 Birincil ikon kitaplığı **Lucide React**'tir. Lucide'da karşılığı olmayan bir
