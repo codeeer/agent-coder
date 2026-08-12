@@ -13,6 +13,7 @@ import (
 	"github.com/agent-coder/backend/internal/llm"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/runbuild"
+	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runs"
 )
 
@@ -23,6 +24,8 @@ type startRunRequest struct {
 	Model      string     `json:"model"`
 	Branch     string     `json:"branch"`
 	Task       string     `json:"task"`
+	// NodeVersion boşsa projenin varsayılanı kullanılır.
+	NodeVersion string `json:"nodeVersion"`
 }
 
 /*
@@ -123,6 +126,13 @@ func (h *Handler) startRun(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "empty_task", "görev metni boş olamaz")
 		return
 	}
+	// Yayınlanmamış bir sürüm kabul edilseydi çalıştırma başlar ve ancak
+	// "imaj bulunamadı" ile düşerdi; istek daha uca varmadan reddediliyor.
+	if !runner.SupportsNodeVersion(strings.TrimSpace(req.NodeVersion)) {
+		respondError(w, http.StatusBadRequest, "invalid_node_version",
+			"bu Node sürümünün imajı yayınlanmamış")
+		return
+	}
 
 	input, err := h.deps.RunBuilder.Build(ctx, runbuild.Request{
 		ProjectID:  req.ProjectID,
@@ -131,6 +141,8 @@ func (h *Handler) startRun(w http.ResponseWriter, r *http.Request) {
 		Model:      req.Model,
 		Branch:     req.Branch,
 		Task:       req.Task,
+
+		NodeVersion: strings.TrimSpace(req.NodeVersion),
 	})
 	if err != nil {
 		h.respondRunError(w, r, err)

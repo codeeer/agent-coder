@@ -102,3 +102,49 @@ func (f fixture) akisAdimiYap(t *testing.T, run runs.Run) {
 		 VALUES ($1, 'a1', 'agent', 0, $2)`, workflowRunID, run.ID)
 	require.NoError(t, err)
 }
+
+// TestNodeSurumu_KayittaAnlikKopyadir — projenin varsayılanı sonradan
+// değişse bile geçmiş kayıt neyle koştuğunu doğru göstermeli.
+//
+// Aynı gerekçe `agent_prompt` ve `model_id` için de geçerli (spec 003):
+// referans tutulsaydı geçmiş, bugünün ayarına göre yeniden yazılmış gibi
+// görünürdü.
+func TestNodeSurumu_KayittaAnlikKopyadir(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+
+	run, err := f.store.Create(ctx, runs.CreateInput{
+		ProjectID:    f.projectID,
+		AgentID:      f.agentID,
+		AgentSlug:    "incelemeci",
+		AgentPrompt:  "özgün talimat",
+		ProviderSlug: "openrouter",
+		ModelID:      "m1",
+		Branch:       "main",
+		Task:         "sürümlü iş",
+		NodeVersion:  "24.13.0",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "24.13.0", run.NodeVersion)
+
+	_, err = f.pool.Exec(ctx,
+		`UPDATE projects SET default_node_version = '24.19.0' WHERE id = $1`, f.projectID)
+	require.NoError(t, err)
+
+	sonra, err := f.store.Get(ctx, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, "24.13.0", sonra.NodeVersion,
+		"projenin varsayılanı değişince geçmiş kaydın sürümü değişmemeli")
+
+	// Liste sorgusu ayrı bir sütun listesi yazıyor; o da taşımalı.
+	list, _, err := f.store.List(ctx, runs.ListFilter{Limit: 10})
+	require.NoError(t, err)
+	require.Equal(t, "24.13.0", list[0].NodeVersion)
+}
+
+// TestNodeSurumu_SecilmezseBosKalir — sürüm seçmeyen için hiçbir şey değişmez.
+func TestNodeSurumu_SecilmezseBosKalir(t *testing.T) {
+	f := setup(t)
+	run := f.create(t, "sürümsüz iş")
+	require.Empty(t, run.NodeVersion)
+}

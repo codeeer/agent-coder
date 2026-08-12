@@ -14,6 +14,15 @@ COMPOSE_DEV  := $(COMPOSE) -f deploy/docker-compose.dev.yml
 COMPOSE_GHCR := $(COMPOSE) -f deploy/docker-compose.ghcr.yml
 RUNNER_IMAGE := agent-coder/opencode-runner:latest
 
+# Sürümlü runner etiketleri için taban ad (etiketsiz) ve sürüm listesi.
+# Liste backend'in içinde çünkü uç nokta onu `go:embed` ile okuyor; CI ve
+# Makefile aynı dosyayı depo kökünden okur — tek kaynak.
+RUNNER_REPO      := $(firstword $(subst :, ,$(RUNNER_IMAGE)))
+NODE_VERSION_FILE := backend/internal/runner/node-versions.txt
+# `\#` KAÇIRILMAK ZORUNDA: make'te kaçırılmamış bir `#` satırın geri kalanını
+# yorum yapar ve `$(shell …)` kapanmadan kesilir.
+NODE_VERSIONS    := $(shell grep -vE '^[[:space:]]*(\#|$$)' $(NODE_VERSION_FILE) 2>/dev/null)
+
 # Yayınlanan imajlar (make quickstart). Kendi çatalınızda GHCR_OWNER'ı
 # değiştirin; IMAGE_TAG ile belirli bir sürüme sabitleyebilirsiniz.
 GHCR_OWNER   ?= codeeer
@@ -102,6 +111,12 @@ quickstart: check-env ## Hazır imajlarla başlat (hiçbir şey derlenmez — en
 	@# anında başlattığı imaj. `compose pull` onu görmez, backend de kendisi
 	@# indirmez (sandbox.EnsureImage yalnızca yerelde var mı diye bakar).
 	docker pull $(GHCR_RUNNER)
+	@# Sürümlü etiketler de çekilir: arayüzdeki sürüm seçicisi bunları
+	@# listeliyor ve çekilmemiş bir sürüm seçmek koşuyu düşürürdü.
+	@for s in $(NODE_VERSIONS); do \
+		docker pull $(firstword $(subst :, ,$(GHCR_RUNNER))):node-$$s || \
+			echo "  UYARI: node-$$s imajı çekilemedi — o sürüm seçilemez"; \
+	done
 	@$(GHCR_ENV) $(COMPOSE_GHCR) pull
 	@# RUNNER_IMAGE .env'e YAZILIR, yalnızca bu komuta özel bırakılmaz.
 	@# Aksi halde kullanıcı quickstart'tan sonra `make restart` çalıştırdığında
@@ -178,9 +193,19 @@ logs-frontend: ## Sadece frontend logları
 
 # ─── Runner imajı ───────────────────────────────────────────────────────────
 
+# Varsayılan imaj + listedeki HER sürüm.
+#
+# Sürümlüler de derleniyor çünkü kaynaktan kuran kullanıcı da arayüzden sürüm
+# seçebiliyor; yalnızca varsayılan derlenseydi seçim "imaj bulunamadı" ile
+# düşerdi. Liste büyüdükçe süre uzar — bedeli bilinçli.
 .PHONY: runner
-runner: ## opencode-runner imajını build et (derleme bağlamı proje köküdür)
+runner: ## opencode-runner imajını build et (varsayılan + listedeki sürümler)
 	docker build -f runner/Dockerfile -t $(RUNNER_IMAGE) .
+	@for s in $(NODE_VERSIONS); do \
+		echo "Node $$s için runner imajı derleniyor…"; \
+		docker build -f runner/Dockerfile --build-arg NODE_VERSION=$$s \
+			-t $(RUNNER_REPO):node-$$s . || exit 1; \
+	done
 
 # ─── Veritabanı ─────────────────────────────────────────────────────────────
 

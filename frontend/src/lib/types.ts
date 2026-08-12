@@ -328,6 +328,8 @@ export interface Project {
   repoUrl: string;
   defaultBranch: string;
   gitProviderId: string | null;
+  /** Bu projede varsayılan Node sürümü. Boşsa runner imajının kendi sürümü. */
+  defaultNodeVersion: string;
   runCount: number;
   createdAt: string;
   updatedAt: string;
@@ -339,6 +341,7 @@ export interface ProjectRequest {
   defaultBranch?: string;
   gitProviderId?: string | null;
   clearGitProvider?: boolean;
+  defaultNodeVersion?: string;
 }
 
 // ─── Agent'lar ──────────────────────────────────────────────────────────────
@@ -424,6 +427,12 @@ export interface Run {
 
   branch: string;
   task: string;
+  /**
+   * Çalıştırmanın koştuğu Node sürümü. Boşsa runner imajının kendi sürümü.
+   * `agentPrompt` gibi ANLIK KOPYA: projenin varsayılanı sonradan değişse de
+   * geçmiş kayıt neyle koştuğunu doğru gösterir.
+   */
+  nodeVersion: string;
 
   status: RunStatus;
   error: string | null;
@@ -465,6 +474,8 @@ export interface StartRunRequest {
   model?: string;
   branch?: string;
   task: string;
+  /** Boşsa projenin varsayılanı kullanılır. */
+  nodeVersion?: string;
 }
 
 /** SSE ile gelen tek bir ilerleme olayı. */

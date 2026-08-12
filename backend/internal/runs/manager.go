@@ -68,6 +68,11 @@ type StartInput struct {
 	Repo     runner.RepoSpec
 	Agent    runner.AgentSpec
 	Provider runner.ProviderSpec
+
+	// NodeVersion, çalıştırmanın koşacağı Node sürümü. Boşsa runner imajının
+	// kendi sürümü. Kayda da yazılır (Create.NodeVersion) — ikisi aynı değer,
+	// biri motora gider, diğeri geçmişte kalır.
+	NodeVersion string
 }
 
 // Start, çalıştırmayı kaydeder ve arka planda başlatır.
@@ -176,13 +181,14 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 	in.Repo.CloneDepth = m.limits.CloneDepth()
 
 	req := runner.Request{
-		RunID:    run.ID,
-		Repo:     in.Repo,
-		Agent:    in.Agent,
-		Provider: in.Provider,
-		Model:    run.ModelID,
-		Task:     run.Task,
-		Timeout:  m.limits.Timeout(),
+		RunID:       run.ID,
+		NodeVersion: in.NodeVersion,
+		Repo:        in.Repo,
+		Agent:       in.Agent,
+		Provider:    in.Provider,
+		Model:       run.ModelID,
+		Task:        run.Task,
+		Timeout:     m.limits.Timeout(),
 		Limits: runner.Limits{
 			CPUCores: m.limits.CPUCores(),
 			MemoryGB: m.limits.MemoryGB(),

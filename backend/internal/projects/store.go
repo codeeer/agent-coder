@@ -32,6 +32,10 @@ type Project struct {
 	// GitProviderID nil ise depo kimlik doğrulamasız klonlanır (açık depo).
 	GitProviderID *uuid.UUID `json:"gitProviderId"`
 
+	// DefaultNodeVersion, bu projede varsayılan Node sürümü. Boşsa runner
+	// imajının kendi sürümü kullanılır; çalıştırma anında değiştirilebilir.
+	DefaultNodeVersion string `json:"defaultNodeVersion"`
+
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
@@ -46,12 +50,13 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
-const columns = `id, name, repo_url, default_branch, git_provider_id, created_at, updated_at`
+const columns = `id, name, repo_url, default_branch, git_provider_id,
+	default_node_version, created_at, updated_at`
 
 func scan(row pgx.Row) (Project, error) {
 	var p Project
 	err := row.Scan(&p.ID, &p.Name, &p.RepoURL, &p.DefaultBranch,
-		&p.GitProviderID, &p.CreatedAt, &p.UpdatedAt)
+		&p.GitProviderID, &p.DefaultNodeVersion, &p.CreatedAt, &p.UpdatedAt)
 	return p, err
 }
 
@@ -112,6 +117,11 @@ type Input struct {
 	RepoURL       string
 	DefaultBranch string
 	GitProviderID *uuid.UUID
+
+	// DefaultNodeVersion boş bırakılabilir: runner imajının kendi sürümü.
+	// Listede olup olmadığı HTTP katmanında sınanır — bu paket yayınlanan
+	// imajları bilmez.
+	DefaultNodeVersion string
 }
 
 // Normalize, girdiyi doğrular ve tekilleştirir.
@@ -148,6 +158,8 @@ func (in *Input) Normalize() error {
 	if in.DefaultBranch == "" {
 		in.DefaultBranch = "main"
 	}
+
+	in.DefaultNodeVersion = strings.TrimSpace(in.DefaultNodeVersion)
 	return nil
 }
 
@@ -158,10 +170,12 @@ func (s *Store) Create(ctx context.Context, in Input) (Project, error) {
 	}
 
 	p, err := scan(s.pool.QueryRow(ctx, `
-		INSERT INTO projects (name, repo_url, default_branch, git_provider_id)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO projects (name, repo_url, default_branch, git_provider_id,
+			default_node_version)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING `+columns,
-		in.Name, in.RepoURL, in.DefaultBranch, in.GitProviderID))
+		in.Name, in.RepoURL, in.DefaultBranch, in.GitProviderID,
+		in.DefaultNodeVersion))
 	if err != nil {
 		return Project{}, fmt.Errorf("proje kaydedilemedi: %w", err)
 	}
@@ -188,10 +202,11 @@ func (s *Store) Update(ctx context.Context, id uuid.UUID, in Input, clearProvide
 
 	p, err := scan(s.pool.QueryRow(ctx, `
 		UPDATE projects SET name = $2, repo_url = $3, default_branch = $4,
-			git_provider_id = $5, updated_at = now()
+			git_provider_id = $5, default_node_version = $6, updated_at = now()
 		WHERE id = $1
 		RETURNING `+columns,
-		id, in.Name, in.RepoURL, in.DefaultBranch, providerID))
+		id, in.Name, in.RepoURL, in.DefaultBranch, providerID,
+		in.DefaultNodeVersion))
 	if err != nil {
 		return Project{}, fmt.Errorf("proje güncellenemedi: %w", err)
 	}

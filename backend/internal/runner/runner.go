@@ -51,6 +51,12 @@ type Request struct {
 	Model    string
 	Task     string
 
+	// NodeVersion, sandbox'ın koşacağı Node sürümü. Boşsa taban imaj kullanılır.
+	//
+	// Sürüm KOŞU ANINDA İNDİRİLMEZ: her desteklenen sürümün imajı derleme
+	// anında hazırlanmıştır (bkz. ImageFor, node-versions.txt).
+	NodeVersion string
+
 	// Timeout, çalıştırmanın azami süresi. Ayarlardan gelir.
 	Timeout time.Duration
 

@@ -149,6 +149,10 @@ type Request struct {
 	// Branch boşsa projenin varsayılanı kullanılır.
 	Branch string
 	Task   string
+
+	// NodeVersion boş bırakılabilir; o zaman projenin varsayılanı kullanılır.
+	// Öncelik sırası Build içinde, tek yerde çözülür.
+	NodeVersion string
 }
 
 // Build, isteği çalıştırma girdisine çevirir.
@@ -199,6 +203,8 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 		branch = project.DefaultBranch
 	}
 
+	nodeVersion := resolveNodeVersion(req.NodeVersion, project.DefaultNodeVersion)
+
 	repo := runner.RepoSpec{URL: project.RepoURL, Branch: branch}
 	if project.GitProviderID != nil {
 		gp, err := b.git.Get(ctx, *project.GitProviderID)
@@ -233,6 +239,7 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 			AgentSlug: agent.Slug, AgentPrompt: agent.Prompt,
 			ProviderSlug: provider.Slug, ModelID: model,
 			Branch: branch, Task: req.Task,
+			NodeVersion: nodeVersion,
 		},
 		Repo: repo,
 		Agent: runner.AgentSpec{
@@ -246,5 +253,24 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 			Slug: provider.Slug, Kind: string(provider.Type),
 			BaseURL: provider.BaseURL, APIKey: apiKey,
 		},
+		NodeVersion: nodeVersion,
 	}, nil
+}
+
+/*
+ * resolveNodeVersion, Node sürümü önceliğini uygular:
+ *
+ *   koşu seçimi > projenin varsayılanı > "" (runner imajının kendi sürümü)
+ *
+ * Ayrı bir fonksiyon çünkü kural TEK YERDE durmalı: hem HTTP yolu hem akış
+ * adımı yolu (steprunner) Build'den geçiyor ve sıra iki yere dağılsaydı biri
+ * güncellenip diğeri unutulurdu. Saf olduğu için de doğrudan sınanabiliyor.
+ *
+ * Akış adımları sürüm vermez; onlarda projenin varsayılanı geçerli olur.
+ */
+func resolveNodeVersion(istek, projeVarsayilani string) string {
+	if v := strings.TrimSpace(istek); v != "" {
+		return v
+	}
+	return strings.TrimSpace(projeVarsayilani)
 }

@@ -136,6 +136,15 @@ export default function RunDetailPage() {
                 <span>{run.projectName}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-mono">{run.branch}</span>
+                {/* Node sürümü yalnızca SEÇİLMİŞSE yazılır: seçmeyen koşularda
+                    runner imajının kendi sürümü geçerli ve onu burada iddia
+                    etmek, ölçmediğimiz bir şeyi göstermek olurdu. */}
+                {run.nodeVersion && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-mono">node {run.nodeVersion}</span>
+                  </>
+                )}
                 <span aria-hidden="true">·</span>
                 <span>{formatRelative(run.createdAt)}</span>
               </p>

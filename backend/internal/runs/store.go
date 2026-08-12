@@ -64,6 +64,11 @@ type Run struct {
 	Branch string `json:"branch"`
 	Task   string `json:"task"`
 
+	// NodeVersion, çalıştırmanın koştuğu Node sürümü. Boşsa runner imajının
+	// kendi sürümü. ANLIK KOPYA: projenin varsayılanı sonradan değişse bile
+	// geçmiş kayıt neyle koştuğunu doğru gösterir.
+	NodeVersion string `json:"nodeVersion"`
+
 	Status Status              `json:"status"`
 	Error  *string             `json:"error"`
 	Output string              `json:"output"`
@@ -105,7 +110,7 @@ const runColumns = `
 	r.id, r.project_id, r.agent_id, r.provider_id,
 	p.name,
 	r.agent_slug, r.agent_prompt, r.provider_slug, r.model_id,
-	r.branch, r.task,
+	r.branch, r.task, r.node_version,
 	r.status, r.error, r.output, r.diff, r.files,
 	r.prompt_tokens, r.completion_tokens, r.cost_usd,
 	ws.workflow_run_id, coalesce(wf.name, ''),
@@ -127,7 +132,7 @@ func scanRun(row pgx.Row) (Run, error) {
 	err := row.Scan(&r.ID, &r.ProjectID, &r.AgentID, &r.ProviderID,
 		&r.ProjectName,
 		&r.AgentSlug, &r.AgentPrompt, &r.ProviderSlug, &r.ModelID,
-		&r.Branch, &r.Task,
+		&r.Branch, &r.Task, &r.NodeVersion,
 		&r.Status, &r.Error, &r.Output, &r.Diff, &rawFile,
 		&r.PromptTokens, &r.CompletionTokens, &r.CostUSD,
 		&r.WorkflowRunID, &r.WorkflowName, &r.StepName,
@@ -154,6 +159,9 @@ type CreateInput struct {
 
 	Branch string
 	Task   string
+
+	// NodeVersion boş bırakılabilir: runner imajının kendi sürümü kullanılır.
+	NodeVersion string
 }
 
 // Create, çalıştırmayı 'pending' olarak kaydeder.
@@ -161,8 +169,9 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Run, error) {
 	const q = `
 		WITH inserted AS (
 			INSERT INTO runs (project_id, agent_id, provider_id,
-				agent_slug, agent_prompt, provider_slug, model_id, branch, task)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+				agent_slug, agent_prompt, provider_slug, model_id, branch, task,
+				node_version)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 			RETURNING *
 		)
 		SELECT ` + runColumns + `
@@ -171,7 +180,7 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Run, error) {
 	return scanRun(s.pool.QueryRow(ctx, q,
 		in.ProjectID, in.AgentID, in.ProviderID,
 		in.AgentSlug, in.AgentPrompt, in.ProviderSlug, in.ModelID,
-		in.Branch, in.Task))
+		in.Branch, in.Task, in.NodeVersion))
 }
 
 // Get, tek bir çalıştırmayı döner.
@@ -226,7 +235,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) ([]Run, int, error) {
 	q := fmt.Sprintf(`
 		SELECT r.id, r.project_id, r.agent_id, r.provider_id, p.name,
 		       r.agent_slug, '', r.provider_slug, r.model_id,
-		       r.branch, r.task,
+		       r.branch, r.task, r.node_version,
 		       r.status, r.error, '', '', r.files,
 		       r.prompt_tokens, r.completion_tokens, r.cost_usd,
 		       ws.workflow_run_id, coalesce(wf.name, ''),

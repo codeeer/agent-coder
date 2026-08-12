@@ -38,6 +38,13 @@ export function StartRunForm({
     queryKey: ["models", "run-picker"],
     queryFn: () => api.models.list({ limit: 500, sort: "provider" }),
   });
+  // Sürüm listesi yalnızca yeni bir runner imajı yayınlandığında değişir;
+  // her form açılışında yeniden çekmek gereksiz.
+  const nodeVersions = useQuery({
+    queryKey: ["node-versions"],
+    queryFn: () => api.runner.nodeVersions(),
+    staleTime: 60 * 60 * 1000,
+  });
 
   const [projectId, setProjectId] = useState("");
   const [branch, setBranch] = useState("");
@@ -49,8 +56,12 @@ export function StartRunForm({
       : null,
   );
   const [task, setTask] = useState("");
+  // Boş = projenin varsayılanı. Sürüm KOŞU BAŞLAMADAN seçilir: container
+  // ayağa kalktıktan sonra değiştirilemez.
+  const [nodeVersion, setNodeVersion] = useState("");
 
   const project = projects.data?.items.find((p) => p.id === projectId);
+  const surumler = nodeVersions.data?.versions ?? [];
   const chosenModel = models.data?.items.find(
     (m) => m.id === model?.modelId && m.providerId === model.providerId,
   );
@@ -64,6 +75,7 @@ export function StartRunForm({
         model: model?.modelId,
         branch: branch.trim() || undefined,
         task: task.trim(),
+        nodeVersion: nodeVersion || undefined,
       }),
     onSuccess: (run) => {
       onDone();
@@ -136,6 +148,38 @@ export function StartRunForm({
             />
           </label>
         </div>
+
+        {/*
+          Node sürümü — SERBEST METİN DEĞİL.
+
+          Her sürümün imajı derleme anında hazırlanıyor; listede olmayan bir
+          sürüm seçilse koşu klonlamaya bile başlamadan "imaj bulunamadı" ile
+          düşerdi. Seçenek yoksa alan hiç gösterilmiyor: tek satırlık bir
+          açılır liste, olmayan bir seçim vaat etmesin.
+        */}
+        {surumler.length > 0 && (
+          <label className="block">
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
+              Node sürümü
+            </span>
+            <Select
+              className="mt-1"
+              value={nodeVersion}
+              onChange={(e) => setNodeVersion(e.target.value)}
+            >
+              <option value="">
+                {project?.defaultNodeVersion
+                  ? `Proje varsayılanı (${project.defaultNodeVersion})`
+                  : "Proje varsayılanı"}
+              </option>
+              {surumler.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
 
         <div>
           <span className="text-2xs tracking-wide text-ink-2 uppercase">

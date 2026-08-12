@@ -5,7 +5,18 @@
 #
 # Debian tabanı bilinçli seçildi: opencode'un dağıttığı ikili dosyalar glibc'ye
 # bağlı, Alpine'ın musl'ı ile çalışmaz.
-FROM node:24-slim
+#
+# Node sürümü DIŞARIDAN verilebilir: agent'ın koşturduğu build komutları belirli
+# bir sürüm isteyebiliyor. Sürüm KOŞU ANINDA İNDİRİLMEZ — desteklenen her sürüm
+# için derleme anında ayrı bir imaj yayınlanır (`node-<sürüm>` etiketi) ve
+# kullanıcı koşuyu başlatmadan önce seçer. Liste tek yerde:
+# `backend/internal/runner/node-versions.txt`.
+#
+# Varsayılan `24`, yani KAYAN yama — bugünkü davranışın aynısı. Tam sürüme
+# sabitlemek `latest` imajını bulunduğu yamadan aşağı çekerdi; sabit sürüm
+# isteyen `node-<sürüm>` etiketini seçer.
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim
 
 # git      — repo klonlama ve diff üretimi
 # ca-certs — OpenRouter'a HTTPS

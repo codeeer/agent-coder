@@ -117,18 +117,39 @@ func (m *Manager) Close() error { return m.docker.Close() }
 
 // EnsureImage, imajın yerelde bulunduğunu doğrular.
 //
-// Otomatik indirme YAPILMAZ: runner imajı bu depodan build ediliyor, kayıt
-// defterinde yok. Eksikse kullanıcıya ne yapması gerektiği söylenir.
+// Otomatik indirme YAPILMAZ: runner imajı bu depodan build ediliyor. Eksikse
+// kullanıcıya ne yapması gerektiği söylenir — Node sürümü seçilmişse o sürümün
+// imajı hiç hazırlanmamış olabilir, mesaj bunu ayırt ediyor.
 func (m *Manager) EnsureImage(ctx context.Context, ref string) error {
 	_, err := m.docker.ImageInspect(ctx, ref)
 	if err == nil {
 		return nil
 	}
 	if client.IsErrNotFound(err) {
-		return fmt.Errorf("%w: %q imajı bulunamadı — `make runner` ile oluşturun", ErrCreate, ref)
+		return fmt.Errorf("%w: %q imajı bulunamadı — %s", ErrCreate, ref, imageHint(ref))
 	}
 	return fmt.Errorf("%w: imaj kontrol edilemedi: %w", ErrCreate, err)
 }
+
+// imageHint, eksik imaj için ne yapılacağını söyler.
+//
+// "make runner" demek sürümlü imajlarda yanıltıcı olurdu: hazır imajla kuran
+// biri hiçbir şey derlemiyor, `docker pull` etmesi gerekiyor.
+func imageHint(ref string) string {
+	if strings.Contains(ref, ":"+nodeTagPrefix) {
+		if strings.HasPrefix(ref, "ghcr.io/") {
+			return "`docker pull " + ref + "` ile çekin"
+		}
+		return "`make runner` bu sürümü de derler"
+	}
+	return "`make runner` ile oluşturun"
+}
+
+// nodeTagPrefix, sürümlü runner etiketlerinin öneki (runner.ImageFor ile aynı).
+//
+// Sabit burada tekrarlanıyor çünkü sandbox paketi runner paketini import
+// edemez — runner zaten sandbox'ı kullanıyor, ters bağımlılık döngü olurdu.
+const nodeTagPrefix = "node-"
 
 /*
  * caBind, kurumsal CA için salt okunur bağlama listesini üretir.

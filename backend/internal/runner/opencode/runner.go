@@ -65,11 +65,30 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 		return nil, fmt.Errorf("%w: %w", runner.ErrSandbox, err)
 	}
 
-	emit(runner.Event{Level: runner.LevelInfo, Message: "çalışma ortamı hazırlanıyor"})
+	/*
+	 * İmaj, seçilen Node sürümüne göre belirlenir; sürüm boşsa taban imaj.
+	 *
+	 * VARLIĞI BURADA, klonlama başlamadan sınanır. Eskiden `EnsureImage`
+	 * yalnızca açılıştaki `Ping`te çağrılıyordu ve hatası log'a düşüp
+	 * yutuluyordu; eksik imaj ancak `ContainerCreate` hatasıyla, kullanıcının
+	 * beklemesinden sonra görünürdü. Sürümlü imajlarda bu daha da kötü olurdu:
+	 * taban imaj yerinde ama seçilen sürüm çekilmemiş olabilir.
+	 */
+	image := runner.ImageFor(r.image, req.NodeVersion)
+
+	hazirlik := "çalışma ortamı hazırlanıyor"
+	if req.NodeVersion != "" {
+		hazirlik += " (node " + req.NodeVersion + ")"
+	}
+	emit(runner.Event{Level: runner.LevelInfo, Message: hazirlik})
+
+	if err := r.sandbox.EnsureImage(runCtx, image); err != nil {
+		return nil, classify(err, runCtx, ctx)
+	}
 
 	ct, err := r.sandbox.Create(runCtx, sandbox.Spec{
 		RunID:       req.RunID.String(),
-		Image:       r.image,
+		Image:       image,
 		Network:     r.network,
 		Env:         buildEnv(req, r.extraCACert),
 		CPUCores:    req.Limits.CPUCores,

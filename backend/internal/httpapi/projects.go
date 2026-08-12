@@ -5,11 +5,13 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/agent-coder/backend/internal/gitprovider"
 	"github.com/agent-coder/backend/internal/projects"
+	"github.com/agent-coder/backend/internal/runner"
 )
 
 // projectResponse, proje ve kaç çalıştırması olduğu.
@@ -25,6 +27,21 @@ type projectRequest struct {
 	GitProviderID *uuid.UUID `json:"gitProviderId"`
 	// ClearGitProvider true ise erişim kaldırılır (açık depoya dönüştürülür).
 	ClearGitProvider bool `json:"clearGitProvider"`
+	// DefaultNodeVersion boşsa runner imajının kendi sürümü kullanılır.
+	DefaultNodeVersion string `json:"defaultNodeVersion"`
+}
+
+// checkNodeVersion, yayınlanmamış bir sürümü isteği reddederek yakalar.
+//
+// Doğrulama HTTP katmanında: `projects` paketi hangi imajların yayınlandığını
+// bilmez ve bilmemeli.
+func checkNodeVersion(w http.ResponseWriter, v string) bool {
+	if runner.SupportsNodeVersion(strings.TrimSpace(v)) {
+		return true
+	}
+	respondError(w, http.StatusBadRequest, "invalid_node_version",
+		"bu Node sürümünün imajı yayınlanmamış")
+	return false
 }
 
 func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
@@ -70,9 +87,14 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkNodeVersion(w, req.DefaultNodeVersion) {
+		return
+	}
+
 	in := projects.Input{
 		Name: req.Name, RepoURL: req.RepoURL,
 		DefaultBranch: req.DefaultBranch, GitProviderID: req.GitProviderID,
+		DefaultNodeVersion: req.DefaultNodeVersion,
 	}
 	if err := in.Normalize(); err != nil {
 		h.respondProjectError(w, r, err)
@@ -112,9 +134,14 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !checkNodeVersion(w, req.DefaultNodeVersion) {
+		return
+	}
+
 	in := projects.Input{
 		Name: req.Name, RepoURL: req.RepoURL,
 		DefaultBranch: req.DefaultBranch, GitProviderID: req.GitProviderID,
+		DefaultNodeVersion: req.DefaultNodeVersion,
 	}
 	if err := in.Normalize(); err != nil {
 		h.respondProjectError(w, r, err)

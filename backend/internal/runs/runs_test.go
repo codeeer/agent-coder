@@ -134,9 +134,24 @@ type stubRunner struct {
 	started atomic.Int32
 	// err, block kapandığında dönülecek hata.
 	err error
+
+	// son, motora ULAŞAN son istek. Boru hattının bir alanı gerçekten
+	// taşıyıp taşımadığı ancak burada görülebilir.
+	mu  sync.Mutex
+	son runner.Request
 }
 
-func (s *stubRunner) Run(ctx context.Context, _ runner.Request, emit runner.EventFunc) (*runner.Result, error) {
+// LastRequest, motora ulaşan son isteği döner.
+func (s *stubRunner) LastRequest() runner.Request {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.son
+}
+
+func (s *stubRunner) Run(ctx context.Context, req runner.Request, emit runner.EventFunc) (*runner.Result, error) {
+	s.mu.Lock()
+	s.son = req
+	s.mu.Unlock()
 	s.started.Add(1)
 	emit(runner.Event{Level: runner.LevelInfo, Message: "başladı"})
 

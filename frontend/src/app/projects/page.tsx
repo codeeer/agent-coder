@@ -519,6 +519,16 @@ function ProjectForm({
   const [gitProviderId, setGitProviderId] = useState(
     project?.gitProviderId ?? "",
   );
+  const [nodeVersion, setNodeVersion] = useState(
+    project?.defaultNodeVersion ?? "",
+  );
+
+  // Yalnızca yeni imaj yayınlanınca değişir; uzun süre taze sayılabilir.
+  const nodeVersions = useQuery({
+    queryKey: ["node-versions"],
+    queryFn: () => api.runner.nodeVersions(),
+    staleTime: 60 * 60 * 1000,
+  });
 
   const save = useMutation({
     mutationFn: () => {
@@ -528,6 +538,7 @@ function ProjectForm({
         defaultBranch: branch.trim() || "main",
         gitProviderId: gitProviderId || undefined,
         clearGitProvider: gitProviderId === "",
+        defaultNodeVersion: nodeVersion,
       };
       return editing
         ? api.projects.update(project.id, body)
@@ -593,6 +604,24 @@ function ProjectForm({
               ))}
             </Select>
           </Field>
+
+          {/* Her koşuda elle seçmemek için varsayılan; çalıştırırken
+              değiştirilebilir. Seçenek yoksa alan hiç gösterilmiyor. */}
+          {(nodeVersions.data?.versions.length ?? 0) > 0 && (
+            <Field label="Varsayılan Node sürümü" className="min-w-44 flex-1">
+              <Select
+                value={nodeVersion}
+                onChange={(e) => setNodeVersion(e.target.value)}
+              >
+                <option value="">Runner varsayılanı</option>
+                {nodeVersions.data?.versions.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
         </div>
 
         {/* Özel depo için kimlik ZORUNLU ve bunu ancak kaydetme anında

@@ -210,6 +210,9 @@ func (h *Handler) Routes() http.Handler {
 		r.Put("/credentials/{kind}", h.putCredential)
 		r.Delete("/credentials/{kind}", h.deleteCredential)
 
+		// Çalıştırma ortamı envanteri — DB'siz, sabit.
+		r.Get("/runner/node-versions", h.nodeVersions)
+
 		r.Route("/runs", func(r chi.Router) {
 			r.Get("/", h.listRuns)
 			r.Post("/", h.startRun)

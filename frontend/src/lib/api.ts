@@ -357,6 +357,19 @@ export const api = {
       apiFetch<null>(`/api/agents/${id}`, { method: "DELETE" }),
   },
 
+  /** Çalıştırma ortamı hakkında sabit bilgiler (veritabanına dokunmaz). */
+  runner: {
+    /**
+     * İmajı yayınlanmış Node sürümleri.
+     *
+     * Serbest metin YOK: burada olmayan bir sürüm seçilirse koşu "imaj
+     * bulunamadı" ile düşerdi. Liste nadiren değişir (yeni imaj yayınlanınca),
+     * bu yüzden çağıran uzun `staleTime` verebilir.
+     */
+    nodeVersions: () =>
+      apiFetch<{ versions: string[] }>("/api/runner/node-versions"),
+  },
+
   runs: {
     list: (params: PageQuery & { project?: string } = {}) =>
       apiFetch<RunList>(`/api/runs${pageQuery(params)}`),

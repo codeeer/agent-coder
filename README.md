@@ -229,6 +229,27 @@ kök listesine **ekleme** yapar; genel sertifikalar geçerli kalır.
 > ve bu imaj başka kurumlarda da çalışıyor. Kurumun kök sertifikası da imaja
 > **gömülmez**: imaj herkese dağıtılıyor.
 
+### Node sürümü
+
+Agent'ın koşturduğu build komutları belirli bir Node sürümü isteyebilir.
+Desteklenen her sürüm için **ayrı bir runner imajı yayınlanır**; sürüm koşu
+anında indirilmez.
+
+Seçim iki yerde yapılabilir:
+
+- **Projeler → varsayılan Node sürümü** — her koşuda elle seçmemek için.
+- **Bir agent'ı çalıştırırken** — o koşuya özel; projenin varsayılanını ezer.
+
+Hiçbiri seçilmezse runner imajının kendi sürümü kullanılır (bugün Node 24'ün
+güncel yaması). Listede olmayan bir sürüm seçilemez — arayüzde serbest metin
+yoktur ve uç nokta da reddeder.
+
+Desteklenen sürümler tek bir dosyada:
+`backend/internal/runner/node-versions.txt`. Yeni bir sürüm eklemek için o
+dosyaya bir satır eklemek yeterli; CI o sürüm için
+`ghcr.io/codeeer/agent-coder-runner:node-<sürüm>` etiketini yayınlar,
+`make runner` de yerelde derler.
+
 > **Sağlayıcı sürücüleri için artık internet gerekmiyor.** Runner imajı,
 > OpenAI-uyumlu sağlayıcıların ihtiyaç duyduğu sürücü paketlerini derleme
 > anında içine alır (sürümler `runner/package-lock.json` ile sabit). Bir

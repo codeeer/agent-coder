@@ -1,0 +1,16 @@
+# Runner imajı yayınlanan Node sürümleri.
+#
+# TEK LİSTE. Buraya bir satır eklemek üç şeyi birden yapar:
+#   · CI o sürüm için `…-runner:node-<sürüm>` etiketini yayınlar
+#   · `make runner` yerelde aynı etiketi derler
+#   · arayüzdeki sürüm seçicisine düşer
+#
+# Sürüm koşu anında İNDİRİLMEZ; burada olmayan bir sürüm seçilemez.
+# Tam sürüm yazılır (24.13.0), kayan etiket değil — kayan olan yalnızca
+# varsayılan imaj (`runner/Dockerfile`: ARG NODE_VERSION=24).
+#
+# Sürücü paketlerinin ilan ettiği taban 24 hattında 24.15.0'dır
+# (`ini@7.0.0`). 24.13.0 bunun altında: `npm ci` EBADENGINE uyarısı verir
+# ama kurulum tamamlanır ve sürücü yüklenir — ölçüldü. CI her yayında o
+# imajda `opencode --version` ve kapalı ağ testini koşarak bunu sınar.
+24.13.0
