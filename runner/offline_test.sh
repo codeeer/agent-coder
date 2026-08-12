@@ -65,16 +65,41 @@ docker network rm "$AG" >/dev/null 2>&1 || true
 docker network create --internal "$AG" >/dev/null
 log "izole ağ kuruldu (internal: true)"
 
+# python imajı yerelde yoksa burada çekilir; uzun sürebilir ve sessiz kalmasın.
+log "sahte sağlayıcı başlatılıyor (python:3.12-slim gerekiyorsa çekilecek)…"
 docker run -d --name oc-sahte-llm --network "$AG" \
   -v "$DIZIN/sahte.py:/app/sahte.py:ro" python:3.12-slim python /app/sahte.py >/dev/null
+log "sahte sağlayıcı ayakta"
+
+log "runner başlatılıyor: $IMAJ"
 docker run -d --name oc-runner-test --network "$AG" \
   -v "$DIZIN/opencode.json:/home/agent/.config/opencode/opencode.json:ro" \
   --entrypoint sh "$IMAJ" -c 'opencode serve --hostname 0.0.0.0 --port 4096' >/dev/null
 
+# Motorun ayağa kalkmasını bekle.
+#
+# Döngü BAŞARISIZLIĞI YUTMAMALI. Öncesinde `for … done` sonrası koşulsuz
+# "motor ayakta" yazılıyordu: motor hiç kalkmasa bile test devam ediyor,
+# sonraki adımda sessizce asılıyor ve CI 6 saatlik varsayılan sınıra kadar
+# bekliyordu. Nerede takıldığı da anlaşılmıyordu.
+hazir=0
 for _ in $(seq 1 40); do
-  docker exec oc-runner-test curl -fsS http://127.0.0.1:4096/global/health >/dev/null 2>&1 && break
+  if docker exec oc-runner-test curl -fsS -m 3 \
+      http://127.0.0.1:4096/global/health >/dev/null 2>&1; then
+    hazir=1
+    break
+  fi
   sleep 1
 done
+
+if [ "$hazir" -ne 1 ]; then
+  log "BAŞARISIZ: motor 40 sn içinde ayağa kalkmadı"
+  log "── runner logu ──"
+  docker logs oc-runner-test 2>&1 | tail -30
+  log "── sahte sağlayıcı logu ──"
+  docker logs oc-sahte-llm 2>&1 | tail -10
+  exit 1
+fi
 log "motor ayakta"
 
 # Ağın gerçekten kapalı olduğu KANITLANIR; yoksa test hiçbir şey ölçmez.
@@ -83,8 +108,16 @@ if docker exec oc-runner-test curl -m 5 -sS https://registry.npmjs.org/ -o /dev/
 fi
 log "paket deposuna erişim yok (beklenen)"
 
-ID=$(docker exec oc-runner-test curl -fsS -X POST http://127.0.0.1:4096/session \
+# `--max-time` ZORUNLU: zaman aşımsız bir curl, motor yanıt vermediğinde
+# sonsuza kadar bekler ve testi askıda bırakır.
+ID=$(docker exec oc-runner-test curl -fsS -m 20 -X POST http://127.0.0.1:4096/session \
        -H "Content-Type: application/json" -d '{}' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+if [ -z "$ID" ]; then
+  log "BAŞARISIZ: oturum açılamadı"
+  docker logs oc-runner-test 2>&1 | tail -30
+  exit 1
+fi
+log "oturum açıldı, istek gönderiliyor"
 docker exec oc-runner-test curl -sS -X POST "http://127.0.0.1:4096/session/$ID/message" \
   -H "Content-Type: application/json" --max-time 90 -o /dev/null \
   -d '{"agent":"build","model":{"providerID":"sirket","modelID":"test-model"},

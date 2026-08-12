@@ -79,6 +79,7 @@ jobs:
   # unutulduğunda arayüz, yayınlanmamış bir imajı seçtirirdi.
   hazirlik:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       surumler: ${{ steps.oku.outputs.surumler }}
       kisa_sha: ${{ steps.oku.outputs.kisa_sha }}
@@ -109,6 +110,11 @@ jobs:
   imaj:
     needs: hazirlik
     runs-on: ${{ matrix.kosucu }}
+    # Askıda kalan bir yayın HIZLA düşmeli: GitHub'ın 6 saatlik varsayılanı
+    # boru hattını bir gün boyunca meşgul ediyor ve yeniden tetiklemek için
+    # elle iptal gerekiyor. Ölçülen süreler bunun çok altında (en yavaşı
+    # frontend/arm64, 2 dk 14 sn).
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -191,6 +197,7 @@ jobs:
   runner-node:
     needs: hazirlik
     runs-on: ${{ matrix.kosucu }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -247,6 +254,7 @@ jobs:
   birlestir:
     needs: [hazirlik, imaj, runner-node]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -329,6 +337,10 @@ jobs:
   duman-testi:
     needs: [hazirlik, birlestir]
     runs-on: ubuntu-latest
+    # Bu iş bir kez askıda kaldı: kapalı ağ testindeki sağlık bekleme döngüsü
+    # başarısızlığı yutuyordu ve sonraki curl zaman aşımsızdı. İkisi de
+    # düzeltildi; sınır ikinci savunma hattı.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -479,6 +491,7 @@ jobs:
   terfi:
     needs: [hazirlik, duman-testi]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
