@@ -6,7 +6,7 @@
  */
 
 import type React from "react";
-import { IconSearch } from "@/components/ui/icons";
+import { IconAlert, IconSearch } from "@/components/ui/icons";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ─── Yüzey ──────────────────────────────────────────────────────────────────
@@ -658,6 +658,59 @@ export function Notice({
     >
       {title && <p className="font-medium">{title}</p>}
       {children && <div className={title ? "mt-0.5" : ""}>{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * Geri alınamayan bir eylemin yerinde onayı.
+ *
+ * Modal DEĞİL, şerit: onay silinecek şeyin yanında açılır, kullanıcı neyi
+ * onayladığını görmeye devam eder. Projede `window.confirm` ve Dialog
+ * bileşeni bilinçli olarak yok.
+ *
+ * `consequence` en önemli alan: "emin misiniz?" hiçbir şey söylemez.
+ * Ne kaybedileceği SAYIYLA yazılır — "12 çalışma geçmişi de silinecek",
+ * "$0,004 maliyet raporlardan düşecek". Ölçülemiyorsa yazılmaz (boş bırakılır),
+ * uydurulmaz.
+ */
+export function ConfirmStrip({
+  question,
+  consequence,
+  confirmLabel = "Evet, sil",
+  busy = false,
+  error,
+  onConfirm,
+  onCancel,
+  className = "",
+}: {
+  question: string;
+  consequence?: React.ReactNode;
+  confirmLabel?: string;
+  busy?: boolean;
+  error?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`border-danger/30 bg-danger-soft px-4 py-3 ${className}`}>
+      <p className="flex items-start gap-2 text-xs text-ink">
+        <IconAlert className="mt-px size-4 shrink-0 text-danger" />
+        <span>
+          {question}
+          {consequence && <> {consequence}</>}
+        </span>
+      </p>
+      <div className="mt-2.5 flex gap-2">
+        <Button size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
+          {busy ? "Siliniyor…" : confirmLabel}
+        </Button>
+        <Button size="sm" onClick={onCancel} disabled={busy}>
+          Vazgeç
+        </Button>
+      </div>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }

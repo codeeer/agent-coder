@@ -57,3 +57,33 @@ func TestRespondRunError_YapilandirmaEksigi500Donmez(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
 }
+
+// TestRespondRunError_SilmeEngelleri — silinemeyen bir kayıt "arıza" değil,
+// KURAL. 409 döner ve mesaj kullanıcıya ne yapacağını söyler.
+func TestRespondRunError_SilmeEngelleri(t *testing.T) {
+	h := &Handler{}
+
+	durumlar := []struct {
+		ad   string
+		err  error
+		code string
+	}{
+		{"süren çalıştırma", runs.ErrActive, "run_active"},
+		{"akış adımı", runs.ErrWorkflowStep, "run_workflow_step"},
+	}
+
+	for _, d := range durumlar {
+		t.Run(d.ad, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			h.respondRunError(rec,
+				httptest.NewRequest(http.MethodDelete, "/api/runs/x", nil), d.err)
+
+			require.Equal(t, http.StatusConflict, rec.Code)
+
+			var body ErrorBody
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Equal(t, d.code, body.Error.Code)
+			require.NotEmpty(t, body.Error.Message)
+		})
+	}
+}

@@ -355,11 +355,14 @@ func insertPRStep(t *testing.T, pool *pgxpool.Pool, projectID uuid.UUID,
 		t.Fatalf("sürüm eklenemedi: %v", err)
 	}
 
+	// project_id çalışmanın kendi sütunu (migration 000012): akış artık farklı
+	// projelerde koşabildiği için proje akıştan türetilmiyor.
 	var runID uuid.UUID
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO workflow_runs (workflow_id, version_id, version, status, trigger_kind, created_at)
-		VALUES ($1, $2, 1, 'succeeded', 'manual', $3) RETURNING id`,
-		workflowID, versionID, created).Scan(&runID); err != nil {
+		INSERT INTO workflow_runs (workflow_id, project_id, version_id, version,
+			status, trigger_kind, created_at)
+		VALUES ($1, $2, $3, 1, 'succeeded', 'manual', $4) RETURNING id`,
+		workflowID, projectID, versionID, created).Scan(&runID); err != nil {
 		t.Fatalf("akış çalışması eklenemedi: %v", err)
 	}
 
@@ -402,8 +405,9 @@ func TestSummaryPRsOpened(t *testing.T) {
 	}
 }
 
-// TestSummaryPRsOpenedProjeSuzgeci — PR sayımı proje süzgecine uymalı; akış
-// tarafında proje bir seviye yukarıda duruyor (`workflows.project_id`).
+// TestSummaryPRsOpenedProjeSuzgeci — PR sayımı proje süzgecine uymalı. Proje
+// akışın varsayılanından değil, ÇALIŞMANIN kendi kaydından okunur
+// (`workflow_runs.project_id`): aynı akış farklı projelerde koşabiliyor.
 func TestSummaryPRsOpenedProjeSuzgeci(t *testing.T) {
 	pool, store, projectID, _ := setup(t)
 	testutil.Truncate(t, pool, "workflow_steps", "workflow_runs", "workflow_versions", "workflows")

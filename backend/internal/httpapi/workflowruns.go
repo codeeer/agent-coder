@@ -16,6 +16,9 @@ import (
 
 type startWorkflowRequest struct {
 	Input string `json:"input"`
+	// ProjectID isteğe bağlı: boşsa akışın varsayılan projesi kullanılır.
+	// Aynı akış farklı projelerde koşabilsin diye var (spec 007, 2026-08-12).
+	ProjectID string `json:"projectId"`
 }
 
 type startWorkflowResponse struct {
@@ -41,7 +44,26 @@ func (h *Handler) startWorkflowRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run, others, err := h.launchWorkflow(r.Context(), id, workflow.TriggerManual, nil, req.Input)
+	// Proje ayrıştırması BURADA yapılır, veritabanına bırakılmaz: geçersiz bir
+	// kimlik FK ihlaline dönüşür ve kullanıcı "işlem tamamlanamadı" görürdü.
+	var projectID uuid.UUID
+	if req.ProjectID != "" {
+		parsed, err := uuid.Parse(req.ProjectID)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_project", "proje kimliği geçersiz")
+			return
+		}
+		if h.deps.Projects != nil {
+			if _, err := h.deps.Projects.Get(r.Context(), parsed); err != nil {
+				respondError(w, http.StatusNotFound, "project_not_found", "proje bulunamadı")
+				return
+			}
+		}
+		projectID = parsed
+	}
+
+	run, others, err := h.launchWorkflow(r.Context(), id, workflow.TriggerManual,
+		nil, req.Input, projectID)
 	if err != nil {
 		h.respondWorkflowError(w, r, err)
 		return
@@ -51,8 +73,12 @@ func (h *Handler) startWorkflowRun(w http.ResponseWriter, r *http.Request) {
 
 // launchWorkflow, akışı başlatır. Gövde `workflow.Launcher` içinde — elle,
 // dışarıdan ve Jira tetiklemesi aynı kapıdan geçsin diye.
+//
+// projectID boş (uuid.Nil) geçilebilir: akışın varsayılanı kullanılır.
+// Tetikleyiciler hep böyle çağırır.
 func (h *Handler) launchWorkflow(ctx contextT, workflowID uuid.UUID,
 	trigger workflow.TriggerKind, payload map[string]string, input string,
+	projectID uuid.UUID,
 ) (workflow.Run, int, error) {
 	others, err := h.deps.Launcher.ActiveRuns(ctx, workflowID)
 	if err != nil {
@@ -61,6 +87,7 @@ func (h *Handler) launchWorkflow(ctx contextT, workflowID uuid.UUID,
 
 	run, err := h.deps.Launcher.Launch(ctx, workflow.LaunchInput{
 		WorkflowID: workflowID, Trigger: trigger, Payload: payload, Input: input,
+		ProjectID: projectID,
 	})
 	if err != nil {
 		return workflow.Run{}, 0, err
@@ -240,8 +267,10 @@ func (h *Handler) triggerHook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Proje verilmez: dışarıdan gelen bir olayın hangi projeye ait olduğuna
+	// karar verecek bilgisi yok, akışın varsayılanı kullanılır.
 	run, _, err := h.launchWorkflow(r.Context(), wf.ID, workflow.TriggerWebhook,
-		payload, payload["input"])
+		payload, payload["input"], uuid.Nil)
 	if err != nil {
 		h.respondWorkflowError(w, r, err)
 		return

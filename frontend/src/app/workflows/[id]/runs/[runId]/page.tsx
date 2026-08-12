@@ -157,6 +157,9 @@ export default function WorkflowRunPage() {
         <aside className="space-y-3">
           <Card>
             <dl className="space-y-3">
+              {/* Proje EN ÜSTTE: aynı akış farklı projelerde koşabildiği için
+                  "bu çalışma nerede koştu" artık akıştan çıkarılamıyor. */}
+              <Field label="Proje" value={r.projectName} />
               <Field label="Toplam maliyet" value={formatMoney(r.costUsd)} />
               <Field label="Token" value={r.tokens.toLocaleString("tr-TR")} />
               <Field

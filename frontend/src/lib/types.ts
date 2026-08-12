@@ -703,8 +703,11 @@ export interface WorkflowRunSummary {
 
 export interface Workflow {
   id: string;
+  /** Akışın VARSAYILAN projesi — çalıştırırken değiştirilebilir. */
   projectId: string;
   projectName: string;
+  /** Toplam çalışma sayısı; silme onayında ne kaybedileceğini yazmak için. */
+  runCount: number;
   name: string;
   description: string;
   isActive: boolean;
@@ -746,7 +749,9 @@ export interface WorkflowRun {
   id: string;
   workflowId: string;
   workflowName: string;
+  /** Çalışmanın koştuğu proje — akışın varsayılanından farklı olabilir. */
   projectId: string;
+  projectName: string;
   versionId: string;
   version: number;
   status: WorkflowRunStatus;

@@ -214,6 +214,7 @@ func (h *Handler) Routes() http.Handler {
 			r.Get("/", h.listRuns)
 			r.Post("/", h.startRun)
 			r.Get("/{id}", h.getRun)
+			r.Delete("/{id}", h.deleteRun)
 			r.Get("/{id}/events", h.runEvents)
 			r.Post("/{id}/cancel", h.cancelRun)
 			r.Post("/{id}/push", h.pushRun)

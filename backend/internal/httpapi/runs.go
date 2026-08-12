@@ -168,6 +168,30 @@ func (h *Handler) cancelRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// deleteRun, bitmiş bir çalıştırma kaydını kalıcı olarak siler.
+//
+// Manager üzerinden geçer, doğrudan store'dan değil: "çalışıyor mu" sorusunun
+// tek doğru cevabı bellekteki canlı iş listesiyle birlikte verilebiliyor.
+func (h *Handler) deleteRun(w http.ResponseWriter, r *http.Request) {
+	if h.deps.RunManager == nil {
+		respondError(w, http.StatusServiceUnavailable, "db_unavailable", "veritabanı hazır değil")
+		return
+	}
+
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.deps.RunManager.Delete(r.Context(), id); err != nil {
+		h.respondRunError(w, r, err)
+		return
+	}
+
+	slog.InfoContext(r.Context(), "çalıştırma silindi", "run_id", id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // pushRun, çalıştırmanın değişikliklerini yeni bir branch'e gönderir.
 func (h *Handler) pushRun(w http.ResponseWriter, r *http.Request) {
 	if h.deps.Pusher == nil {
@@ -228,6 +252,16 @@ func (h *Handler) respondRunError(w http.ResponseWriter, r *http.Request, err er
 	case errors.Is(err, runs.ErrNotRunning):
 		respondError(w, http.StatusConflict, "not_running",
 			"çalıştırma zaten bitmiş, iptal edilemez")
+
+	case errors.Is(err, runs.ErrActive):
+		respondError(w, http.StatusConflict, "run_active",
+			"çalıştırma hâlâ sürüyor — önce iptal edin")
+
+	// Adım tek başına silinemez: kayıt gitse de akış adımı "başarılı" görünmeye
+	// devam eder, ama maliyeti ve hangi agent'ın çalıştığı boşalır.
+	case errors.Is(err, runs.ErrWorkflowStep):
+		respondError(w, http.StatusConflict, "run_workflow_step",
+			"bu çalıştırma bir akışın adımı — akış çalışmasını silin")
 
 	case errors.Is(err, runs.ErrNoChanges):
 		respondError(w, http.StatusConflict, "no_changes",

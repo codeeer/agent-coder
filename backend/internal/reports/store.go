@@ -303,16 +303,20 @@ func (s *Store) totals(ctx context.Context, from, to time.Time, projectID *uuid.
 /*
  * flowScope, akış tarafındaki sorgular için dönem ve proje koşulu.
  *
- * `scope()` `runs` üzerinden yazılmış (`r.project_id`); akış kayıtlarında proje
- * bir seviye yukarıda (`workflows.project_id`). İkisini tek fonksiyona
- * sıkıştırmak, her çağrıda hangi tablodan bahsedildiğini takip etmek demekti.
+ * `scope()` `runs` üzerinden yazılmış (`r.project_id`); bu ise akış
+ * çalışmaları üzerinden. İkisini tek fonksiyona sıkıştırmak, her çağrıda
+ * hangi tablodan bahsedildiğini takip etmek demekti.
+ *
+ * Proje ÇALIŞMADAN okunur (`wr.project_id`), akıştan değil: aynı akış farklı
+ * projelerde koşabiliyor (migration 000012). Akışın varsayılanına bakılsaydı
+ * başka bir projede açılmış bir PR yanlış projenin raporuna sayılırdı.
  */
 func flowScope(from, to time.Time, projectID *uuid.UUID) (string, []any) {
 	args := []any{from, to}
 	where := `WHERE wr.created_at >= $1 AND wr.created_at < $2`
 	if projectID != nil {
 		args = append(args, *projectID)
-		where += fmt.Sprintf(` AND w.project_id = $%d`, len(args))
+		where += fmt.Sprintf(` AND wr.project_id = $%d`, len(args))
 	}
 	return where, args
 }
@@ -327,7 +331,6 @@ func (s *Store) prsOpened(ctx context.Context, from, to time.Time, projectID *uu
 		SELECT count(*)
 		FROM workflow_steps s
 		JOIN workflow_runs wr ON wr.id = s.workflow_run_id
-		JOIN workflows w      ON w.id = wr.workflow_id
 		` + where + ` AND s.node_kind = 'github.pr' AND s.status = 'succeeded'`
 
 	var n int
@@ -348,7 +351,6 @@ func (s *Store) jiraTasks(ctx context.Context, from, to time.Time, projectID *uu
 		SELECT count(DISTINCT p.issue_key)
 		FROM workflow_processed_issues p
 		JOIN workflow_runs wr ON wr.id = p.workflow_run_id
-		JOIN workflows w      ON w.id = wr.workflow_id
 		` + where
 
 	var n int
@@ -432,7 +434,6 @@ func (s *Store) dailyPRs(ctx context.Context, from, to time.Time, tz string,
 		SELECT to_char(wr.created_at AT TIME ZONE $%d, 'YYYY-MM-DD') AS day, count(*)
 		FROM workflow_steps s
 		JOIN workflow_runs wr ON wr.id = s.workflow_run_id
-		JOIN workflows w      ON w.id = wr.workflow_id
 		%s AND s.node_kind = 'github.pr' AND s.status = 'succeeded'
 		GROUP BY day`, len(args), where)
 

@@ -370,6 +370,12 @@ export const api = {
     cancel: (id: string) =>
       apiFetch<null>(`/api/runs/${id}/cancel`, { method: "POST" }),
 
+    /**
+     * Kaydı kalıcı olarak siler. Süren bir çalıştırma ve akış adımı olan bir
+     * çalıştırma 409 döner — sebebi hata mesajında yazar.
+     */
+    remove: (id: string) => apiFetch<null>(`/api/runs/${id}`, { method: "DELETE" }),
+
     push: (id: string, branch?: string) =>
       apiFetch<{ branch: string }>(`/api/runs/${id}/push`, {
         method: "POST",
@@ -403,10 +409,14 @@ export const api = {
         body: { graph },
       }),
 
-    start: (id: string, input: string) =>
+    /**
+     * Akışı başlatır. `projectId` verilmezse akışın varsayılan projesi
+     * kullanılır — aynı akış farklı projelerde koşabilsin diye.
+     */
+    start: (id: string, input: string, projectId?: string) =>
       apiFetch<StartWorkflowResponse>(`/api/workflows/${id}/runs`, {
         method: "POST",
-        body: { input },
+        body: { input, projectId: projectId ?? "" },
       }),
 
     /** Belirli bir sürümün grafı — geçmiş çalışmayı doğru çizmek için. */

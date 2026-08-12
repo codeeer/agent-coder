@@ -19,6 +19,10 @@ type CreateRunInput struct {
 	Trigger  TriggerKind
 	Payload  map[string]string
 	Input    string
+
+	// ProjectID, çalışmanın koşacağı proje. uuid.Nil ise akışın varsayılanı
+	// kullanılır — tetikleyicilerin (Jira, webhook, MCP) yolu budur.
+	ProjectID uuid.UUID
 }
 
 // CreateRun, çalışmayı ve TÜM adımlarını 'pending' olarak kaydeder.
@@ -47,13 +51,20 @@ func (s *Store) CreateRun(ctx context.Context, in CreateRunInput) (Run, error) {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Proje ÇALIŞMAYA yazılır, akıştan JOIN ile okunmaz: akışın varsayılanı
+	// sonradan değişirse geçmiş çalışmaların projesi de geriye dönük değişirdi.
+	projectID := in.ProjectID
+	if projectID == uuid.Nil {
+		projectID = in.Workflow.ProjectID
+	}
+
 	var runID uuid.UUID
 	err = tx.QueryRow(ctx, `
-		INSERT INTO workflow_runs (workflow_id, version_id, version, trigger_kind,
-			trigger_payload, input)
-		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-		in.Workflow.ID, in.Version.ID, in.Version.Version, string(in.Trigger),
-		rawPayload, in.Input).Scan(&runID)
+		INSERT INTO workflow_runs (workflow_id, project_id, version_id, version,
+			trigger_kind, trigger_payload, input)
+		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+		in.Workflow.ID, projectID, in.Version.ID, in.Version.Version,
+		string(in.Trigger), rawPayload, in.Input).Scan(&runID)
 	if err != nil {
 		return Run{}, fmt.Errorf("akış çalışması kaydedilemedi: %w", err)
 	}
@@ -79,10 +90,20 @@ func (s *Store) CreateRun(ctx context.Context, in CreateRunInput) (Run, error) {
 	return s.GetRun(ctx, runID)
 }
 
+// Proje ÇALIŞMANIN kendi sütunundan okunur (`r.project_id`), akıştan değil:
+// akışınki yalnızca varsayılan ve sonradan değişebiliyor. JOIN akış ADI için
+// duruyor — o, geçmişte de bugünkü adıyla anılmalı.
 const runColumns = `
-	r.id, r.workflow_id, w.name, w.project_id, r.version_id, r.version,
+	r.id, r.workflow_id, w.name, r.project_id, p.name, r.version_id, r.version,
 	r.status, r.trigger_kind, r.trigger_payload, r.input, r.error,
 	r.created_at, r.started_at, r.finished_at`
+
+// runFrom, runColumns'un beklediği tablolar. Proje adı olmadan kullanıcı, aynı
+// akışın hangi çalışmasının nerede koştuğunu ayırt edemez.
+const runFrom = `
+	FROM workflow_runs r
+	JOIN workflows w ON w.id = r.workflow_id
+	JOIN projects p ON p.id = r.project_id`
 
 func scanRun(row pgx.Row) (Run, error) {
 	var (
@@ -90,8 +111,8 @@ func scanRun(row pgx.Row) (Run, error) {
 		payload []byte
 	)
 	err := row.Scan(&r.ID, &r.WorkflowID, &r.WorkflowName, &r.ProjectID,
-		&r.VersionID, &r.Version, &r.Status, &r.TriggerKind, &payload,
-		&r.Input, &r.Error, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
+		&r.ProjectName, &r.VersionID, &r.Version, &r.Status, &r.TriggerKind,
+		&payload, &r.Input, &r.Error, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
 	if err != nil {
 		return Run{}, err
 	}
@@ -104,8 +125,7 @@ func scanRun(row pgx.Row) (Run, error) {
 
 // GetRun, çalışmayı adımlarıyla birlikte döner.
 func (s *Store) GetRun(ctx context.Context, id uuid.UUID) (Run, error) {
-	r, err := scanRun(s.pool.QueryRow(ctx, `SELECT `+runColumns+`
-		FROM workflow_runs r JOIN workflows w ON w.id = r.workflow_id
+	r, err := scanRun(s.pool.QueryRow(ctx, `SELECT `+runColumns+runFrom+`
 		WHERE r.id = $1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Run{}, ErrNotFound
@@ -187,8 +207,7 @@ func (s *Store) ListRuns(ctx context.Context, f ListRunsFilter) ([]Run, int, err
 	}
 
 	args = append(args, page.Limit, page.Offset)
-	rows, err := s.pool.Query(ctx, fmt.Sprintf(`SELECT `+runColumns+`
-		FROM workflow_runs r JOIN workflows w ON w.id = r.workflow_id`+where+`
+	rows, err := s.pool.Query(ctx, fmt.Sprintf(`SELECT `+runColumns+runFrom+where+`
 		ORDER BY r.created_at DESC LIMIT $%d OFFSET $%d`, len(args)-1, len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("akış çalışmaları listelenemedi: %w", err)

@@ -24,17 +24,26 @@ import {
   WorkflowRunBadge,
   isWorkflowActive,
 } from "@/components/workflows/WorkflowStatusBadge";
-import { IconAgent, IconComment, IconPlug, IconPullRequest } from "@/components/ui/icons";
+import {
+  IconAgent,
+  IconComment,
+  IconFolder,
+  IconPlug,
+  IconPullRequest,
+  IconTrash,
+} from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
+  ConfirmStrip,
   Input,
   List,
   Mono,
   Notice,
   PageHeader,
   Section,
+  Select,
   Skeleton,
 } from "@/components/ui/primitives";
 
@@ -62,6 +71,10 @@ export default function WorkflowEditorPage() {
   const [problems, setProblems] = useState<GraphProblem[]>([]);
   const [dirty, setDirty] = useState(false);
   const [input, setInput] = useState("");
+  // Çalıştırma anındaki proje. Boş = akışın varsayılanı; kullanıcı seçtiğinde
+  // aynı akış başka bir projede koşar (spec 007, 2026-08-12).
+  const [runProjectId, setRunProjectId] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Adım eklendiğinde tuval yeniden sığdırılır; yeni adım ekran dışında kalmasın.
   const [fitSignal, setFitSignal] = useState(0);
   const [runOffset, setRunOffset] = useState(0);
@@ -121,8 +134,25 @@ export default function WorkflowEditorPage() {
   });
 
   const start = useMutation({
-    mutationFn: () => api.workflows.start(id, input.trim()),
+    mutationFn: () => api.workflows.start(id, input.trim(), runProjectId || undefined),
     onSuccess: (run) => router.push(`/workflows/${id}/runs/${run.id}`),
+  });
+
+  const remove = useMutation({
+    mutationFn: () => api.workflows.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+      void qc.invalidateQueries({ queryKey: ["workflow-runs"] });
+      void qc.invalidateQueries({ queryKey: ["report"] });
+      router.push("/workflows");
+    },
+  });
+
+  // Proje listesi yalnızca çalıştırma kutusu için; akışın varsayılanı zaten
+  // kayıtta duruyor.
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.projects.list({ limit: 200 }),
   });
 
   const runs = useQuery({
@@ -304,10 +334,39 @@ export default function WorkflowEditorPage() {
               >
                 {save.isPending ? "Kaydediliyor…" : dirty ? "Kaydet" : "Kayıtlı"}
               </Button>
+              {/* Silme aynı grupta ama en sonda: durum eylemlerinin arasında
+                  değil, onların ardında. */}
+              <Button
+                variant="danger"
+                icon={<IconTrash className="size-4" />}
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`${wf.name} akışını sil`}
+              >
+                Sil
+              </Button>
             </div>
           </>
         }
       />
+
+      {confirmingDelete && (
+        <ConfirmStrip
+          className="mb-4 rounded-card border"
+          question="Bu akış silinsin mi?"
+          consequence={
+            wf.runCount > 0 ? (
+              <>
+                <strong>{wf.runCount} çalışma geçmişi</strong> de silinecek ve
+                raporlardan düşecek. Bu geri alınamaz.
+              </>
+            ) : undefined
+          }
+          busy={remove.isPending}
+          error={remove.isError ? describeError(remove.error).message : undefined}
+          onConfirm={() => remove.mutate()}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
 
       {generalProblems.length > 0 && (
         <Notice tone="error" title="Akış kaydedilemedi">
@@ -400,6 +459,30 @@ export default function WorkflowEditorPage() {
                 onChange={(e) => setInput(e.target.value)}
               />
             </label>
+
+            {/*
+              Proje burada seçilir, akışın kimliğinde değil: aynı süreç yirmi
+              projede işletilebilsin diye. Boş bırakılırsa akışın varsayılanı
+              kullanılır ve seçenek metninde hangisi olduğu YAZAR — kullanıcı
+              "varsayılan" deyip neye razı olduğunu bilmeli.
+            */}
+            <label className="block min-w-52">
+              <span className="text-2xs tracking-wide text-ink-2 uppercase">Proje</span>
+              <Select
+                className="mt-1"
+                value={runProjectId}
+                onChange={(e) => setRunProjectId(e.target.value)}
+              >
+                <option value="">Varsayılan · {wf.projectName}</option>
+                {projects.data?.items
+                  .filter((p) => p.id !== wf.projectId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </Select>
+            </label>
             <Button
               variant="primary"
               disabled={!canStart || start.isPending}
@@ -436,8 +519,19 @@ export default function WorkflowEditorPage() {
                 <div className="w-28 shrink-0">
                   <WorkflowRunBadge status={r.status} />
                 </div>
-                <div className="min-w-0 flex-1 truncate text-sm">
-                  {r.input || <span className="text-ink-3">görev metni yok</span>}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm">
+                    {r.input || <span className="text-ink-3">görev metni yok</span>}
+                  </div>
+                  {/* Proje YALNIZCA varsayılandan farklıysa yazılır: aynı
+                      değeri her satırda tekrarlamak, gerçekten başka bir
+                      projede koşan satırı görünmez yapardı. */}
+                  {r.projectId !== wf.projectId && (
+                    <div className="mt-0.5 flex items-center gap-1.5 text-2xs text-ink-3">
+                      <IconFolder className="size-3.5" />
+                      {r.projectName}
+                    </div>
+                  )}
                 </div>
                 <Badge>v{r.version}</Badge>
                 <span className="shrink-0 text-xs text-ink-3">

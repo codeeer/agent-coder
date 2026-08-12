@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
@@ -16,11 +16,12 @@ import {
   formatDuration,
   formatMoney,
 } from "@/components/charts/format";
-import { IconAgent, IconAlert, IconExternal } from "@/components/ui/icons";
+import { IconAgent, IconAlert, IconExternal, IconTrash } from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
+  ConfirmStrip,
   IconTile,
   Input,
   Metric,
@@ -35,7 +36,9 @@ import {
 
 export default function RunDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const {
     data: run,
@@ -58,6 +61,25 @@ export default function RunDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["runs"] });
     }
   }, [terminalStatus, id, queryClient]);
+
+  /*
+   * Silme.
+   *
+   * Mutasyon yükleme kontrolünün ÜSTÜNDE tanımlı: hook'lar koşullu return'den
+   * sonra çağrılamaz. Tetiklenmesi yalnızca kayıt geldikten sonra mümkün.
+   *
+   * Rapor anahtarı da tazelenir — maliyet ve token doğrudan bu satırdan
+   * toplanıyor, kayıt gidince geçmiş rakamlar da değişiyor.
+   */
+  const remove = useMutation({
+    mutationFn: () => api.runs.remove(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: ["report"] });
+      router.push("/runs");
+    },
+  });
 
   if (isPending) return <Skeleton rows={4} />;
   if (isError)
@@ -121,7 +143,7 @@ export default function RunDetailPage() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <RunActions run={run} />
+            <RunActions run={run} onConfirmDelete={() => setConfirmingDelete(true)} />
             <Link
               href="/runs"
               className="rounded text-xs text-ink-3 transition-colors hover:text-accent"
@@ -195,6 +217,34 @@ export default function RunDetailPage() {
             </p>
           </div>
         )}
+
+        {/*
+          Silme onayı künyenin içinde, tam genişlikte.
+
+          Sonucu SAYIYLA yazıyor: maliyet ve token doğrudan bu satırın
+          sütunlarında duruyor, ayrı bir özet tablo yok — kayıt gidince rapor
+          rakamları da o kadar azalıyor. "Emin misiniz?" bunu söylemezdi.
+        */}
+        {confirmingDelete && (
+          <ConfirmStrip
+            className="mt-4 rounded-lg border"
+            question="Bu çalıştırma kaydı silinsin mi?"
+            consequence={
+              <>
+                <strong>
+                  {formatMoney(run.costUsd)}
+                  {tokens > 0 && <> ve {formatCompact(tokens)} token</>}
+                </strong>{" "}
+                raporlardan düşecek; çıktı, diff ve olay geçmişi de gider. Bu
+                geri alınamaz.
+              </>
+            }
+            busy={remove.isPending}
+            error={remove.isError ? describeError(remove.error).message : undefined}
+            onConfirm={() => remove.mutate()}
+            onCancel={() => setConfirmingDelete(false)}
+          />
+        )}
       </Card>
 
       {/* Kayan bölge: künye sabit kalırken içerik kayıyor. */}
@@ -243,7 +293,17 @@ function durationOf(run: Run): string {
   return seconds > 0 ? formatDuration(seconds) : "—";
 }
 
-function RunActions({ run }: { run: Run }) {
+/**
+ * Çalıştırmanın kendi eylemleri.
+ *
+ * Süren işte tek eylem iptal; bitmiş işte gönderme ve silme birlikte
+ * durabilir. Silme İPTALİN YERİNE GEÇMEZ — süren bir kaydı silmek, kaydı
+ * olmayan bir container bırakırdı; o yüzden yalnızca bitmiş işte görünür.
+ */
+function RunActions({ run, onConfirmDelete }: {
+  run: Run;
+  onConfirmDelete: () => void;
+}) {
   const queryClient = useQueryClient();
   const [pushing, setPushing] = useState(false);
 
@@ -265,17 +325,35 @@ function RunActions({ run }: { run: Run }) {
     );
   }
 
-  if (run.diff && !run.pushedBranch) {
-    return pushing ? (
-      <PushForm run={run} onDone={() => setPushing(false)} />
-    ) : (
-      <Button variant="primary" onClick={() => setPushing(true)}>
-        Branch&apos;e gönder
-      </Button>
-    );
+  if (pushing) {
+    return <PushForm run={run} onDone={() => setPushing(false)} />;
   }
 
-  return null;
+  return (
+    <>
+      {run.diff && !run.pushedBranch && (
+        <Button variant="primary" onClick={() => setPushing(true)}>
+          Branch&apos;e gönder
+        </Button>
+      )}
+      {/* Akış adımları silinemez: kayıt gitse de akış geçmişinde maliyeti ve
+          agent'ı boşalmış bir adım kalırdı. Düğme gizlenmiyor, SEBEBİ
+          yazılıyor — gizlenen bir eylem kullanıcıya "yok" der, oysa var. */}
+      <Button
+        variant="danger"
+        icon={<IconTrash className="size-4" />}
+        disabled={run.workflowRunId !== null}
+        title={
+          run.workflowRunId !== null
+            ? "Bu çalıştırma bir akışın adımı — akış çalışmasını silin"
+            : undefined
+        }
+        onClick={onConfirmDelete}
+      >
+        Sil
+      </Button>
+    </>
+  );
 }
 
 function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {

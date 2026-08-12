@@ -128,3 +128,84 @@ Kimlik doğrulama v1'de yok; adresin kendisi anahtar olur. Adres yeniden üretil
 kendi kopyasında çalıştığı için teknik sorun yok; ancak ikisi de aynı branch'e
 göndermek isterse çakışır. Başlatırken "bu akışın çalışan bir örneği var" uyarısı
 gösterilir, engellenmez.
+
+## Karar geçmişi
+
+### 2026-08-12 — akışın projesi mühür değil, varsayılan oldu
+
+**Sorun.** Kullanıcı hikâyesi 1 "bir projeye bağlı akış tanımlayabilmeliyim"
+diyordu ve şema bunu harfiyen uyguluyordu: `workflows.project_id NOT NULL`,
+oluşturmada zorunlu, güncellemede değiştirilemez, çalıştırmada seçilemez.
+Çalışmanın projesi de kendi kaydında değil, akıştan JOIN ile okunuyordu.
+
+Sonuç: aynı süreci yirmi projede işletmek isteyen kullanıcı **yirmi ayrı akış
+kaydı** açmak zorundaydı. Tanım tekti, kayıt yirmi taneydi; biri güncellenip
+diğerleri unutulduğunda hangisinin doğru olduğu anlaşılmıyordu.
+
+**Karar.**
+
+1. **Akışın projesi VARSAYILAN oldu.** Sütun `NOT NULL` kaldı; kaldırılsaydı
+   Jira taraması, webhook ve MCP tetikleyicileri projesiz kalırdı — dışarıdan
+   gelen bir olayın hangi projeye ait olduğuna karar verecek bilgisi yok.
+   Onlar varsayılanı kullanmaya devam ediyor, yani mevcut kurulumların hiçbiri
+   değişmedi.
+
+2. **Proje çalıştırma anında değiştirilebiliyor.** `POST /api/workflows/{id}/runs`
+   gövdesi isteğe bağlı `projectId` alıyor; boşsa varsayılan kullanılıyor.
+   Geçersiz kimlik FK hatasına bırakılmıyor, 400/404 ile ayrıştırılıyor.
+
+3. **`workflow_runs.project_id` kendi sütunu oldu** (migration 000012). JOIN ile
+   akıştan okunmaya devam etseydi, akışın varsayılanı sonradan değiştirildiğinde
+   GEÇMİŞ çalışmaların projesi de geriye dönük değişirdi. Aynı sorun sürüm için
+   zaten `version_id` ile çözülmüştü; proje de aynı yere oturdu. Rapor
+   sorgularındaki proje süzgeci de bu sütuna çevrildi (`flowScope`) — akışın
+   varsayılanına bakılsaydı başka projede açılmış bir PR yanlış projenin
+   raporuna sayılırdı.
+
+4. **Proje ekranlarda görünür oldu.** Akış çalışma detayında ilk alan, "Son
+   çalışmalar" listesinde ise YALNIZCA varsayılandan farklıysa yazılıyor: her
+   satırda aynı değeri tekrarlamak, gerçekten başka bir projede koşan satırı
+   görünmez yapardı.
+
+**Kapsam dışı.** Düğüm başına proje seçimi eklenmedi; bir akışın adımlarının
+farklı projelerde koşması istenmiyor.
+
+### 2026-08-12 — akış ve çalıştırma kayıtları silinebiliyor
+
+**Sorun.** `DELETE /api/workflows/{id}` yazılmıştı ama arayüzde düğmesi yoktu ve
+hiç çalıştırılmamış görünüyordu; kullanıcı biriken akışları temizleyemiyordu.
+Tekil çalıştırmalar için ise silme hiç yoktu.
+
+**Ölçüm önce yapıldı.** `workflow_runs.version_id` **ON DELETE RESTRICT**
+taşıyor ve `workflows` silinince hem `workflow_versions` hem `workflow_runs`
+CASCADE'leniyor; sürüm kaskadı önce koşarsa silmenin FK ihlaliyle düşmesi
+bekleniyordu. Geri alınan bir işlemle gerçek veritabanında denendi: **düşmüyor**,
+çalışması olan bir akış sorunsuz siliniyor. Kısıt değiştirilmedi; davranış
+`TestDelete_GecmisiBirlikteGider` ile kilitlendi.
+
+**Karar.**
+
+1. **Süren çalışması olan akış silinmiyor** (409). Silinseydi kayıt giderdi ama
+   motorun goroutine'i yaşamaya devam ederdi: sonraki yazmalar sessizce 0 satır
+   etkiler, container kaydı olmayan bir işi çalıştırmayı sürdürürdü. Zaten
+   tanımlı ama hiç kullanılmayan `ErrRunning` sabiti bu iş için kullanıldı.
+
+2. **Çalıştırma silme yalnızca bitmiş kayıtlarda.** "Çalışıyor mu" sorusunun tek
+   doğru kaynağı veritabanı değil: iptal asenkron, `Cancel` hemen dönerken
+   container silme ve durum yazımı arka planda sürüyor. Bu yüzden kapı
+   `Manager`'da ve hem DB durumuna hem bellekteki canlı iş listesine bakıyor.
+
+3. **Akış adımı olan çalıştırma silinmiyor** (409). `workflow_steps.run_id`
+   ON DELETE SET NULL: kayıt gitse de adım "başarılı" görünmeye devam eder ama
+   agent'ı, modeli, maliyeti ve token'ı boşalır — akış geçmişinde sessiz bir
+   delik açılırdı. Kullanıcı akış çalışmasını siler, tek adımını değil.
+
+4. **Sonuç onayda SAYIYLA yazılıyor.** Maliyet ve token doğrudan `runs`
+   satırının sütunlarında; ayrı bir özet tablo yok, yani silme geçmiş raporları
+   gerçekten ve geri alınamaz biçimde değiştiriyor. Onay şeridi bunu
+   "$0,0041 ve 7,4 B token raporlardan düşecek" gibi somut yazıyor —
+   "emin misiniz?" bunu söylemezdi. Tarayıcıda ölçüldü: silme sonrası rapor
+   toplamı tam o kadar düştü.
+
+**Kapsam dışı.** Toplu silme, arşivleme (soft delete) ve `workflow_runs` için
+ayrı bir silme ucu eklenmedi.

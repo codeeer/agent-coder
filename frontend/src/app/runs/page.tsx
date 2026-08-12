@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
@@ -14,9 +14,10 @@ import {
   formatDuration,
   formatMoney,
 } from "@/components/charts/format";
-import { IconAgent, IconAlert, IconEdit } from "@/components/ui/icons";
+import { IconAgent, IconAlert, IconEdit, IconTrash } from "@/components/ui/icons";
 import {
   Badge,
+  Button,
   Card,
   EmptyState,
   Notice,
@@ -333,7 +334,12 @@ function RunTable({ items }: { items: Run[] }) {
               <th className="w-20 py-2.5 text-right font-medium">Süre</th>
               <th className="w-20 py-2.5 text-right font-medium">Token</th>
               <th className="w-24 py-2.5 text-right font-medium">Maliyet</th>
-              <th className="w-28 py-2.5 pr-4 text-right font-medium">Başlatıldı</th>
+              <th className="w-28 py-2.5 text-right font-medium">Başlatıldı</th>
+              {/* Başlıksız sütun: "Eylem" yazmak her satırda tek bir ikon
+                  duran bir sütuna gereksiz bir kademe eklerdi. */}
+              <th className="w-14 py-2.5 pr-4">
+                <span className="sr-only">Eylemler</span>
+              </th>
             </tr>
           </thead>
 
@@ -422,8 +428,12 @@ function RunTable({ items }: { items: Run[] }) {
                     {run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
                   </td>
 
-                  <td className="py-2.5 pr-4 text-right align-top text-xs text-ink-3">
+                  <td className="py-2.5 text-right align-top text-xs text-ink-3">
                     {formatRelative(run.createdAt)}
+                  </td>
+
+                  <td className="py-2.5 pr-4 align-top">
+                    <DeleteRunButton run={run} />
                   </td>
                 </tr>
               );
@@ -473,12 +483,85 @@ function RunTable({ items }: { items: Run[] }) {
               <td className="py-2 pr-4 text-right font-mono font-medium tabular-nums">
                 {totals.cost > 0 ? formatMoney(totals.cost) : "—"}
               </td>
+              <td className="py-2" />
               <td className="py-2 pr-4" />
             </tr>
           </tfoot>
         </table>
       </div>
     </Card>
+  );
+}
+
+/**
+ * Satır içi silme.
+ *
+ * Düğme, silinemeyen satırlarda GİZLENMİYOR — pasifleşiyor ve sebebi
+ * `title`'da yazıyor. Gizlemek kullanıcıya "böyle bir eylem yok" derdi;
+ * oysa eylem var, o satırda geçerli değil.
+ *
+ * Onay satırın kendisinde açılamaz (bir `<tr>` içine şerit sığmaz), bu yüzden
+ * düğme iki adımlı: birinci tık soruyu, ikinci tık silmeyi yapar. Aradaki
+ * "Vazgeç" için satırın dışına tıklamak yeterli değil, bu yüzden soru
+ * durumunda düğme metni açıkça "Silinsin mi?" diyor.
+ */
+function DeleteRunButton({ run }: { run: Run }) {
+  const qc = useQueryClient();
+  const [asking, setAsking] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: () => api.runs.remove(run.id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["runs"] });
+      void qc.invalidateQueries({ queryKey: ["projects"] });
+      void qc.invalidateQueries({ queryKey: ["report"] });
+    },
+    onSettled: () => setAsking(false),
+  });
+
+  const engel = isActive(run.status)
+    ? "Çalıştırma sürüyor — önce iptal edin"
+    : run.workflowRunId !== null
+      ? "Bu çalıştırma bir akışın adımı — akış çalışmasını silin"
+      : null;
+
+  if (engel) {
+    return (
+      <Button size="sm" variant="danger" disabled title={engel} aria-label={engel}>
+        <IconTrash className="size-4" />
+      </Button>
+    );
+  }
+
+  if (asking) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate()}
+        >
+          {remove.isPending ? "…" : "Sil"}
+        </Button>
+        <Button size="sm" onClick={() => setAsking(false)}>
+          Vazgeç
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      variant="danger"
+      onClick={() => setAsking(true)}
+      aria-label="Bu çalıştırmayı sil"
+      title={`Sil — ${formatMoney(run.costUsd)} raporlardan düşecek`}
+      className="opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+    >
+      <IconTrash className="size-4" />
+    </Button>
   );
 }
 

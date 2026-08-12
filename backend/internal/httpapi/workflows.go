@@ -63,7 +63,41 @@ func (h *Handler) listWorkflows(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "internal_error", "akışlar okunamadı")
 		return
 	}
-	respondJSON(w, http.StatusOK, paged(items, total, page))
+
+	out, err := h.withRunCounts(r.Context(), items)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "çalışma sayıları okunamadı", "error", err)
+		respondError(w, http.StatusInternalServerError, "internal_error", "akışlar okunamadı")
+		return
+	}
+	respondJSON(w, http.StatusOK, paged(out, total, page))
+}
+
+// workflowResponse, akışa silme onayı için çalışma sayısını ekler.
+//
+// Kullanıcı bir akışı silerken geçmişinin de gideceğini SİLMEDEN ÖNCE
+// görmeli; sayı olmadan onay penceresi ne kaybedildiğini söyleyemez.
+type workflowResponse struct {
+	workflow.Workflow
+	RunCount int `json:"runCount"`
+}
+
+func (h *Handler) withRunCounts(ctx contextT, items []workflow.Workflow) (
+	[]workflowResponse, error,
+) {
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	counts, err := h.deps.Workflows.RunCounts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]workflowResponse, 0, len(items))
+	for _, it := range items {
+		out = append(out, workflowResponse{Workflow: it, RunCount: counts[it.ID]})
+	}
+	return out, nil
 }
 
 func (h *Handler) createWorkflow(w http.ResponseWriter, r *http.Request) {
@@ -114,10 +148,18 @@ func (h *Handler) getWorkflow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Etkin sürümün grafı da döner: düzenleme ekranı ayrı bir istek atmasın.
+	// Çalışma sayısı da: editördeki silme onayı da ne kaybedileceğini yazmalı.
 	resp := struct {
-		workflow.Workflow
+		workflowResponse
 		Graph *workflow.Graph `json:"graph"`
-	}{Workflow: wf}
+	}{workflowResponse: workflowResponse{Workflow: wf}}
+
+	counts, err := h.deps.Workflows.RunCounts(r.Context(), []uuid.UUID{id})
+	if err != nil {
+		h.respondWorkflowError(w, r, err)
+		return
+	}
+	resp.RunCount = counts[id]
 
 	if wf.ActiveVersionID != nil {
 		v, err := h.deps.Workflows.Version(r.Context(), *wf.ActiveVersionID)
@@ -178,6 +220,7 @@ func (h *Handler) deleteWorkflow(w http.ResponseWriter, r *http.Request) {
 		h.respondWorkflowError(w, r, err)
 		return
 	}
+	slog.InfoContext(r.Context(), "akış silindi", "id", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -335,6 +378,9 @@ func (h *Handler) respondWorkflowError(w http.ResponseWriter, r *http.Request, e
 			"akışın kayıtlı bir tanımı yok — önce adımları kaydedin")
 	case errors.Is(err, workflow.ErrNotRunning):
 		respondError(w, http.StatusConflict, "not_running", "akış zaten bitmiş")
+	case errors.Is(err, workflow.ErrRunning):
+		respondError(w, http.StatusConflict, "workflow_running",
+			"akışın süren bir çalışması var — önce onu durdurun")
 	default:
 		slog.ErrorContext(r.Context(), "akış işlemi başarısız", "error", err)
 		respondError(w, http.StatusInternalServerError, "internal_error", "işlem tamamlanamadı")

@@ -10,11 +10,12 @@ import {
   WorkflowRunBadge,
   isWorkflowActive,
 } from "@/components/workflows/WorkflowStatusBadge";
-import { IconFolder, IconPlus, IconWorkflow } from "@/components/ui/icons";
+import { IconFolder, IconPlus, IconTrash, IconWorkflow } from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
+  ConfirmStrip,
   EmptyState,
   IconTile,
   Input,
@@ -177,58 +178,9 @@ export default function WorkflowsPage() {
 
         {items.length > 0 && (
           <div className="space-y-2.5">
-          {items.map((w) => (
-            /* Kartın TAMAMI bağlantı: satırın sonundaki "Aç" düğmesi hem
-               gereksiz bir tıklama hedefi hem de her satırda tekrar eden
-               görsel gürültüydü — kartın kendisi zaten oraya götürüyor. */
-            <Link
-              key={w.id}
-              href={`/workflows/${w.id}`}
-              className="flex items-center gap-4 rounded-card border border-line bg-surface p-3.5 shadow-(--shadow-card) transition-colors hover:border-line-strong hover:bg-raised"
-            >
-              {/*
-                Karo, satırın kimlik işareti. Rengi akışın kimliğinden
-                türetiliyor ve sabit kalıyor: kullanıcı ikinci sayfada da
-                aradığı akışı aynı renkte buluyor. Karo DURUM ANLATMAZ —
-                onu sağdaki rozet söylüyor.
-              */}
-              <IconTile tone={toneFromKey(w.id)}>
-                <IconWorkflow className="size-4" />
-              </IconTile>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-sm font-semibold tracking-[-0.01em]">
-                    {w.name}
-                  </span>
-                  {/* "tanımsız" ne olduğu belirsizdi; "taslak" bir sonraki
-                     adımı da söylüyor: henüz kaydedilmemiş bir akış. */}
-                  {!w.activeVersion && <Badge tone="warning">taslak</Badge>}
-                  {!w.isActive && <Badge tone="warning">duraklatıldı</Badge>}
-                </div>
-
-                {w.description && (
-                  <p className="mt-0.5 truncate text-xs text-ink-2">{w.description}</p>
-                )}
-
-                <p className="mt-1 flex items-center gap-1.5 text-2xs text-ink-3">
-                  <IconFolder className="size-3.5" />
-                  {w.projectName}
-                </p>
-              </div>
-
-              {/* Rozet tek başına "akış başarısız" gibi okunuyordu; başına
-                 "son çalışma" yazınca neyin durumu olduğu belli oluyor. */}
-              {w.lastRun && (
-                <div className="flex shrink-0 items-center gap-3 text-2xs text-ink-3">
-                  <span className="hidden sm:inline">
-                    son çalışma {formatRelative(w.lastRun.createdAt)}
-                  </span>
-                  <WorkflowRunBadge status={w.lastRun.status} />
-                </div>
-              )}
-            </Link>
-          ))}
+            {items.map((w) => (
+              <WorkflowRow key={w.id} workflow={w} />
+            ))}
           </div>
         )}
       </div>
@@ -263,6 +215,121 @@ export default function WorkflowsPage() {
   );
 }
 
+/**
+ * Liste satırı.
+ *
+ * Bağlantı satırın TAMAMINI değil içeriğini sarar; silme düğmesi kardeş
+ * hücrede durur. Bir `<a>` içine `<button>` konamaz (geçersiz HTML) ve satırı
+ * bütünüyle bağlantı bırakmak silmeyi imkânsız kılardı. Aynı ayrım
+ * Çalıştırmalar tablosunda da var.
+ *
+ * Düğme durgunken görünmez (`sm:opacity-0`): her satırda duran bir silme
+ * düğmesi, listenin asıl işi olan "aç"ın önüne geçerdi. Odakla da beliriyor —
+ * klavyeyle gezen kullanıcı için görünmezlik erişilemezlik olmamalı. Dar
+ * ekranda hover yok, bu yüzden orada hep görünür.
+ */
+function WorkflowRow({ workflow: w }: { workflow: Workflow }) {
+  const qc = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: () => api.workflows.remove(w.id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+      // Akış çalışmaları ve raporlar da bu akışın geçmişini gösteriyordu.
+      void qc.invalidateQueries({ queryKey: ["workflow-runs"] });
+      void qc.invalidateQueries({ queryKey: ["report"] });
+      setConfirming(false);
+    },
+  });
+
+  return (
+    <div className="group overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card) transition-colors hover:border-line-strong">
+      <div className="flex items-center gap-4 p-3.5">
+        <Link
+          href={`/workflows/${w.id}`}
+          className="flex min-w-0 flex-1 items-center gap-4 rounded transition-colors"
+        >
+          {/*
+            Karo, satırın kimlik işareti. Rengi akışın kimliğinden
+            türetiliyor ve sabit kalıyor: kullanıcı ikinci sayfada da
+            aradığı akışı aynı renkte buluyor. Karo DURUM ANLATMAZ —
+            onu sağdaki rozet söylüyor.
+          */}
+          <IconTile tone={toneFromKey(w.id)}>
+            <IconWorkflow className="size-4" />
+          </IconTile>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="truncate text-sm font-semibold tracking-[-0.01em]">
+                {w.name}
+              </span>
+              {/* "tanımsız" ne olduğu belirsizdi; "taslak" bir sonraki
+                 adımı da söylüyor: henüz kaydedilmemiş bir akış. */}
+              {!w.activeVersion && <Badge tone="warning">taslak</Badge>}
+              {!w.isActive && <Badge tone="warning">duraklatıldı</Badge>}
+            </div>
+
+            {w.description && (
+              <p className="mt-0.5 truncate text-xs text-ink-2">{w.description}</p>
+            )}
+
+            {/* "varsayılan": akış artık tek bir projeye mühürlü değil,
+               çalıştırırken başka bir proje seçilebiliyor. */}
+            <p className="mt-1 flex items-center gap-1.5 text-2xs text-ink-3">
+              <IconFolder className="size-3.5" />
+              varsayılan {w.projectName}
+            </p>
+          </div>
+
+          {/* Rozet tek başına "akış başarısız" gibi okunuyordu; başına
+             "son çalışma" yazınca neyin durumu olduğu belli oluyor. */}
+          {w.lastRun && (
+            <div className="flex shrink-0 items-center gap-3 text-2xs text-ink-3">
+              <span className="hidden sm:inline">
+                son çalışma {formatRelative(w.lastRun.createdAt)}
+              </span>
+              <WorkflowRunBadge status={w.lastRun.status} />
+            </div>
+          )}
+        </Link>
+
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() => setConfirming(true)}
+          aria-label={`${w.name} akışını sil`}
+          className="shrink-0 opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+        >
+          <IconTrash className="size-4" />
+        </Button>
+      </div>
+
+      {confirming && (
+        <ConfirmStrip
+          className="border-t"
+          question="Bu akış silinsin mi?"
+          consequence={
+            w.runCount > 0 ? (
+              <>
+                <strong>
+                  {w.runCount} çalışma geçmişi
+                </strong>{" "}
+                de silinecek ve raporlardan düşecek. Bu geri alınamaz.
+              </>
+            ) : undefined
+          }
+          busy={remove.isPending}
+          error={remove.isError ? describeError(remove.error).message : undefined}
+          onConfirm={() => remove.mutate()}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 /** Yeni akış formu. Akış önce boş oluşur, adımları düzenleme ekranından eklenir. */
 function CreateForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
@@ -285,7 +352,7 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     return (
       <Card className="mb-5">
         <Notice tone="warning">
-          Akış bir projeye bağlıdır. Önce bir proje tanımlayın.{" "}
+          Akışın bir varsayılan projesi olmalı. Önce bir proje tanımlayın.{" "}
           <Link href="/projects" className="underline">
             Projeler
           </Link>
@@ -307,7 +374,9 @@ function CreateForm({ onDone }: { onDone: () => void }) {
       >
         <div className="flex flex-wrap gap-3">
           <label className="block min-w-56 flex-1">
-            <span className="text-2xs tracking-wide text-ink-2 uppercase">Proje</span>
+            <span className="text-2xs tracking-wide text-ink-2 uppercase">
+              Varsayılan proje
+            </span>
             <Select
               className="mt-1"
               value={projectId}

@@ -303,6 +303,44 @@ func (m *Manager) Cancel(id uuid.UUID) error {
 	return nil
 }
 
+// Running, işin BU SÜREÇTE hâlâ canlı olup olmadığı.
+//
+// Veritabanındaki durum tek başına yetmez: iptal asenkron. `Cancel` hemen
+// döner ama container'ın silinmesi ve `status='cancelled'` yazımı arka planda
+// sürer. Yalnızca DB'ye bakılsaydı iptalden hemen sonraki bir silme, hâlâ
+// koşan goroutine ile yarışırdı — o goroutine silinmiş kayda `UPDATE` atar
+// (sessizce 0 satır), olay yazarken de FK ihlaline düşerdi.
+func (m *Manager) Running(id uuid.UUID) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.cancels[id]
+	return ok
+}
+
+// Delete, bitmiş bir çalıştırma kaydını siler.
+//
+// Silme kapısı Manager'da: "çalışıyor mu" sorusunun iki kaynağı var (DB durumu
+// ve bellekteki canlı iş listesi) ve ikisine birden yalnızca burası bakabilir.
+func (m *Manager) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.Running(id) {
+		return ErrActive
+	}
+	if err := m.store.Delete(ctx, id); err != nil {
+		return err
+	}
+	// Açık SSE bağlantıları kapansın: kayıt gittiği için artık hiçbir olay
+	// gelmeyecek ve abone 25 sn'lik ping'lerle sonsuza kadar beklerdi.
+	//
+	// Veritabanına YAZILMAZ — yazılacak satır kalmadı; bu yalnızca o an bağlı
+	// olanlara "bitti, kapat" demek için.
+	m.bus.Publish(id, events.Event{
+		Level: "info", Message: "çalıştırma kaydı silindi",
+		TS:       time.Now().UTC().Format(time.RFC3339),
+		Terminal: true,
+	})
+	return nil
+}
+
 // Active, o an çalışan iş sayısı.
 func (m *Manager) Active() int {
 	m.mu.Lock()

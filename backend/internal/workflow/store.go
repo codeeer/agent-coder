@@ -134,9 +134,13 @@ type Run struct {
 	ID           uuid.UUID `json:"id"`
 	WorkflowID   uuid.UUID `json:"workflowId"`
 	WorkflowName string    `json:"workflowName"`
-	ProjectID    uuid.UUID `json:"projectId"`
-	VersionID    uuid.UUID `json:"versionId"`
-	Version      int       `json:"version"`
+	// Proje çalışmanın kendi kaydından gelir; akışınki yalnızca varsayılan.
+	// Aynı akış farklı projelerde koşabildiği için hangisinde koştuğu ekranda
+	// görünmek zorunda — bu yüzden ad da taşınıyor.
+	ProjectID   uuid.UUID `json:"projectId"`
+	ProjectName string    `json:"projectName"`
+	VersionID   uuid.UUID `json:"versionId"`
+	Version     int       `json:"version"`
 
 	Status         RunStatus         `json:"status"`
 	TriggerKind    TriggerKind       `json:"triggerKind"`
@@ -358,8 +362,22 @@ func (s *Store) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (Workf
 	return s.Get(ctx, id)
 }
 
-// Delete, akışı ve ona bağlı her şeyi siler.
+// Delete, akışı ve ona bağlı her şeyi siler: sürümler, çalışmalar, adımlar,
+// hook ve Jira tarama durumu (hepsi CASCADE).
+//
+// SÜREN ÇALIŞMASI OLAN AKIŞ SİLİNMEZ. Silinseydi kayıt giderdi ama motorun
+// goroutine'i yaşamaya devam ederdi: sonraki `MarkStepRunning`/`FinishRun`
+// yazmaları sessizce 0 satır etkiler, container ise kaydı olmayan bir işi
+// çalıştırmayı sürdürürdü. Kullanıcı önce durdurur, sonra siler.
 func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
+	active, err := s.ActiveRuns(ctx, id)
+	if err != nil {
+		return err
+	}
+	if active > 0 {
+		return ErrRunning
+	}
+
 	tag, err := s.pool.Exec(ctx, `DELETE FROM workflows WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("akış silinemedi: %w", err)
@@ -368,6 +386,40 @@ func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// RunCounts, akış başına toplam çalışma sayısı — silmeden önce kullanıcıya ne
+// kaybedeceği söylenebilsin diye.
+//
+// TEK sorgu: `lastRuns` ile aynı toplu kalıp. Akış başına sorgu atmak listede
+// N+1 olurdu.
+func (s *Store) RunCounts(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int, error) {
+	out := map[uuid.UUID]int{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.pool.Query(ctx,
+		`SELECT workflow_id, count(*) FROM workflow_runs
+		  WHERE workflow_id = ANY($1) GROUP BY workflow_id`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("çalışma sayıları okunamadı: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id uuid.UUID
+			n  int
+		)
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("çalışma sayısı taranamadı: %w", err)
+		}
+		out[id] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("çalışma sayıları okunamadı: %w", err)
+	}
+	return out, nil
 }
 
 /* ── Sürümler ────────────────────────────────────────────────────────────── */

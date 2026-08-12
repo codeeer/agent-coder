@@ -41,6 +41,8 @@ var (
 	ErrNoChanges     = errors.New("gönderilecek değişiklik yok")
 	ErrAlreadyPushed = errors.New("bu çalıştırma zaten gönderilmiş")
 	ErrNoGitAccess   = errors.New("projede git erişimi tanımlı değil")
+	ErrActive        = errors.New("çalıştırma hâlâ sürüyor")
+	ErrWorkflowStep  = errors.New("çalıştırma bir akış adımı")
 )
 
 // Run, bir agent çalıştırması.
@@ -381,4 +383,54 @@ func (s *Store) Events(ctx context.Context, runID uuid.UUID) ([]StoredEvent, err
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// Delete, bir çalıştırma kaydını kalıcı olarak siler.
+//
+// GERİ ALINAMAZ ve yalnızca kaydı silmez: maliyet, token ve değişen dosya
+// sayıları doğrudan bu satırın sütunlarında duruyor, ayrı bir özet tablo yok.
+// Yani rapor ekranındaki geçmiş rakamlar da o kadar azalır. Kullanıcıya bunu
+// silmeden önce söylemek arayüzün işi.
+//
+// Olay geçmişi `run_events` üzerinden CASCADE ile gider (migration 000003).
+//
+// İki durumda reddedilir:
+//
+//   - AKIŞ ADIMI ise. `workflow_steps.run_id` ON DELETE SET NULL: kayıt gitse
+//     de adım "başarılı" görünmeye devam eder ama agent'ı, modeli, maliyeti ve
+//     token'ı boşalır — akış geçmişinde sessiz bir delik açılır. Kullanıcı akış
+//     çalışmasını silmeli, tek adımını değil.
+//   - SÜRÜYORSA. Burada DB durumuna bakılır ama bu tek başına yetmez: iptal
+//     asenkron olduğu için `Manager` katmanı ayrıca bellekteki canlı iş
+//     listesine de bakar (bkz. Manager.Running).
+func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
+	var (
+		status     Status
+		isWorkflow bool
+	)
+	err := s.pool.QueryRow(ctx, `
+		SELECT r.status,
+		       EXISTS (SELECT 1 FROM workflow_steps st WHERE st.run_id = r.id)
+		  FROM runs r WHERE r.id = $1`, id).Scan(&status, &isWorkflow)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("çalıştırma okunamadı: %w", err)
+	}
+	if isWorkflow {
+		return ErrWorkflowStep
+	}
+	if !status.Terminal() {
+		return ErrActive
+	}
+
+	tag, err := s.pool.Exec(ctx, `DELETE FROM runs WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("çalıştırma silinemedi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

@@ -29,6 +29,11 @@ type LaunchInput struct {
 	Trigger    TriggerKind
 	Payload    map[string]string
 	Input      string
+
+	// ProjectID boş bırakılabilir: o zaman akışın varsayılan projesi kullanılır.
+	// Tetikleyiciler (Jira, webhook, MCP) hep böyle çağırır — dışarıdan gelen
+	// bir olayın hangi projeye ait olduğuna karar verecek bir bilgisi yok.
+	ProjectID uuid.UUID
 }
 
 // Launch, akışı başlatır ve hemen döner.
@@ -48,6 +53,7 @@ func (l *Launcher) Launch(ctx context.Context, in LaunchInput) (Run, error) {
 	run, err := l.store.CreateRun(ctx, CreateRunInput{
 		Workflow: wf, Version: version,
 		Trigger: in.Trigger, Payload: in.Payload, Input: in.Input,
+		ProjectID: in.ProjectID,
 	})
 	if err != nil {
 		return Run{}, err
@@ -57,7 +63,8 @@ func (l *Launcher) Launch(ctx context.Context, in LaunchInput) (Run, error) {
 
 	slog.InfoContext(ctx, "akış başlatıldı",
 		"workflow_id", in.WorkflowID, "workflow_run_id", run.ID,
-		"version", run.Version, "trigger", in.Trigger)
+		"version", run.Version, "trigger", in.Trigger,
+		"project_id", run.ProjectID)
 	return run, nil
 }
 
