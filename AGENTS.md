@@ -41,7 +41,8 @@ Bu dosya projenin tek kural kaynağıdır. Claude Code ve opencode aynı dosyay�
                                                           └──────────────────┘
 ```
 
-- **frontend** — Next.js 15 App Router, TypeScript strict, Tailwind + shadcn/ui,
+- **frontend** — Next.js 15 App Router, TypeScript strict, Tailwind + kendi bileşen
+  katmanı (`components/ui/primitives.tsx` — shadcn/ui KULLANILMIYOR),
   `@xyflow/react` tuvali, TanStack Query, SSE ile canlı run takibi.
 - **backend** — Go. Workflow DAG motoru, run/step state, sandbox orkestrasyonu,
   entegrasyonlar (Jira, git sağlayıcılar), çoklu sağlayıcı model kataloğu ve maliyet hesabı.
@@ -591,6 +592,14 @@ Faz listesi ve doğrulama adımları:
 [plans/01-mimari-ve-yol-haritasi-2026-08-09.md](plans/01-mimari-ve-yol-haritasi-2026-08-09.md)
 
 ## Visual Design / UI Redesign
+
+> **Bir ekranı yeniden tasarlarken önce şunu okuyun:**
+> [.claude/rules/ui.md](.claude/rules/ui.md) — süreç, tasarım ilkeleri,
+> bileşen ve ikon kuralları, iki temanın ayrı ayrı değerlendirilmesi,
+> uydurulmayacak veriler ve doğrulama listesi.
+>
+> Buradaki bölüm ne zaman devreye girdiğini söyler; o dosya nasıl
+> yapılacağını.
 
 Kullanıcı bir screenshot, mockup veya visual reference sağladığında
 ve bunu mevcut UI'ın tasarım referansı olarak verdiğinde, bu referansı

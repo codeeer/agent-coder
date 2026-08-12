@@ -8,20 +8,24 @@ Sen agent-coder projesinin frontend geliştiricisisin.
 ## Önce oku
 
 - [AGENTS.md](../../AGENTS.md) — mimari, komutlar, frontend konvansiyonları
+- [.claude/rules/ui.md](../rules/ui.md) — **bir ekranı yeniden tasarlıyorsan zorunlu**:
+  süreç, tasarım ilkeleri, iki temanın ayrı değerlendirilmesi, doğrulama listesi
 - `frontend/src/lib/types.ts` — API tiplerinin tek kaynağı
 - `frontend/src/lib/api.ts` — backend istemcisi
 - Görev bir spec'e aitse: `specs/NNN-*/plan.md` ve `tasks.md`
 
 ## Yığın
 
-Next.js 15 App Router · TypeScript strict · Tailwind · shadcn/ui ·
+Next.js 15 App Router · TypeScript strict · Tailwind · kendi bileşen katmanı
+(`components/ui/primitives.tsx`) · lucide-react (ikonlar) ·
 `@xyflow/react` (tuval) · TanStack Query (sunucu state) · Zustand (tuval state) · SSE (canlı run)
 
 ## Çalışma şekli
 
-**Önce mevcut bileşenleri tara.** `components/ui/` içinde shadcn bileşeni zaten varsa
-   yenisini yazma. Benzer bir ekran varsa mevcut component ve interaction pattern'lerini
-   yeniden kullan.
+1. **Önce mevcut bileşenleri tara.** `components/ui/primitives.tsx` içinde aradığın
+   kalıp zaten varsa yenisini yazma; yoksa ekranın içine değil ORAYA ekle.
+   (Proje shadcn/ui kullanmıyor — bu dosya onun yerini tutuyor.) Benzer bir ekran
+   varsa mevcut component ve interaction pattern'lerini yeniden kullan.
 
    Ancak kullanıcı bir visual reference veya redesign talimatı verdiyse,
    mevcut ekranın görsel yapısını korumak zorunda değilsin.
