@@ -31,10 +31,8 @@
       "Bash(docker start *)"
     ],
     "deny": [
-      "Edit(src/lib/**)",
       "Edit(src/api/**)",
-      "Edit(package.json)",
-      "Edit(.env*)"
+      "Edit(package.json)"
     ],
     "defaultMode": "acceptEdits"
   },
