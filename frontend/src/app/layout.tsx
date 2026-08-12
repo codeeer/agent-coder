@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { QueryProvider } from "@/lib/query-provider";
-import { apiConfigScript, serverApiUrl } from "@/lib/runtime-config";
+import {
+  apiConfigScript,
+  serverApiUrl,
+  serverAppName,
+} from "@/lib/runtime-config";
 import { themeBootstrapScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -25,11 +29,22 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-export const metadata: Metadata = {
-  title: "Agent Coder",
-  description:
-    "Kod yazan agent'ları akışlara bağlayıp çalıştıran platform",
-};
+/*
+ * Başlık sabit DEĞİL: ürün adı `APP_NAME` ile değiştirilebiliyor ve sekmede de
+ * onun görünmesi gerekiyor. `metadata` sabiti bunu yapamaz — modül yüklenirken
+ * bir kez okunur; `generateMetadata` ise `force-dynamic` sayesinde her istekte
+ * çalışır.
+ *
+ * `template`, alt sayfaların markayı kendilerinin yazmasını gereksiz kılar:
+ * "Nasıl çalışır" başlığı sekmede "Nasıl çalışır · <ad>" olarak çıkar.
+ */
+export function generateMetadata(): Metadata {
+  const ad = serverAppName();
+  return {
+    title: { default: ad, template: `%s · ${ad}` },
+    description: "Kod yazan agent'ları akışlara bağlayıp çalıştıran platform",
+  };
+}
 
 /*
  * force-dynamic: API adresi HER İSTEKTE ortamdan okunmalı.
@@ -63,7 +78,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <QueryProvider>
-          <AppShell>{children}</AppShell>
+          {/* Ürün adı prop olarak iniyor, sayfaya betikle yazılmıyor.
+              Kenar çubuğu bir istemci bileşeni: `window`'dan okusaydı sunucu
+              varsayılanı, istemci gerçek adı basar ve metin hydration'da
+              uyuşmazdı. */}
+          <AppShell appName={serverAppName()}>{children}</AppShell>
         </QueryProvider>
       </body>
     </html>

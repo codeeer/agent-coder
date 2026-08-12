@@ -125,6 +125,33 @@ API adresi ve sunucunun CORS ayarı bu değerlerden **kendiliğinden** üretilir
 > Portu kullanan şeyi merak ederseniz: `lsof -i :3002` (macOS/Linux),
 > `netstat -ano | findstr :3002` (Windows).
 
+### Ürün adını değiştirmek
+
+Sol üstteki kelime markası ve tarayıcı sekmesi `.env` içinden değiştirilir:
+
+```env
+APP_NAME=Şirket AI
+```
+
+Sonra `make restart`. Vermezseniz **"Agent Coder"** yazmaya devam eder.
+
+Compose'u elle çalıştırıyorsanız komutun başına da yazabilirsiniz:
+
+```bash
+APP_NAME="Şirket AI" docker compose --project-directory "$PWD" \
+  -f deploy/docker-compose.yml -f deploy/docker-compose.ghcr.yml up -d
+```
+
+> Adres gibi bu değer de arayüz imajına **gömülmez** — aynı hazır imaj her
+> markayla çalışır, yeniden derleme gerekmez. Kenar çubuğuna ~20 karakter
+> sığar; daha uzun adlar üç noktayla kırpılır ve tamamı üzerine gelince
+> görünür.
+>
+> Belgelerdeki anlatım metinleri ("Nasıl çalışır" sayfası, ayarlardaki
+> açıklamalar) eski adı kullanmaya devam eder: Türkçede ek uyumu son ünlüye
+> göre değişiyor (*Coder'ı* ama *Panel'i*), değişkenden gelen bir adı o
+> cümlelere yerleştirmek dilbilgisini bozardı.
+
 ### Sunucuya kurulum
 
 Kendi bilgisayarınızda çalıştıracaksanız **bu bölümü atlayın.**

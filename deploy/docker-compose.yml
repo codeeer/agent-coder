@@ -104,6 +104,15 @@ services:
       # okumayı derleme anında metne çeviriyor (sunucu bileşeninde bile). O adı
       # taşısaydı çalışma anında okuduğumuzu sanırken derleme değerini gömerdik.
       API_URL: ${NEXT_PUBLIC_API_URL:-http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}}
+      # Arayüzde görünen ürün adı — kelime markası ve sekme başlığı.
+      #
+      # Buraya varsayılan YAZILMAZ; boş geçilir ve arayüz kendi varsayılanına
+      # ("Agent Coder", frontend/src/lib/runtime-config.ts) düşer. İki yerde iki
+      # varsayılan tutulsaydı er geç ayrışırlardı.
+      #
+      # API_URL gibi NEXT_PUBLIC_ öneksiz: değer imaja gömülmez, aynı imaj her
+      # markayla çalışır.
+      APP_NAME: ${APP_NAME:-}
     ports:
       - "${FRONTEND_PORT:-3002}:3000"
     networks:

@@ -1,5 +1,5 @@
 /**
- * Çalışma anı yapılandırması — API adresi.
+ * Çalışma anı yapılandırması — API adresi ve ürün adı.
  *
  * NEDEN VAR: `NEXT_PUBLIC_*` değişkenleri **derleme anında** bundle'a metin
  * olarak gömülür. Bu, hazır bir Docker imajı yayınlamayı imkânsız kılıyordu:
@@ -61,4 +61,27 @@ export function serverApiUrl(): string {
     process.env.NEXT_PUBLIC_API_URL ??
     "http://localhost:8080"
   );
+}
+
+/** Hiçbir şey verilmediğinde arayüzde görünen ürün adı. */
+export const DEFAULT_APP_NAME = "Agent Coder";
+
+/**
+ * serverAppName, arayüzde görünen ürün adı.
+ *
+ * Kurulumu yapan `APP_NAME` verirse kelime markası ve sekme başlığı onu
+ * gösterir; vermezse varsayılan kalır. Aynı imaj her markayla çalışır — değer
+ * imaja gömülmez.
+ *
+ * `serverApiUrl` ile aynı gerekçeyle `NEXT_PUBLIC_` ÖNEKSİZ (yukarıdaki nota
+ * bkz.); o önek değeri derleme anında gömer ve her marka için ayrı imaj
+ * gerekirdi.
+ *
+ * Boş dize de varsayılana düşer: compose değişkeni tanımlanmadığında
+ * container'a `APP_NAME=""` olarak ulaşıyor. Varsayılan YALNIZCA burada
+ * yazılı; compose'a ikinci bir varsayılan konsaydı ikisi er geç ayrışırdı.
+ */
+export function serverAppName(): string {
+  const verilen = process.env.APP_NAME?.trim();
+  return verilen ? verilen : DEFAULT_APP_NAME;
 }

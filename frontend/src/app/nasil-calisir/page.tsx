@@ -24,8 +24,11 @@ import {
   type TileTone,
 } from "@/components/ui/primitives";
 
+// Marka soneki burada YAZILMAZ: kök düzenin `title.template`'i ekliyor ve o,
+// ürün adını `APP_NAME`'den okuyor. Sabit yazılsaydı adı değiştiren kurulumda
+// bu tek sekme eski adı göstermeye devam ederdi.
 export const metadata: Metadata = {
-  title: "Nasıl çalışır · Agent Coder",
+  title: "Nasıl çalışır",
 };
 
 /**

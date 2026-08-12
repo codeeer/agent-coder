@@ -28,6 +28,9 @@ services:
       dockerfile: Dockerfile.dev
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://${PUBLIC_HOST:-localhost}:${BACKEND_PORT:-8080}}
+      # Temel dosyadaki ile aynı — `next dev`'de de düzen bir sunucu bileşeni
+      # ve değişkeni çalışma anında okur.
+      APP_NAME: ${APP_NAME:-}
     volumes:
       - ./frontend:/app
       # node_modules ve .next host'tan gölgelenmesin — container'ınki kullanılır.

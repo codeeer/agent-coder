@@ -61,7 +61,13 @@ const NAV = [
   },
 ] as const;
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({
+  appName,
+  onNavigate,
+}: {
+  appName: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
@@ -71,8 +77,20 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           açıyordu. Kelime markası tek başına duruyor. */}
       <div className="flex h-14 items-center gap-2.5 border-b border-line px-4">
         <Logo />
-        <div className="text-sm font-semibold tracking-[-0.01em]">
-          Agent Coder
+        {/*
+          min-w-0 + truncate ZORUNLU: ad `APP_NAME` ile değiştirilebiliyor,
+          uzunluğu bilinmiyor. Kenar çubuğu 216px sabit ve logoyla dolgudan
+          sonra metne ~146px kalıyor (14px semibold'da ~18-20 karakter).
+          Korumasız bırakılsa uzun bir ad `h-14`'ün dışına sarıp altındaki
+          gezinmenin üzerine biner; boşluksuz uzun bir kelime ise kenarlığı
+          yatay olarak aşar. Flex çocuğu olduğu için `truncate` tek başına
+          yetmez. Kırpılan ad `title` ile tam okunur.
+        */}
+        <div
+          className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em]"
+          title={appName}
+        >
+          {appName}
         </div>
       </div>
 

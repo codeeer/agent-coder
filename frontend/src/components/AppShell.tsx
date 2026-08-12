@@ -15,8 +15,18 @@ import { IconClose, IconMenu } from "@/components/ui/icons";
  * Çekmece kapanma yolları bilinçli olarak çok: bağlantıya tıklama (yol
  * değişimi), örtüye tıklama, Esc. Kullanıcı bir çıkış arıyorsa ilk denediği
  * şey çalışmalı.
+ *
+ * `appName` isteğe bağlı DEĞİL: varsayılanı olsaydı çağrı yerinde unutulduğunda
+ * arayüz sessizce eski ada döner ve kimse fark etmezdi. Zorunlu olunca `tsc`
+ * yakalar.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  appName,
+}: {
+  children: React.ReactNode;
+  appName: string;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -51,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       {/* Geniş ekran: her zaman görünür. */}
       <div className="hidden lg:flex">
-        <Sidebar />
+        <Sidebar appName={appName} />
       </div>
 
       {/* Dar ekran: çekmece. `hidden` yerine kaydırma — açılışı ani değil. */}
@@ -73,7 +83,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <Sidebar onNavigate={() => setOpen(false)} />
+          <Sidebar appName={appName} onNavigate={() => setOpen(false)} />
         </div>
       </div>
 
@@ -89,7 +99,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             {open ? <IconClose className="size-4" /> : <IconMenu className="size-4" />}
           </button>
-          <span className="text-sm font-semibold tracking-[-0.01em]">Agent Coder</span>
+          {/* min-w-0 + truncate: ad değişkenden geliyor, uzunluğu bilinmiyor.
+              Kutu `h-14` sabit — sarmasına izin verilirse alttaki içeriğe
+              biner. Flex çocuğu olduğu için `truncate` tek başına yetmez. */}
+          <span
+            className="min-w-0 truncate text-sm font-semibold tracking-[-0.01em]"
+            title={appName}
+          >
+            {appName}
+          </span>
         </div>
 
         {/*
