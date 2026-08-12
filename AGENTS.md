@@ -185,8 +185,7 @@ ait olduğu sekmede çizilir. Yeni bir ayar eklemek yine tek satır — ama grub
 seçerken hangi sekmede görüneceğini de seçmiş olursunuz.
 
 **Sekme adı değişirse belgelerdeki "Ayarlar → X" yolları da değişir.** Bu
-projede bir kez, arayüzde karşılığı olmayan bir yol belgeye yazıldı (spec 010
-Ölçüm 6).
+projede bir kez, arayüzde karşılığı olmayan bir yol belgeye yazıldı.
 
 ### Grafikler
 
@@ -499,7 +498,7 @@ argümanlar şablonlanabilir, çıktı sonraki adıma geçer. Yanlış araç ad�
 Cursor akışları listeleyip başlatabiliyor; başlatma mevcut `Launcher`'dan geçiyor, dördüncü
 bir yol açılmadı. Adres Ayarlar'da, kopyalanabilir kurulum örneğiyle birlikte.
 
-**Arayüz denetimi tamamlandı** ([spec 010](specs/010-arayuz-denetimi/spec.md)):
+**Arayüz denetimi tamamlandı:**
 
 - **Telefonda kullanılabilir** — kenar çubuğu çekmeceye dönüşüyor; eskiden içeriğe
   ~175px kalıyor ve "Kaydet" ekranın dışında kalıyordu

@@ -14,11 +14,10 @@ anlaşılıyordu. Birleştirildi.
 | [003](003-agent-calistirma/spec.md) | Projeler, agent tanımları, çalıştırma | sandbox, runner arayüzü, canlı olay akışı | Uygulandı |
 | [004](004-rapor/spec.md) | **Rapor ekranı** | `/reports` sayfasının tamamı — eski 012 buraya katıldı | Uygulandı |
 | [005](005-agent-ciktisi-bicimleme/spec.md) | Agent çıktısının gösterimi | markdown ayrıştırma ve çizim | Uygulandı |
-| [006](006-tema-secimi/spec.md) | Tema seçimi | sistem/açık/koyu, renk jetonları | Uygulandı · **değerleri 010 ile ölçülüp düzeltildi** |
+| [006](006-tema-secimi/spec.md) | Tema seçimi | sistem/açık/koyu, renk jetonları | Uygulandı · **değerleri sonradan ölçülerek düzeltildi** |
 | [007](007-workflow-motoru/spec.md) | Akış motoru | graf modeli, seviyeler, paralellik, şablon | Uygulandı |
 | [008](008-tuval-editoru/spec.md) | Tuval editörü | akışı çizerek kurma, canlı izleme | Uygulandı |
 | [009](009-jira-ve-depo-dugumleri/spec.md) | Jira ve kod deposu düğümleri | PR açma, Jira yorumu, Jira tetikleyici | Uygulandı |
-| [010](010-arayuz-denetimi/spec.md) | Arayüz denetimi | mobil kabuk, açılış ekranı, sayfalama, tema eşliği | Uygulandı |
 | [011](011-mcp/spec.md) | MCP desteği | agent'lara dış araçlar, `mcp.call` düğümü, MCP sunucusu | Uygulandı |
 | [012](012-betikler/spec.md) | Betikler | merkezî betik kütüphanesi, agent'ın çalıştırabildiği hazır prosedürler | Uygulandı |
 

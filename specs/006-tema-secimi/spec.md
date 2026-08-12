@@ -70,7 +70,7 @@ başına saklamak istenirse o zaman yeniden değerlendirilir.
 Bu spec temanın **mekanizmasını** tanımlıyor (üç durum, jeton kapsamları,
 `color-scheme`) ve o kısım hâlâ geçerli.
 
-Ama **jetonların değerleri** [spec 010](../010-arayuz-denetimi/spec.md) ile
+Ama **jetonların değerleri** sonradan yapılan bir arayüz denetiminde
 değişti. Sebep: değerler gözle seçilmişti ve ölçülünce bir kısmı eşiğin altında
 çıktı — `ink-3` koyu temada, `info` açık temada. Ayrıca denetim sınırı diye ayrı
 bir jeton (`control-line`) eklendi.

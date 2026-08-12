@@ -25,6 +25,27 @@ göstermek istediğiniz bir veri yoksa, onu uydurmak yerine göstermeyin.
 
 ---
 
+## Redesign derinliği
+
+**Mevcut düzeni küçük CSS değişiklikleriyle korumak varsayılan yaklaşım
+değildir.** "Mevcut bileşenleri kullan" kuralı, "mevcut layout'u koru"
+demek değildir.
+
+Bilgi mimarisi zayıfsa yapılacak iş şudur:
+
+- bölümleri yeniden grupla, içerik sırasını değiştir
+- araç çubuğu oluştur (arama, süzgeç, görünüm anahtarı tek yerde)
+- ikincil bilgileri üstveri seviyesine indir
+- ilişkili bilgileri aynı görsel grubun altında topla
+- gereksiz alanları kaldır
+- var olan ama görünmeyen bilgiyi görünür kıl
+- tablo / liste / detay ilişkisini yeniden kur
+
+Redesign'ın amacı mevcut ekranı süslemek değil, **aynı işlevi daha iyi bir
+kullanıcı deneyimiyle yeniden sunmaktır.**
+
+---
+
 ## Sıra
 
 Kod yazmadan önce:
@@ -52,11 +73,32 @@ Kalite ölçüsü olarak Linear, Vercel, Raycast, GitHub, Stripe ve Datadog'un
 ortak prensiplerine bakılır — **birebir kopyalanmaz.** Alınan şey görüntü
 değil, karar biçimi: yoğunluk, hiyerarşi, sessiz görsellik.
 
+### Tercih edilenler
+
+- güçlü ama **küçük** tipografik kontrastlar
+- kompakt araç çubukları
+- iyi gruplanmış üstveri
+- bağlama duyarlı eylemler (satırın/seçimin kendi eylemleri)
+- ince hover ve focus geri bildirimi
+- net seçili / etkin durumlar
+- tutarlı 4/8px boşluk ritmi
+- kontrollü kenarlık ve yüzey katmanları
+- kısa ve anlamlı durum göstergeleri
+- kademeli açığa çıkarma (progressive disclosure)
+- gerektiğinde zaman çizelgesi / etkinlik akışı / çalıştırma izi
+- gerektiğinde bölünmüş görünüm veya detay paneli
+- gerektiğinde sekme ve segment düğmeleri
+
 ### Kaçınılacaklar
 
 - Başlık + dört KPI kartı + kocaman grafik + genel tablo şablonu
 - Az bilgiyi büyük kartlara yayan "generic SaaS dashboard" düzeni
-- Gereksiz gradient, glow, büyük gölge, dekoratif öğe
+- **Her şeyi kart yapmak**; her bölümü başlık + açıklama + kart olarak
+  tekrarlamak
+- Aşırı büyük başlıklar, aşırı yuvarlak köşeler
+- **Her düğmeyi dolu yapmak**, her metriği renklendirmek
+- Gereksiz gradient, glow, büyük gölge, dekoratif grafik
+- Yalnızca boşluk doldurmak için eklenen görsel öğe
 - Her şeyi kenarlık, gölge ve renkle ayırmak
 - Emoji, karışık ikon kümesi, tutarsız ikon boyutu
 
@@ -70,9 +112,22 @@ Kullanıcı ilk bakışta şu sırayla görebilmeli: sayfanın ne olduğu → en
 bilgi → ana eylem → durum → detay. Her şey aynı punto ve kalınlıktaysa
 hiyerarşi yok demektir.
 
-Eylem hiyerarşisi **renkle değil dolguyla** kurulur: ekranda tek bir dolu
-düğme olur (asıl eylem), gerisi kenarlıklıdır. Aksan her satırda tekrar
-ederse vurgu olmaktan çıkar.
+### Eylem hiyerarşisi
+
+Renk ve dolgu **bilinçli** kullanılır; ikisi birlikte bir sıra kurar.
+
+Kural: **bir ekranda genellikle tek bir birincil eylem öne çıkar** ve
+yalnızca o doludur. İkincil eylemler kenarlıklı, ghost veya düz bağlantı
+olarak durur.
+
+Gerçekten gerekmedikçe aynı görsel ağırlıkta **birden fazla dolu düğme
+kullanılmaz.** Aksan her satırda tekrar ederse vurgu olmaktan çıkar: altı
+satırlık bir listede altı dolu düğme, sayfanın asıl eylemini
+görünmez yapar.
+
+Bir eylemin düğme olduğu **kenarlığından** anlaşılır. "Bu çizgi olmasaydı
+kullanıcı orada tıklanabilir bir şey olduğunu anlar mıydı?" — cevap hayırsa
+kenarlık zorunludur, sessizleştirmek için kaldırılamaz.
 
 ### Bilgi yoğunluğu
 
@@ -169,9 +224,24 @@ görüntüsü alınır ve şunlar tek tek kontrol edilir:
 - açık tema ve koyu tema **ayrı ayrı**
 - hover, focus, yükleniyor, boş ve hata durumları
 
-Renk iddiaları **ölçülür**, göze güvenilmez: iki tema aynı anda görülemiyor
-ve 4,1 ile 4,6 arası bakışla ayırt edilmiyor. Ekran görüntüsünden piksel
-okumak bunun en ucuz yolu.
+### Renk ve kontrast iddiaları ölçülür
+
+Göze güvenilmez. İki tema aynı anda görülemiyor ve 4,1 ile 4,6 arası bakışla
+ayırt edilmiyor; "iyi görünüyor" bir ölçüm değildir.
+
+Bir renk, kontrast veya boyut iddiasında bulunulacaksa **gerçek değer**
+okunur:
+
+- tarayıcıda hesaplanmış CSS (`getComputedStyle`) — jetonun ekrana ne
+  olarak çıktığını yalnızca bu söyler
+- gerçek DOM ölçüsü (`getBoundingClientRect`, `scrollHeight`) — taşma ve
+  kırpılma iddiaları için
+- ekran görüntüsünden piksel okumak — iki temanın gerçekten farklı
+  boyandığını doğrulamanın en ucuz yolu
+- gerekiyorsa hesaplanmış kontrast oranı (metin 4,5:1 · iri metin ve
+  denetim sınırı 3:1)
+
+Ölçüm yapılmadan "kontrast yeterli" veya "iki tema da doğru" denmez.
 
 Sonuç referanstan veya hedeften belirgin biçimde uzaksa **tekrar düzenlenir.**
 

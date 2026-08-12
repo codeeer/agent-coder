@@ -530,8 +530,7 @@ yapılıyor.
 ## Revizyon — Arayüz denetimi (2026-08-10)
 
 Beş faz boyunca arayüz özellik özellik büyüdü ama hiç **bütün olarak**
-kullanılmadı. Baştan sona bir kullanıcı gibi gezildiğinde çıkanlar
-[spec 010](../specs/010-arayuz-denetimi/spec.md) altında.
+kullanılmadı. Baştan sona bir kullanıcı gibi gezildiğinde çıkanlar aşağıda.
 
 Planda hiç öngörülmemiş iki şey:
 

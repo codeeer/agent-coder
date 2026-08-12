@@ -209,7 +209,7 @@ sayfa gibi ürün içi anlatımlar listeden düşüyor. Bu sayfa da bir belgedir
 `TriggerKind`'a `mcp` eklendiğinde TypeScript hemen uyardı:
 `Property 'mcp' is missing in type ... Record<TriggerKind, …>`.
 
-Bu tam olarak spec 010 Ölçüm 5'te canlı bir hatadan sonra kurulan koruma:
+Bu tam olarak daha önce canlı bir hatadan sonra kurulan koruma:
 o zaman `jira` eklenmiş ve etiket eksik kaldığı için Jira'nın başlattığı
 çalışmalar listede "elle" görünmüştü. Aynı hata bu sefer derleme zamanında
 yakalandı.

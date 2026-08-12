@@ -457,7 +457,7 @@ const buttonVariants: Record<ButtonVariant, string> = {
    * Kenar `control-line`: `secondary` ile aynı jeton, yani aynı ölçülmüş
    * 3:1 denetim sınırı. Bu bilinçli — daha önce kenar `danger/35` iken
    * açık temada 1,76:1, koyu temada 1,85:1 ölçülmüştü ve "Sil" düğmesinin
-   * sınırı iki temada da görünmüyordu (spec 010). Sessizleştirmek o hatayı
+   * sınırı iki temada da görünmüyordu. Sessizleştirmek o hatayı
    * geri getirmemeli: kırmızıyı hover'a taşıyoruz, sınırı zayıflatmıyoruz.
    */
   danger:
