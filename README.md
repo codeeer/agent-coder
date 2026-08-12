@@ -256,6 +256,22 @@ docker inspect ghcr.io/codeeer/agent-coder-backend:latest \
 > kullanan herkes eski backend ile koşuyordu. Artık **her main commit'i imaj
 > üretir** ve imaj hangi commit'ten geldiğini üzerinde taşır.
 
+### Güncelleme
+
+Ayrı bir komut yok — **`make quickstart` aynı zamanda güncelleme komutudur.**
+Üç imajı yeniden çeker, değişen servisi yeniden yaratır. `make restart` de
+hazır imajlı bir kurulumu tanır ve kaynaktan derlemeye geçmez.
+
+Aynı işi elle yapacaksanız **`.env` içindeki `RUNNER_IMAGE` satırını da
+güncelleyin.** Runner bir compose servisi değil; adını backend `.env`'den
+okuyor. Yalnızca komut satırında verirseniz bir sonraki başlatmada sessizce
+eski yerel imaja dönersiniz:
+
+```bash
+docker pull ghcr.io/codeeer/agent-coder-runner:latest
+sed -i.bak 's|^RUNNER_IMAGE=.*|RUNNER_IMAGE=ghcr.io/codeeer/agent-coder-runner:latest|' .env && rm -f .env.bak
+```
+
 ### 🔨 Kaynaktan derleme yolu
 
 Kodda değişiklik yapacaksanız veya hazır imaja güvenmek istemiyorsanız:

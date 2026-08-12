@@ -22,6 +22,11 @@ GHCR_RUNNER   := ghcr.io/$(GHCR_OWNER)/agent-coder-runner:$(IMAGE_TAG)
 GHCR_BACKEND  := ghcr.io/$(GHCR_OWNER)/agent-coder-backend:$(IMAGE_TAG)
 GHCR_FRONTEND := ghcr.io/$(GHCR_OWNER)/agent-coder-frontend:$(IMAGE_TAG)
 
+# Üç değişken compose'a HER çağrıda verilmek zorunda: overlay'deki
+# `${BACKEND_IMAGE:-…}` varsayılanları yalnızca `latest` içindir, IMAGE_TAG ile
+# sürüm sabitleyen kurulumda sessizce yanlış etikete düşerdi.
+GHCR_ENV := RUNNER_IMAGE=$(GHCR_RUNNER) BACKEND_IMAGE=$(GHCR_BACKEND) FRONTEND_IMAGE=$(GHCR_FRONTEND)
+
 # Yalnızca ekrana yazdırmak için .env'den okunur. Servislerin gerçek port
 # yapılandırması compose tarafından yapılır.
 env_or = $(or $(shell grep -E '^$(1)=' .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]'),$(2))
@@ -93,16 +98,17 @@ up: check-env ## Tüm servisleri build edip başlat
 .PHONY: quickstart
 quickstart: check-env ## Hazır imajlarla başlat (hiçbir şey derlenmez — en hızlı yol)
 	@echo "Hazır imajlar çekiliyor — hiçbir şey derlenmeyecek…"
+	@# Runner AYRI çekilir: o bir compose servisi değil, backend'in çalışma
+	@# anında başlattığı imaj. `compose pull` onu görmez, backend de kendisi
+	@# indirmez (sandbox.EnsureImage yalnızca yerelde var mı diye bakar).
 	docker pull $(GHCR_RUNNER)
-	@RUNNER_IMAGE=$(GHCR_RUNNER) BACKEND_IMAGE=$(GHCR_BACKEND) FRONTEND_IMAGE=$(GHCR_FRONTEND) \
-		$(COMPOSE_GHCR) pull
+	@$(GHCR_ENV) $(COMPOSE_GHCR) pull
 	@# RUNNER_IMAGE .env'e YAZILIR, yalnızca bu komuta özel bırakılmaz.
 	@# Aksi halde kullanıcı quickstart'tan sonra `make restart` çalıştırdığında
 	@# hiç derlemediği yerel imaja geri döner ve kurulum sessizce bozulur.
 	@sed -i.bak "s|^RUNNER_IMAGE=.*|RUNNER_IMAGE=$(GHCR_RUNNER)|" .env && rm -f .env.bak
 	@echo "  .env → RUNNER_IMAGE=$(GHCR_RUNNER)"
-	@RUNNER_IMAGE=$(GHCR_RUNNER) BACKEND_IMAGE=$(GHCR_BACKEND) FRONTEND_IMAGE=$(GHCR_FRONTEND) \
-		$(COMPOSE_GHCR) up -d
+	@$(GHCR_ENV) $(COMPOSE_GHCR) up -d
 	@echo
 	@echo "  Arayüz : http://localhost:$(FRONTEND_PORT)"
 	@echo "  API    : http://localhost:$(BACKEND_PORT)/health"
@@ -134,8 +140,25 @@ down: ## Servisleri durdur (veri korunur)
 clean: ## Servisleri durdur ve TÜM verileri sil
 	$(COMPOSE_DEV) down -v --remove-orphans
 
+# restart, kurulumun TÜRÜNÜ korur.
+#
+# Eskiden `down up` idi ve `up` kaynaktan derliyordu: quickstart ile hazır imaj
+# çeken kullanıcı tek bir `make restart` sonrası, farkında olmadan yerel
+# derlemeye geçiyordu. Yayınlanan imajdaki bir düzeltme böylece sessizce geri
+# alınabiliyordu — çektiği imaj değil, kendi ağacındaki kod koşuyordu.
+#
+# Ayrımı .env'deki RUNNER_IMAGE söylüyor: quickstart oraya GHCR adresini yazar,
+# yerel kurulumda `agent-coder/...` kalır. Ayrı bir bayrak eklenmedi; ikinci bir
+# işaretçi er geç birinciyle çelişirdi.
 .PHONY: restart
-restart: down up ## Yeniden başlat
+restart: ## Yeniden başlat (kurulum türü korunur: hazır imaj / kaynaktan)
+	@if grep -qE '^RUNNER_IMAGE=ghcr\.io/' .env 2>/dev/null; then \
+		echo "Hazır imajlı kurulum — kaynaktan derlenmeyecek."; \
+		$(MAKE) --no-print-directory down; \
+		$(MAKE) --no-print-directory quickstart; \
+	else \
+		$(MAKE) --no-print-directory down up; \
+	fi
 
 .PHONY: ps
 ps: ## Servis durumları
