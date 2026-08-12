@@ -43,6 +43,7 @@ import {
   EyeOff,
   Folder,
   GitPullRequest,
+  Globe,
   LayoutDashboard,
   Menu,
   MessageSquare,
@@ -140,6 +141,7 @@ export const IconSparkle = icon(Sparkles);
 export const IconPullRequest = icon(GitPullRequest);
 export const IconComment = icon(MessageSquare);
 export const IconPlug = icon(Plug);
+export const IconGlobe = icon(Globe);
 export const IconTerminal = icon(Terminal);
 
 // ─── Kabuk ──────────────────────────────────────────────────────────────────

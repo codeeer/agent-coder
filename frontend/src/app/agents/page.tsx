@@ -2,33 +2,109 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
-import type { Agent, LLMProvider, Model } from "@/lib/types";
+import type { Agent, LLMProvider, Model, ReportGroup, Run } from "@/lib/types";
 import { ModelPicker } from "@/components/models/ModelPicker";
 import { StartRunForm } from "@/components/runs/StartRunForm";
-import { IconPlus } from "@/components/ui/icons";
+import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
+import {
+  formatCompact,
+  formatCount,
+  formatDuration,
+  formatMoney,
+  formatPercent,
+} from "@/components/charts/format";
+import {
+  IconAgent,
+  IconEdit,
+  IconGlobe,
+  IconPlay,
+  IconPlug,
+  IconPlus,
+  IconTerminal,
+  IconTrash,
+  IconUndo,
+} from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
-  List,
   Checkbox,
+  EmptyState,
+  IconTile,
   Input,
   Notice,
   PageHeader,
+  Panel,
+  SearchField,
+  Segmented,
   Skeleton,
   Textarea,
+  Toolbar,
   Well,
+  formatRelative,
+  panelLinkClass,
 } from "@/components/ui/primitives";
+
+/**
+ * Agent'lar — tanım ekranı değil, SEÇİM ekranı.
+ *
+ * ÖNCEKİ HALİ DÜZ BİR LİSTEYDİ ve iki soruya da cevap vermiyordu:
+ *
+ *   1. "Bu iş için hangi agent'ı çalıştırayım?" Altı satır aynı görsel
+ *      ağırlıktaydı; hangisinin gerçekten kullanıldığı, ne kadara mal
+ *      olduğu, ne kadarının tuttuğu ekranda YOKTU — oysa bu veri
+ *      `reports.byAgent` içinde zaten duruyor ve rapor ekranı onu
+ *      gösteriyordu. Agent'ı seçen kişi ise burada.
+ *
+ *   2. "Bu agent'ı nasıl ayarlarım?" Talimat, yetkiler ve araçlar ancak
+ *      satırın içinde açılan devasa bir formda görünüyordu; form açılınca
+ *      liste aşağı kayıyor ve karşılaştırma imkânı kayboluyordu.
+ *
+ * Şimdi master–detay: solda taranan liste, sağda seçilenin künyesi.
+ * Formlar da detay sütununda açılıyor — liste hiç oynamıyor, yani
+ * "şunu mu bunu mu" karşılaştırması form açıkken de sürüyor.
+ */
 
 const PAGE_SIZE = 25;
 
+/** Kullanım rakamlarının dönemi. Rapor ekranının varsayılanıyla aynı. */
+const USAGE_DAYS = 30;
+
+const FILTERS = [
+  { id: "all", label: "Tümü" },
+  { id: "builtin", label: "Hazır" },
+  { id: "custom", label: "Özel" },
+  { id: "modified", label: "Değiştirilmiş" },
+] as const;
+
+type FilterId = (typeof FILTERS)[number]["id"];
+
+function matches(a: Agent, filter: FilterId): boolean {
+  switch (filter) {
+    case "builtin":
+      return a.source === "builtin";
+    case "custom":
+      return a.source === "custom";
+    case "modified":
+      return a.isModified;
+    default:
+      return true;
+  }
+}
+
+/** Detay sütununun ne gösterdiği. Aynı anda yalnızca biri açık olabilir. */
+type Mode = "view" | "edit" | "run" | "create";
+
 export default function AgentsPage() {
-  const [creating, setCreating] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<FilterId>("all");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("view");
 
   const agents = useQuery({
     queryKey: ["agents", offset],
@@ -45,83 +121,374 @@ export default function AgentsPage() {
     queryFn: () => api.models.list({ limit: 500, sort: "provider" }),
   });
 
+  /*
+   * Kullanım rakamları raporun kendi ucundan geliyor — yeni bir uç YOK.
+   * `byAgent` satırlarının anahtarı çalıştırma kaydındaki agent slug'ı,
+   * yani agent listesiyle doğrudan eşleşiyor.
+   */
+  const report = useQuery({
+    queryKey: ["report", "agents", USAGE_DAYS],
+    queryFn: () => api.reports.summary({ days: USAGE_DAYS }),
+  });
+
+  // Son çalıştırmalar penceresi: seçili agent'ın son işleri bundan süzülüyor.
+  const runs = useQuery({
+    queryKey: ["runs", "agents-panel"],
+    queryFn: () => api.runs.list({ limit: 100 }),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((r) => isActive(r.status)) ? 5000 : false,
+  });
+
+  const mcpServers = useQuery({
+    queryKey: ["mcp-servers"],
+    queryFn: api.mcpServers.list,
+  });
+  const scripts = useQuery({
+    queryKey: ["scripts", "all"],
+    queryFn: () => api.scripts.list({ limit: 200 }),
+  });
+
+  const items = useMemo(() => {
+    const rows = agents.data?.items ?? [];
+    const needle = q.trim().toLocaleLowerCase("tr");
+    return rows.filter(
+      (a) =>
+        matches(a, filter) &&
+        (needle === "" ||
+          [a.name, a.slug, a.description, a.defaultModel]
+            .filter(Boolean)
+            .some((v) => v.toLocaleLowerCase("tr").includes(needle))),
+    );
+  }, [agents.data, filter, q]);
+
+  // Seçim listeden düşerse (süzgeç, arama, silme) ilk sıradakine kayar:
+  // detay sütununun boş kalması, ekranın yarısını boşa harcamak olurdu.
+  const selected =
+    items.find((a) => a.id === selectedId) ?? items[0] ?? null;
+
+  function select(agent: Agent) {
+    setSelectedId(agent.id);
+    setMode("view");
+  }
+
   return (
-    /* `max-w-4xl` kaldırıldı: Projeler ve Çalıştırmalar aynı türden listeler
-       ama tam genişlikte duruyordu. Aynı iş için iki farklı sayfa genişliği
-       keyfi bir farktı. Açıklama metni zaten kendi `max-w-prose` sınırını
-       taşıyor, yani okuma satırı uzamıyor. */
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
         title="Agent'lar"
-        description="Hazır agent'ların talimatını kendi kurallarınıza göre değiştirebilir, sıfırdan kendi agent'ınızı oluşturabilirsiniz."
+        description="Her agent bir talimat, bir varsayılan model ve bir yetki kümesidir."
         actions={
-          !creating && (
-            <Button
-              variant="primary"
-              onClick={() => setCreating(true)}
-              icon={<IconPlus className="size-4" />}
-            >
-              Agent oluştur
-            </Button>
-          )
+          <Button
+            variant="primary"
+            onClick={() => setMode("create")}
+            icon={<IconPlus className="size-4" />}
+          >
+            Agent oluştur
+          </Button>
         }
       />
 
-      <div className="space-y-3">
-        {creating && (
-          <AgentForm
-            providers={providers.data ?? []}
-            models={models.data?.items ?? []}
-            onDone={() => setCreating(false)}
-          />
-        )}
+      {agents.isPending && <Skeleton rows={4} />}
+      {agents.isError && (
+        <Notice tone="error">{describeError(agents.error).message}</Notice>
+      )}
 
-        {agents.isPending && <Skeleton rows={3} />}
-        {agents.isError && (
-          <Notice tone="error">{describeError(agents.error).message}</Notice>
-        )}
+      {agents.data && agents.data.total === 0 && mode !== "create" && (
+        <EmptyState
+          icon={<IconAgent className="size-4" />}
+          title="Henüz agent yok"
+          description="Hazır agent'lar kurulumda gelir. Hiçbiri görünmüyorsa backend ilk açılışını tamamlamamış olabilir."
+          action={
+            <Button variant="primary" onClick={() => setMode("create")}>
+              İlk agent&apos;ı oluştur
+            </Button>
+          }
+        />
+      )}
 
-        {agents.data && agents.data.items.length > 0 && (
-          <List>
-            {agents.data.items.map((a) => (
-              <AgentRow
-                key={a.id}
-                agent={a}
-                providers={providers.data ?? []}
-                models={models.data?.items ?? []}
-              />
-            ))}
-          </List>
-        )}
+      {agents.data && agents.data.total > 0 && (
+        <>
+          <Toolbar>
+            <SearchField
+              className="min-w-50 flex-1 sm:max-w-xs"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Agent, slug veya model ara…"
+              aria-label="Agent'larda ara"
+            />
+            <Segmented
+              label="Kaynak süzgeci"
+              options={FILTERS}
+              value={filter}
+              onChange={setFilter}
+            />
+            <span className="ml-auto hidden text-2xs text-ink-3 lg:block">
+              {items.length === agents.data.items.length
+                ? `${items.length} agent`
+                : `${items.length} / ${agents.data.items.length} agent`}
+            </span>
+          </Toolbar>
 
-        {agents.data && (
+          {/*
+            İki sütun: solda seçim, sağda karar.
+
+            Dar ekranda alt alta geçiyor ve liste kendi yüksekliğiyle
+            sınırlanıyor (`max-h`): telefonda tam boy bir liste, detayın
+            hiç görünmemesi demek olurdu.
+          */}
+          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_1fr]">
+            <AgentList
+              agents={items}
+              /* Yeni agent formu açıkken listede seçili satır YOK: detay
+                 sütunu artık o agent'ı göstermiyor ve vurgulu satır
+                 kullanıcıya yanlış şeyi işaret ederdi. */
+              selectedId={mode === "create" ? null : (selected?.id ?? null)}
+              onSelect={select}
+              usage={report.data?.byAgent ?? []}
+            />
+
+            <div className="-mx-1 min-h-0 overflow-y-auto px-1 pb-1">
+              {mode === "create" ? (
+                <AgentForm
+                  providers={providers.data ?? []}
+                  models={models.data?.items ?? []}
+                  onDone={() => setMode("view")}
+                />
+              ) : selected === null ? (
+                <Card>
+                  <p className="text-sm text-ink-3">
+                    Bu süzgece uyan agent yok.
+                  </p>
+                </Card>
+              ) : mode === "edit" ? (
+                <AgentForm
+                  agent={selected}
+                  providers={providers.data ?? []}
+                  models={models.data?.items ?? []}
+                  onDone={() => setMode("view")}
+                />
+              ) : mode === "run" ? (
+                <StartRunForm agent={selected} onDone={() => setMode("view")} />
+              ) : (
+                <AgentDetail
+                  agent={selected}
+                  provider={providers.data?.find(
+                    (p) => p.id === selected.defaultProviderId,
+                  )}
+                  model={models.data?.items.find(
+                    (m) =>
+                      m.id === selected.defaultModel &&
+                      m.providerId === selected.defaultProviderId,
+                  )}
+                  usage={report.data?.byAgent.find((g) => g.key === selected.slug)}
+                  runs={
+                    runs.data?.items.filter((r) => r.agentSlug === selected.slug) ??
+                    []
+                  }
+                  mcpNames={(mcpServers.data ?? [])
+                    .filter((s) => selected.mcpServerIds.includes(s.id))
+                    .map((s) => s.name)}
+                  scriptNames={(scripts.data?.items ?? [])
+                    .filter((s) => selected.scriptIds.includes(s.id))
+                    .map((s) => s.name)}
+                  onRun={() => setMode("run")}
+                  onEdit={() => setMode("edit")}
+                />
+              )}
+            </div>
+          </div>
+
           <Pagination
             total={agents.data.total}
             limit={agents.data.limit}
             offset={agents.data.offset}
-            onChange={setOffset}
+            onChange={(next) => {
+              setOffset(next);
+              setQ("");
+              setSelectedId(null);
+            }}
             unit="agent"
           />
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
-function AgentRow({
+/* ── Liste sütunu ────────────────────────────────────────────────────────── */
+
+function AgentList({
+  agents,
+  selectedId,
+  onSelect,
+  usage,
+}: {
+  agents: Agent[];
+  selectedId: string | null;
+  onSelect: (a: Agent) => void;
+  usage: ReportGroup[];
+}) {
+  return (
+    <div className="flex max-h-80 min-h-0 flex-col overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card) lg:max-h-none">
+      <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
+        {agents.map((a) => {
+          const on = a.id === selectedId;
+          const stats = usage.find((g) => g.key === a.slug);
+
+          return (
+            <li key={a.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(a)}
+                aria-current={on ? "true" : undefined}
+                className={`relative flex w-full items-start gap-3 px-3.5 py-3 text-left transition-colors ${
+                  on ? "bg-accent-soft" : "hover:bg-raised"
+                }`}
+              >
+                {/* Seçili satırı soldaki şerit de işaretler — arayüzün geri
+                    kalanındaki (kenar çubuğu, ayarlar menüsü) kalıbın aynısı. */}
+                {on && (
+                  <span className="absolute top-1/2 left-0 h-8 w-0.75 -translate-y-1/2 rounded-r-full bg-accent" />
+                )}
+
+                {/*
+                  Monogram — simge değil.
+
+                  Altı satırda aynı agent simgesi dursaydı hiçbir şeyi ayırt
+                  etmez, yalnızca yer doldururdu. Harf ayırt ediyor.
+
+                  `toLocaleUpperCase("tr")`: Türkçede "i" harfinin büyüğü
+                  "İ"; öntanımlı büyütme "I" verir ve monogram yanlış harfi
+                  gösterirdi.
+                */}
+                <span
+                  className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border text-xs font-semibold select-none ${
+                    on
+                      ? "border-accent/30 bg-surface text-accent"
+                      : "border-line bg-raised text-ink-2"
+                  }`}
+                >
+                  {a.name.charAt(0).toLocaleUpperCase("tr")}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{a.name}</span>
+                    {a.source === "custom" && <Badge tone="info">özel</Badge>}
+                    {a.isModified && <Badge tone="warning">değişik</Badge>}
+                  </span>
+
+                  <span className="mt-0.5 block truncate font-mono text-2xs text-ink-3">
+                    {a.slug}
+                  </span>
+
+                  <span className="mt-2 flex items-center gap-2">
+                    <CapabilityStrip agent={a} />
+                    {/* Kullanım rakamı yalnızca VARSA. "0 iş" yazmak,
+                        çalıştırılmamış bir agent'ı başarısız gibi gösterir;
+                        hazır agent'ların çoğu hiç çalıştırılmamış olabilir. */}
+                    {stats && (
+                      <span className="ml-auto shrink-0 text-2xs text-ink-3 tabular-nums">
+                        {formatCount(stats.runs)} iş
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/* ── Yetki şeridi ────────────────────────────────────────────────────────── */
+
+/**
+ * Üç sabit yuva: dosya, komut, ağ.
+ *
+ * Öncesinde yalnızca AÇIK yetkiler rozet olarak yazılıyordu; liste boyunca
+ * her satırda farklı sayıda rozet olunca sütun hizası kayıyordu ve iki
+ * agent'ın yetkileri ancak etiketler okunarak karşılaştırılabiliyordu.
+ *
+ * Sabit üç yuva bunu tabloya çeviriyor: aynı yetki her satırda AYNI yerde
+ * duruyor, kapalı olan sönük. Göz artık okumadan karşılaştırıyor.
+ *
+ * Renk anlamlı: açık bir yazma/çalıştırma yetkisi bir RİSKTİR, yeşil
+ * değil amber. "Hiçbir şeyi değiştiremez" ise gerçekten iyi haberdir ve
+ * onu detay panelindeki "yalnızca okur" satırı söylüyor.
+ */
+function CapabilityStrip({ agent }: { agent: Agent }) {
+  const caps = [
+    {
+      on: agent.allowEdit,
+      Icon: IconEdit,
+      label: "Dosya değiştirebilir",
+      tone: "text-warn",
+    },
+    {
+      on: agent.allowBash,
+      Icon: IconTerminal,
+      label: "Komut çalıştırabilir",
+      tone: "text-warn",
+    },
+    {
+      on: agent.allowWebfetch,
+      Icon: IconGlobe,
+      label: "Ağa erişebilir",
+      tone: "text-info",
+    },
+  ];
+
+  return (
+    <span className="flex items-center gap-1.5">
+      {caps.map(({ on, Icon, label, tone }) => (
+        <span
+          key={label}
+          title={on ? label : `${label} — kapalı`}
+          className={on ? tone : "text-ink-3/40"}
+        >
+          <Icon className="size-3.5" />
+        </span>
+      ))}
+      {agent.mcpServerIds.length > 0 && (
+        <span
+          title={`${agent.mcpServerIds.length} dış araç sunucusu (MCP)`}
+          className="flex items-center gap-0.5 text-info"
+        >
+          <IconPlug className="size-3.5" />
+          <span className="text-2xs tabular-nums">{agent.mcpServerIds.length}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ── Detay sütunu ────────────────────────────────────────────────────────── */
+
+function AgentDetail({
   agent,
-  providers,
-  models,
+  provider,
+  model,
+  usage,
+  runs,
+  mcpNames,
+  scriptNames,
+  onRun,
+  onEdit,
 }: {
   agent: Agent;
-  providers: LLMProvider[];
-  models: Model[];
+  provider?: LLMProvider;
+  model?: Model;
+  usage?: ReportGroup;
+  runs: Run[];
+  mcpNames: string[];
+  scriptNames: string[];
+  onRun: () => void;
+  onEdit: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [running, setRunning] = useState(false);
 
   const invalidate = () =>
     void queryClient.invalidateQueries({ queryKey: ["agents"] });
@@ -138,241 +505,441 @@ function AgentRow({
     },
   });
 
-  const provider = providers.find((p) => p.id === agent.defaultProviderId);
-
   return (
-    /*
-     * `group`: eylemlerin hover'da açılması buna bağlı.
-     *
-     * Satır önceden üst üste dizilmiş DÖRT metin satırıydı (ad, açıklama,
-     * yetkiler, model) ve hepsi sola yaslıydı; aralarındaki tek fark punto
-     * ve renkti. Göz nereye bakacağını bilmiyordu.
-     *
-     * Şimdi üç bölge var: solda çıpa (simge), ortada içerik, sağda eylemler.
-     */
-    <div className="group px-4 py-3.5">
-      <div className="flex items-start gap-3.5">
-        {/*
-          Görsel çıpa — SİMGE DEĞİL, MONOGRAM.
-
-          Satır çıplak metinle başlıyordu; listede göz her satırın nerede
-          başladığını yeniden aramak zorundaydı. Sabit genişlikte bir kutu
-          sol kenarda dikey ritim kuruyor.
-
-          İlk hali agent simgesiydi ama altı satırda aynı simge duruyordu:
-          hiçbir şeyi ayırt etmiyor, yalnızca yer dolduruyordu — yani
-          tanımı gereği dekoratif. Monogram aynı ritmi kuruyor ama ayırt
-          edici: satırlar birbirinden bakışla ayrılıyor.
-
-          `toLocaleUpperCase("tr")`: Türkçede "i" harfinin büyüğü "İ".
-          Öntanımlı büyütme "I" verir ve bir agent adı "İ" ile başlıyorsa
-          monogram yanlış harfi gösterirdi.
-        */}
-        <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-raised text-sm font-semibold text-ink-2 select-none">
-          {agent.name.charAt(0).toLocaleUpperCase("tr")}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h2 className="text-sm font-semibold tracking-[-0.01em]">
-              {agent.name}
-            </h2>
-            <span className="font-mono text-xs text-ink-3">{agent.slug}</span>
-            {agent.source === "custom" && <Badge tone="info">özel</Badge>}
-            {agent.isModified && <Badge tone="warning">değiştirilmiş</Badge>}
+    <div className="space-y-4">
+      {/* ── Künye ── */}
+      <Card>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <IconTile tone="accent">
+              <IconAgent className="size-4" />
+            </IconTile>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold tracking-[-0.02em]">
+                  {agent.name}
+                </h2>
+                {agent.source === "custom" ? (
+                  <Badge tone="info">özel</Badge>
+                ) : (
+                  <Badge>hazır</Badge>
+                )}
+                {agent.isModified && <Badge tone="warning">değiştirilmiş</Badge>}
+              </div>
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+                <span className="font-mono">{agent.slug}</span>
+                <span aria-hidden="true">·</span>
+                {/* Talimatı değiştirilen bir agent'ın NE ZAMAN değiştiği,
+                    "değiştirilmiş" rozetinden daha çok şey söyler. */}
+                <span>güncellendi {formatRelative(agent.updatedAt)}</span>
+              </p>
+              {agent.description && (
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-2">
+                  {agent.description}
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* İki satırda kesiliyor: liste taranacak bir şey, okunacak değil.
-              Tam metin agent'ı düzenlerken zaten görünüyor. */}
-          <p className="mt-1 line-clamp-2 max-w-prose text-sm text-ink-2">
-            {agent.description}
-          </p>
+          {/*
+            Eylem hiyerarşisi RENKLE değil DOLGUYLA kuruluyor.
 
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <PermissionLine agent={agent} />
-            {agent.defaultModel ? (
-              <span className="ml-auto truncate pl-2 font-mono text-2xs text-ink-3">
-                {provider ? `${provider.name} · ` : ""}
-                {agent.defaultModel}
-              </span>
-            ) : (
-              <span className="ml-auto pl-2 text-2xs text-ink-3">
-                model seçilmemiş
-              </span>
-            )}
-          </div>
-        </div>
-
-        {!editing && !confirming && !running && (
-          /*
-           * Satır eylemleri İKİNCİL — ama GÖRÜNÜR.
-           *
-           * İki uçtan da geçildi. Önce hepsi dolu mor birincil düğmeydi ve
-           * liste altı agent gösterdiği için sayfada altı tane duruyordu;
-           * aksan her satırda tekrarlanınca vurgu olmaktan çıkıyor ve sağ
-           * üstteki gerçek birincil eylem ("Agent oluştur") aralarında
-           * kayboluyordu.
-           *
-           * Sonra tersine kaçıldı: `ghost` yapıldılar ve kenarlıkları da
-           * zeminleri de gitti — düğme oldukları anlaşılmıyordu. Bu, projenin
-           * kendi `control-line` kuralının ihlaliydi: "bu çizgi olmasaydı
-           * kullanıcı orada tıklanabilir bir şey olduğunu anlar mıydı?"
-           * Cevap hayırsa kenarlık ZORUNLU.
-           *
-           * Doğru yer ikisinin ortası: hepsi `secondary` — kenarlıklı, yani
-           * düğme oldukları belli; dolu değil, yani birincil eylemle
-           * yarışmıyorlar. Hiyerarşi renkle değil DOLGUYLA kuruluyor.
-           *
-           * İKİNCİ SORUN SAYIYDI: altı satır × üç düğme = ekranda sürekli
-           * duran on sekiz düğme. Asıl eylem ("Çalıştır") her satırda
-           * kalıyor; geri kalanlar imlecin üstünde olduğu satırda açılıyor.
-           * Ekranda aynı anda görünen düğme sayısı üçte birine iniyor.
-           *
-           * Gizlenmiyorlar, ERTELENİYORLAR — üç yoldan da ulaşılabilir:
-           *   · fareyle satırın üstüne gelince (`group-hover`)
-           *   · klavyeyle sekmeyle girince (`group-focus-within`)
-           *   · dar ekranda hep açık (`sm:` öncesi opaklık 1) — dokunmatik
-           *     cihazda hover diye bir şey yok, orada erteleme gizlemek olurdu
-           */
-          <div className="flex shrink-0 items-start gap-2">
-            <div className="flex flex-wrap justify-end gap-2 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-              <Button onClick={() => setShowPrompt((v) => !v)}>
-                {showPrompt ? "Talimatı gizle" : "Talimatı gör"}
+            Tek dolu düğme "Çalıştır" — bu ekranın asıl eylemi. Diğerleri
+            kenarlıklı: düğme oldukları belli ama birincil eylemle
+            yarışmıyorlar. Öncesinde bunlar liste satırında hover'da
+            açılıyordu; detay sütununda yer var, saklamaya gerek yok.
+          */}
+          {confirming ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-xs text-ink-2">Bu agent silinsin mi?</span>
+              <Button
+                variant="danger"
+                onClick={() => remove.mutate()}
+                disabled={remove.isPending}
+              >
+                {remove.isPending ? "Siliniyor…" : "Evet, sil"}
               </Button>
-              <Button onClick={() => setEditing(true)}>Düzenle</Button>
+              <Button onClick={() => setConfirming(false)}>Vazgeç</Button>
+            </div>
+          ) : (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={onRun}
+                icon={<IconPlay className="size-4" />}
+              >
+                Çalıştır
+              </Button>
+              <Button onClick={onEdit} icon={<IconEdit className="size-4" />}>
+                Düzenle
+              </Button>
               {agent.isModified && (
-                <Button onClick={() => reset.mutate()} disabled={reset.isPending}>
+                <Button
+                  onClick={() => reset.mutate()}
+                  disabled={reset.isPending}
+                  icon={<IconUndo className="size-4" />}
+                  title="Hazır agent'ı özgün talimatına döndürür"
+                >
                   {reset.isPending ? "…" : "Sıfırla"}
                 </Button>
               )}
               {agent.source === "custom" && (
-                <Button variant="danger" onClick={() => setConfirming(true)}>
+                <Button
+                  variant="danger"
+                  onClick={() => setConfirming(true)}
+                  icon={<IconTrash className="size-4" />}
+                >
                   Sil
                 </Button>
               )}
             </div>
-            <Button onClick={() => setRunning(true)}>Çalıştır</Button>
-          </div>
-        )}
-
-        {confirming && (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-ink-2">Emin misiniz?</span>
-            <Button
-              variant="danger"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
-            >
-              {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-            </Button>
-            <Button onClick={() => setConfirming(false)}>Vazgeç</Button>
-          </div>
-        )}
-      </div>
-
-      {remove.isError && (
-        <p className="mt-2 text-sm text-danger">
-          {describeError(remove.error).message}
-        </p>
-      )}
-
-      {showPrompt && !editing && (
-        <Well className="mt-4 max-h-80 overflow-auto p-3.5">
-          <pre className="font-mono text-xs leading-relaxed whitespace-pre-wrap">
-            {agent.prompt}
-          </pre>
-        </Well>
-      )}
-
-      {running && (
-        <div className="mt-4">
-          <StartRunForm agent={agent} onDone={() => setRunning(false)} />
+          )}
         </div>
-      )}
 
-      {editing && (
-        <div className="mt-4">
-          <AgentForm
-            agent={agent}
-            providers={providers}
-            models={models}
-            onDone={() => setEditing(false)}
-            inline
+        {remove.isError && (
+          <p className="mt-3 text-sm text-danger">
+            {describeError(remove.error).message}
+          </p>
+        )}
+
+        {/* ── Kullanım ── */}
+        <div className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+          <Metric
+            label={`Çalıştırma (${USAGE_DAYS}g)`}
+            value={usage ? formatCount(usage.runs) : "—"}
+            note={usage ? `${formatCount(usage.succeeded)} tamamlandı` : "kayıt yok"}
+          />
+          <Metric
+            label="Başarı"
+            value={usage ? formatPercent(usage.succeeded, usage.runs) : "—"}
+            note={usage && usage.failed > 0 ? `${usage.failed} başarısız` : undefined}
+            tone={
+              usage && usage.runs > 0
+                ? usage.succeeded / usage.runs >= 0.8
+                  ? "ok"
+                  : "warn"
+                : undefined
+            }
+          />
+          <Metric
+            label="Maliyet"
+            value={usage ? formatMoney(usage.costUsd) : "—"}
+            note={usage ? `${formatCompact(usage.tokens)} token` : undefined}
+          />
+          <Metric
+            label="Ort. süre"
+            value={usage ? formatDuration(usage.avgDurationSec) : "—"}
+            note={usage ? `${formatCompact(usage.filesChanged)} dosya değişti` : undefined}
           />
         </div>
+      </Card>
+
+      {/*
+        İki sütun ancak GERÇEKTEN yer varken (2xl).
+
+        `xl`'de denendi ve olmadı: soldaki liste zaten 340px alıyor, 1280px'lik
+        bir ekranda detaya kalan ~640px ikiye bölününce talimat sütunu 350px'e
+        düşüyor ve tek aralıklı metin her satırda sarıyordu — talimat, bu
+        ekranın en çok okunan içeriği.
+
+        `min-w-0` şart: ızgara sütunlarının varsayılan alt sınırı `auto`, yani
+        içeriklerinin doğal genişliği. Sağdaki model kimliği (uzun, kırılmayan
+        tek aralıklı bir metin) sütunu şişiriyor ve talimat sütununu birkaç
+        piksele eziyordu.
+      */}
+      <div className="grid items-start gap-4 2xl:grid-cols-[1.3fr_1fr]">
+        {/* ── Talimat ── */}
+        <Panel
+          className="min-w-0"
+          title="Talimat"
+          action={
+            <span className="text-2xs text-ink-3 tabular-nums">
+              {formatCount(agent.prompt.length)} karakter
+            </span>
+          }
+          padded={false}
+        >
+          {/*
+            Talimat GİZLENMİYOR.
+
+            Öncesinde "Talimatı gör" düğmesinin ardındaydı. Oysa bir agent'ın
+            ne olduğu talimatıdır — adı ve açıklaması onun özeti. Ekranın
+            asıl içeriğini bir tıklamanın arkasına koymak, ekranı boş
+            gösteriyordu.
+          */}
+          <pre className="max-h-105 overflow-auto px-4 py-3.5 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+            {agent.prompt}
+          </pre>
+        </Panel>
+
+        <div className="min-w-0 space-y-4">
+          {/* ── Model ── */}
+          <Panel title="Varsayılan model">
+            {agent.defaultModel ? (
+              <div className="space-y-3">
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-sm">{agent.defaultModel}</p>
+                  <p className="mt-0.5 text-xs text-ink-3">
+                    {provider?.name ?? "sağlayıcı bulunamadı"}
+                  </p>
+                </div>
+
+                {model ? (
+                  <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
+                    <Metric
+                      label="Bağlam"
+                      value={
+                        model.contextLength === null
+                          ? "—"
+                          : formatCompact(model.contextLength)
+                      }
+                      small
+                    />
+                    <Metric
+                      label="Girdi /M"
+                      value={formatMoney(model.promptPricePerMTok)}
+                      small
+                    />
+                    <Metric
+                      label="Çıktı /M"
+                      value={formatMoney(model.completionPricePerMTok)}
+                      small
+                    />
+                  </dl>
+                ) : (
+                  /* Katalogda yoksa sessiz geçilmez: model silinmiş ya da
+                     sağlayıcı değişmiş olabilir ve agent çalışmaz. */
+                  <Notice tone="warning">
+                    Bu model katalogda bulunamadı. Sağlayıcı kaldırılmış veya
+                    katalog güncellenmemiş olabilir.
+                  </Notice>
+                )}
+
+                {model?.supportsTools === false && (
+                  <Notice tone="warning">
+                    Model araç çağıramıyor — bu agent dosya okuyup değiştiremez.
+                  </Notice>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-3">
+                Seçilmemiş — her çalıştırmada model ayrıca seçilir.
+              </p>
+            )}
+          </Panel>
+
+          {/* ── Yetkiler ── */}
+          <Panel title="Yetkiler ve araçlar">
+            <ul className="divide-y divide-line">
+              <PermissionRow
+                Icon={IconEdit}
+                label="Dosya değiştirebilir"
+                on={agent.allowEdit}
+                note="Depodaki dosyaları yazabilir."
+              />
+              <PermissionRow
+                Icon={IconTerminal}
+                label="Komut çalıştırabilir"
+                on={agent.allowBash}
+                note="Container içinde kabuk komutu çalıştırır."
+              />
+              <PermissionRow
+                Icon={IconGlobe}
+                label="Ağa erişebilir"
+                on={agent.allowWebfetch}
+                note="Dış adreslerden içerik çekebilir."
+              />
+            </ul>
+
+            {/* Yetkisiz agent bir EKSİKLİK değil, güvenlik özelliği — ve bu
+                cümlenin kaybolmaması gerekiyor. */}
+            {!agent.allowEdit && !agent.allowBash && !agent.allowWebfetch && (
+              <p className="mt-3 text-xs text-ok">
+                Bu agent hiçbir şeyi değiştiremez; yalnızca okur.
+              </p>
+            )}
+
+            <div className="mt-4 space-y-3 border-t border-line pt-3">
+              <ToolList
+                label="Dış araçlar (MCP)"
+                names={mcpNames}
+                empty="Hiçbir dış araç sunucusu açılmamış."
+              />
+              <ToolList
+                label="Betikler"
+                names={scriptNames}
+                empty="Hazır betik atanmamış."
+                mono
+                /* Komut yetkisi kapalıyken betik container'a hiç kopyalanmaz;
+                   yazılmasaydı kullanıcı agent'ın betiği neden çağırmadığını
+                   hiçbir hata mesajı olmadan arardı. */
+                warning={
+                  !agent.allowBash && scriptNames.length > 0
+                    ? "Komut çalıştırma yetkisi kapalı — betikler ortama kopyalanmaz."
+                    : undefined
+                }
+              />
+            </div>
+          </Panel>
+
+          {/* ── Son çalıştırmalar ── */}
+          <Panel
+            title="Son çalıştırmalar"
+            action={
+              <Link href="/runs" className={panelLinkClass}>
+                Tümü
+              </Link>
+            }
+            padded={false}
+          >
+            {runs.length === 0 ? (
+              /* "Hiç çalışmadı" DENMİYOR: liste yalnızca son 100 çalıştırmaya
+                 bakıyor, daha eskisini görmüyor. Bilmediğimiz şeyi iddia
+                 etmiyoruz. */
+              <p className="px-4 py-3.5 text-sm text-ink-3">
+                Yakın geçmişte bu agent&apos;ın çalıştırması yok.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {runs.slice(0, 5).map((r) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/runs/${r.id}`}
+                      className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-raised"
+                    >
+                      <span className="shrink-0">
+                        <RunStatusBadge status={r.status} />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-xs">
+                        {r.task}
+                      </span>
+                      <span className="shrink-0 text-2xs text-ink-3">
+                        {formatRelative(r.createdAt)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Etiket + rakam. `small`, kart içindeki ikincil ölçüler için. */
+function Metric({
+  label,
+  value,
+  note,
+  tone,
+  small = false,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  /** Yalnızca yorumlanabilir bir değer varsa: başarı oranı gibi. */
+  tone?: "ok" | "warn";
+  small?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
+        {label}
+      </dt>
+      <dd
+        className={`mt-1 truncate font-semibold tabular-nums ${
+          small ? "text-sm" : "text-lg leading-none"
+        } ${tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : ""}`}
+      >
+        {value}
+      </dd>
+      {note && <p className="mt-1 truncate text-2xs text-ink-3">{note}</p>}
+    </div>
+  );
+}
+
+function PermissionRow({
+  Icon,
+  label,
+  on,
+  note,
+}: {
+  Icon: (p: { className?: string }) => React.ReactElement;
+  label: string;
+  on: boolean;
+  note: string;
+}) {
+  return (
+    <li className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+      <span className={`mt-0.5 shrink-0 ${on ? "text-warn" : "text-ink-3/40"}`}>
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={`block text-sm ${on ? "font-medium" : "text-ink-3"}`}>
+          {label}
+        </span>
+        {on && <span className="mt-0.5 block text-2xs text-ink-3">{note}</span>}
+      </span>
+      <span className="shrink-0 text-2xs text-ink-3">{on ? "açık" : "kapalı"}</span>
+    </li>
+  );
+}
+
+function ToolList({
+  label,
+  names,
+  empty,
+  mono = false,
+  warning,
+}: {
+  label: string;
+  names: string[];
+  empty: string;
+  mono?: boolean;
+  warning?: string;
+}) {
+  return (
+    <div>
+      <p className="text-2xs font-medium tracking-wide text-ink-3 uppercase">
+        {label}
+      </p>
+      {names.length === 0 ? (
+        <p className="mt-1 text-xs text-ink-3">{empty}</p>
+      ) : (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {names.map((n) => (
+            <span
+              key={n}
+              className={`rounded-md border border-line bg-raised px-1.5 py-px text-2xs ${
+                mono ? "font-mono" : ""
+              }`}
+            >
+              {n}
+            </span>
+          ))}
+        </div>
+      )}
+      {warning && (
+        <p className="mt-1.5 text-2xs text-warn">{warning}</p>
       )}
     </div>
   );
 }
 
-/**
- * Agent'ın neye yetkisi olduğu.
- *
- * Önceki hali üç yetkiyi de rozetle gösteriyordu: açık olanlar YEŞİL, kapalılar
- * gri. İki sorun vardı. Yeşil "iyi" demek; oysa burada "bu agent dosyalarınızı
- * değiştirebilir" demek — riskli olan durumu güvenli renkle boyuyordu. Ve beş
- * agent yan yana on beş rozet ediyordu.
- *
- * Şimdi yalnızca AÇIK olanlar yazılıyor; hiçbiri yoksa tek cümle. Kapalı bir
- * yetkinin ekranda yer kaplaması gerekmiyor — yokluğu zaten cevap.
- */
-function PermissionLine({ agent }: { agent: Agent }) {
-  /* Çip olarak kısaldılar: "dosya değiştirebilir" bir cümlenin parçasıydı,
-     "dosya" ise bir etiket. Tam anlam `title` ile duruyor. */
-  const izinli = [
-    agent.allowEdit && "dosya yazar",
-    agent.allowBash && "komut çalıştırır",
-    agent.allowWebfetch && "ağa çıkar",
-  ].filter(Boolean) as string[];
-
-  const mcp = agent.mcpServerIds.length;
-  // Betikler yalnızca komut yetkisi açıkken çalıştırılabiliyor; kapalıyken
-  // sayıyı yazmak, olmayan bir yeteneği varmış gibi göstermek olurdu.
-  const betik = agent.allowBash ? agent.scriptIds.length : 0;
-
-  /*
-   * Yetkiler ÇİP, cümle değil.
-   *
-   * Önceden "Yetkileri: dosya değiştirebilir · komut çalıştırabilir · ağa
-   * çıkabilir" diye tek satır düz metindi. İki sorunu vardı: satırdaki diğer
-   * üç metin bloğuyla aynı görünüyordu, ve bir agent'ın neye yetkili olduğu
-   * ancak cümle okunarak anlaşılıyordu — oysa bu, listede TARANAN bir bilgi.
-   *
-   * "Yalnızca okur" hâli bilerek ayrı tutuldu ve `ok` tonunda: bu bir eksiklik
-   * değil, güvenlik özelliği. Yetkisiz bir agent'ın deponuza yazamayacağını
-   * söylüyor ve o cümlenin kaybolmaması gerekiyordu.
-   */
-  return (
-    <>
-      {izinli.length === 0 ? (
-        <Badge tone="success" title="Bu agent hiçbir şeyi değiştiremez">
-          yalnızca okur
-        </Badge>
-      ) : (
-        izinli.map((y) => <Badge key={y}>{y}</Badge>)
-      )}
-      {mcp > 0 && (
-        <Badge tone="info" title="Dış araç sunucusu (MCP)">
-          {mcp} dış araç
-        </Badge>
-      )}
-      {betik > 0 && <Badge title="Hazır betik">{betik} betik</Badge>}
-    </>
-  );
-}
+/* ── Form ────────────────────────────────────────────────────────────────── */
 
 function AgentForm({
   agent,
   providers,
   models,
   onDone,
-  inline = false,
 }: {
   agent?: Agent;
   providers: LLMProvider[];
   models: Model[];
   onDone: () => void;
-  inline?: boolean;
 }) {
   const queryClient = useQueryClient();
   const editing = agent !== undefined;
@@ -442,79 +1009,101 @@ function AgentForm({
   );
   const canSubmit = name.trim() !== "" && prompt.trim() !== "";
 
-  const body = (
+  return (
     <form
-      className="space-y-3"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSubmit) save.mutate();
       }}
     >
-      <div className="flex gap-3">
-        <label className="block flex-1">
-          <span className="text-xs text-ink-2">Ad</span>
-          <Input
-            className="mt-1"
-            value={name}
-            placeholder="Kod İncelemecisi"
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label className="block flex-2">
-          <span className="text-xs text-ink-2">Açıklama</span>
-          <Input
-            className="mt-1"
-            value={description}
-            placeholder="Ne yaptığını bir cümleyle anlatın"
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-      </div>
+      {/*
+        Form ÜÇ PANOYA bölündü: kimlik, talimat, yetki ve araçlar.
 
-      <label className="block">
-        <span className="text-xs text-ink-2">
-          Talimat (agent&apos;a verilen sistem yönergesi)
-        </span>
+        Öncesinde tek bir kartın içinde on bir alan alt alta diziliydi ve
+        aralarındaki tek ayrım `fieldset` kenarlıklarıydı. Bir agent'ı
+        düzenleyen kişi genellikle TEK bir şeyi değiştirmek ister; hangi
+        bölümde olduğunu görmesi gerekiyor.
+      */}
+      <Panel title={editing ? `${agent.name} — düzenle` : "Yeni agent"}>
+        <div className="flex flex-wrap gap-3">
+          <label className="block min-w-48 flex-1">
+            <span className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+              Ad
+            </span>
+            <Input
+              className="mt-1"
+              value={name}
+              placeholder="Kod İncelemecisi"
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className="block min-w-64 flex-2">
+            <span className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+              Açıklama
+            </span>
+            <Input
+              className="mt-1"
+              value={description}
+              placeholder="Ne yaptığını bir cümleyle anlatın"
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="mt-3">
+          <span className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+            Varsayılan model
+          </span>
+          <div className="mt-1">
+            <ModelPicker
+              models={models}
+              providerId={model?.providerId ?? null}
+              modelId={model?.modelId ?? ""}
+              onChange={setModel}
+              emptyLabel="Model ara… (seçilmezse her çalıştırmada seçilir)"
+            />
+          </div>
+        </div>
+
+        {/* Araç desteği agent'ın çalışıp çalışmayacağını belirler; sessiz geçilmez. */}
+        {selected && selected.supportsTools === false && (
+          <div className="mt-3">
+            <Notice tone="warning">
+              Seçilen model araç çağıramıyor. Agent dosya okuyup değiştiremeyeceği
+              için büyük olasılıkla işe yaramaz.
+            </Notice>
+          </div>
+        )}
+        {selected && selected.supportsTools === null && (
+          <div className="mt-3">
+            <Notice tone="warning">
+              Sağlayıcı bu modelin araç desteğini bildirmiyor. Çalışabilir ama
+              garanti değil.
+            </Notice>
+          </div>
+        )}
+      </Panel>
+
+      <Panel
+        title="Talimat"
+        description="Agent'a verilen sistem yönergesi. Ne yapacağını, neyi yapmayacağını ve çıktıyı nasıl vereceğini burası belirler."
+        padded={false}
+      >
         <Textarea
-          className="mt-1 h-64 font-mono text-xs leading-relaxed"
+          className="h-72 rounded-none border-0 bg-transparent font-mono text-xs leading-relaxed focus:border-0"
           value={prompt}
           placeholder="Sen bir kod incelemecisisin. …"
           onChange={(e) => setPrompt(e.target.value)}
+          aria-label="Talimat"
         />
-      </label>
+      </Panel>
 
-      <div>
-        <span className="text-2xs tracking-wide text-ink-2 uppercase">
-          Varsayılan model
-        </span>
-        <div className="mt-1">
-          <ModelPicker
-            models={models}
-            providerId={model?.providerId ?? null}
-            modelId={model?.modelId ?? ""}
-            onChange={setModel}
-            emptyLabel="Model ara… (seçilmezse her çalıştırmada seçilir)"
-          />
-        </div>
-      </div>
-
-      {/* Araç desteği agent'ın çalışıp çalışmayacağını belirler; sessiz geçilmez. */}
-      {selected && selected.supportsTools === false && (
-        <Notice tone="warning">
-          Seçilen model araç çağıramıyor. Agent dosya okuyup değiştiremeyeceği
-          için büyük olasılıkla işe yaramaz.
-        </Notice>
-      )}
-      {selected && selected.supportsTools === null && (
-        <Notice tone="warning">
-          Sağlayıcı bu modelin araç desteğini bildirmiyor. Çalışabilir ama garanti
-          değil.
-        </Notice>
-      )}
-
-      <fieldset className="rounded border border-line p-3">
-        <legend className="px-1 text-xs text-ink-2">Yetkiler</legend>
-        <div className="flex flex-wrap gap-4">
+      <Panel
+        title="Yetkiler ve araçlar"
+        description="Agent'ın çalıştırma ortamında neye erişebileceği. Kapalı bir yetki, o yeteneğin ortama hiç girmemesi demektir."
+      >
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Checkbox
             label="Dosya değiştirebilir"
             checked={allowEdit}
@@ -531,106 +1120,113 @@ function AgentForm({
             onChange={setAllowWebfetch}
           />
         </div>
-      </fieldset>
 
-      {/* Dış araçlar da bir YETKİDİR: bu agent'ın neye erişebildiğinin parçası.
-          Ayrı bir kutuda çünkü listesi değişken ve her kurulumda farklı. */}
-      <fieldset className="mt-3 rounded border border-line p-3">
-        <legend className="px-1 text-xs text-ink-2">Dış araçlar (MCP)</legend>
-        {mcpServers.data === undefined ? (
-          <p className="text-xs text-ink-3">Yükleniyor…</p>
-        ) : mcpServers.data.length === 0 ? (
-          <p className="text-xs text-ink-3">
-            Tanımlı sunucu yok. Ayarlar → Dış araçlar bölümünden ekleyebilirsiniz.
-          </p>
-        ) : (
+        <div className="mt-4 grid gap-4 border-t border-line pt-4 md:grid-cols-2">
+          {/* Dış araçlar da bir YETKİDİR: bu agent'ın neye erişebildiğinin
+              parçası. Ayrı kutuda çünkü listesi her kurulumda farklı. */}
           <div>
-            <PickerList>
-              {mcpServers.data.map((srv) => (
-                <PickerRow
-                  key={srv.id}
-                  title={srv.name}
-                  note={`${srv.tools.length} araç`}
-                  checked={mcpIds.includes(srv.id)}
-                  onChange={(on) =>
-                    setMcpIds((prev) =>
-                      on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
-                    )
-                  }
-                />
-              ))}
-            </PickerList>
-            <p className="mt-2 text-2xs text-ink-3">
-              Seçilmeyen sunucuların araçları bu agent&apos;a hiç sunulmaz.
+            <p className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+              Dış araçlar (MCP)
             </p>
-          </div>
-        )}
-      </fieldset>
-
-      {/* Betikler: model NE ZAMAN çağıracağına karar verir, NE YAPACAĞINA betik
-          karar verir. Prosedür işlerinde doğaçlamayı kesen tek şey bu. */}
-      <fieldset className="mt-3 rounded border border-line p-3">
-        <legend className="px-1 text-xs text-ink-2">Betikler</legend>
-        {scripts.data === undefined ? (
-          <p className="text-xs text-ink-3">Yükleniyor…</p>
-        ) : scripts.data.items.length === 0 ? (
-          <p className="text-xs text-ink-3">
-            Tanımlı betik yok. Ayarlar → Betikler bölümünden ekleyebilirsiniz.
-          </p>
-        ) : (
-          <div>
-            <PickerList>
-              {scripts.data.items.map((s) => (
-                <PickerRow
-                  key={s.id}
-                  title={s.name}
-                  note={s.description}
-                  mono
-                  checked={scriptIds.includes(s.id)}
-                  onChange={(on) =>
-                    setScriptIds((prev) =>
-                      on ? [...prev, s.id] : prev.filter((id) => id !== s.id),
-                    )
-                  }
-                />
-              ))}
-            </PickerList>
-
-            {/*
-             * Sessiz bir kural görünür kılınıyor.
-             *
-             * Komut yetkisi kapalıyken betik container'a hiç kopyalanmıyor.
-             * Yazılmasaydı kullanıcı betiği seçer, kaydeder, çalıştırır ve
-             * agent'ın onu neden hiç çağırmadığını arardı — hiçbir hata mesajı
-             * çıkmadan.
-             */}
-            {!allowBash && scriptIds.length > 0 ? (
-              <div className="mt-2">
-                <Notice tone="warning">
-                  Bu agent&apos;ın <strong>komut çalıştırma</strong> yetkisi kapalı.
-                  Seçilen betikler kaydedilir ama çalıştırma ortamına
-                  kopyalanmaz — yetkiyi açana kadar kullanılamazlar.
-                </Notice>
-              </div>
-            ) : (
-              <p className="mt-2 text-2xs text-ink-3">
-                Seçilen betikler agent&apos;ın ortamına konur ve talimatına
-                yazılır. Ne zaman çağıracağına agent karar verir.
+            {mcpServers.data === undefined ? (
+              <p className="mt-1 text-xs text-ink-3">Yükleniyor…</p>
+            ) : mcpServers.data.length === 0 ? (
+              <p className="mt-1 text-xs text-ink-3">
+                Tanımlı sunucu yok. Ayarlar → Dış araçlar bölümünden
+                ekleyebilirsiniz.
               </p>
+            ) : (
+              <>
+                <Well className="mt-1.5 px-3">
+                  <PickerList>
+                    {mcpServers.data.map((srv) => (
+                      <PickerRow
+                        key={srv.id}
+                        title={srv.name}
+                        note={`${srv.tools.length} araç`}
+                        checked={mcpIds.includes(srv.id)}
+                        onChange={(on) =>
+                          setMcpIds((prev) =>
+                            on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
+                          )
+                        }
+                      />
+                    ))}
+                  </PickerList>
+                </Well>
+                <p className="mt-1.5 text-2xs text-ink-3">
+                  Seçilmeyen sunucuların araçları bu agent&apos;a hiç sunulmaz.
+                </p>
+              </>
             )}
           </div>
-        )}
-      </fieldset>
+
+          {/* Betikler: model NE ZAMAN çağıracağına karar verir, NE YAPACAĞINA
+              betik karar verir. Prosedür işlerinde doğaçlamayı kesen tek şey. */}
+          <div>
+            <p className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+              Betikler
+            </p>
+            {scripts.data === undefined ? (
+              <p className="mt-1 text-xs text-ink-3">Yükleniyor…</p>
+            ) : scripts.data.items.length === 0 ? (
+              <p className="mt-1 text-xs text-ink-3">
+                Tanımlı betik yok. Ayarlar → Betikler bölümünden ekleyebilirsiniz.
+              </p>
+            ) : (
+              <>
+                <Well className="mt-1.5 px-3">
+                  <PickerList>
+                    {scripts.data.items.map((s) => (
+                      <PickerRow
+                        key={s.id}
+                        title={s.name}
+                        note={s.description}
+                        mono
+                        checked={scriptIds.includes(s.id)}
+                        onChange={(on) =>
+                          setScriptIds((prev) =>
+                            on ? [...prev, s.id] : prev.filter((id) => id !== s.id),
+                          )
+                        }
+                      />
+                    ))}
+                  </PickerList>
+                </Well>
+
+                {/*
+                 * Sessiz bir kural görünür kılınıyor: komut yetkisi kapalıyken
+                 * betik container'a hiç kopyalanmıyor. Yazılmasaydı kullanıcı
+                 * betiği seçer, kaydeder, çalıştırır ve agent'ın onu neden hiç
+                 * çağırmadığını hiçbir hata mesajı olmadan arardı.
+                 */}
+                {!allowBash && scriptIds.length > 0 ? (
+                  <div className="mt-2">
+                    <Notice tone="warning">
+                      Bu agent&apos;ın <strong>komut çalıştırma</strong> yetkisi
+                      kapalı. Seçilen betikler kaydedilir ama çalıştırma ortamına
+                      kopyalanmaz.
+                    </Notice>
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-2xs text-ink-3">
+                    Seçilen betikler agent&apos;ın ortamına konur ve talimatına
+                    yazılır.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </Panel>
 
       {save.isError && (
-        <div className="rounded border border-danger/35 bg-danger-soft px-3 py-2 text-sm">
-          <p className="font-medium text-danger">
-            {describeError(save.error).message}
-          </p>
-        </div>
+        <Notice tone="error" title={describeError(save.error).message}>
+          {describeError(save.error).hint}
+        </Notice>
       )}
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="submit"
           variant="primary"
@@ -653,8 +1249,6 @@ function AgentForm({
       </div>
     </form>
   );
-
-  return inline ? body : <Card>{body}</Card>;
 }
 
 /*
@@ -664,13 +1258,13 @@ function AgentForm({
  * varken sorun görünmüyordu, ikinci kayıt eklenince iki satır aynı satıra
  * yapıştı. `space-y-*` bunu düzeltmez — dikey boşluk satır içi öğelerde akmaz.
  * Kap açıkça `flex-col` olmak zorunda.
- *
- * Ayrıca bu liste iki bilgi taşıyor (ad + ne olduğu). Tek satıra "ad — açıklama"
- * diye sıkıştırıldığında uzun açıklama satırı taşırıyor ve göz adı bulamıyor;
- * ad üstte, açıklama altında duruyor.
  */
 function PickerList({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-col divide-y divide-line">{children}</div>;
+  return (
+    <div className="flex max-h-44 flex-col divide-y divide-line overflow-y-auto">
+      {children}
+    </div>
+  );
 }
 
 function PickerRow({
@@ -688,7 +1282,7 @@ function PickerRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 py-2 first:pt-0 last:pb-0">
+    <label className="flex cursor-pointer items-start gap-2.5 py-2">
       {/* mt: kutu, iki satırlık metnin ortasına değil ilk satırın hizasına oturur. */}
       <input
         type="checkbox"
@@ -705,4 +1299,3 @@ function PickerRow({
     </label>
   );
 }
-

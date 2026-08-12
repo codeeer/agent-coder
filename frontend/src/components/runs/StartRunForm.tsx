@@ -13,6 +13,7 @@ import {
   Card,
   Input,
   Notice,
+  Panel,
   Select,
   Textarea,
 } from "@/components/ui/primitives";
@@ -89,7 +90,11 @@ export function StartRunForm({
   }
 
   return (
-    <Card>
+    /* Başlık, formun HANGİ agent'ı çalıştıracağını söylüyor. Öncesinde bu
+       bilgi yalnızca görev alanının ipucu metnindeydi; form bir liste
+       satırının altında açıldığı için bağlam satırdan okunuyordu. Artık
+       kendi sütununda duruyor ve bağlamı kendisi taşımak zorunda. */
+    <Panel title={`${agent.name} çalıştır`}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -199,6 +204,6 @@ export function StartRunForm({
           )}
         </div>
       </form>
-    </Card>
+    </Panel>
   );
 }
