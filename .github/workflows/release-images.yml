@@ -149,6 +149,20 @@ jobs:
           docker buildx imagetools inspect "$IMAJ" | grep -q "linux/arm64"
           echo "Runner imajı doğrulandı."
 
+      # Sağlayıcı sürücüleri imajda mı, yoksa koşu anında mı iniyor?
+      #
+      # Bir zamanlar koşu anında iniyorlardı: SSL denetimi yapan kurumsal
+      # ağlarda istek düşüyor, air-gapped ortamda ise koşu hiç mümkün
+      # olmuyordu (spec 003, 2026-08-12). Test tamamen kapalı bir ağda
+      # (internal: true) koşuyor; isteğin sahte sağlayıcıya ULAŞMASI
+      # sürücünün imajdan geldiğini kanıtlıyor.
+      - uses: actions/checkout@v4
+      - name: Kapalı ağda sağlayıcı sürücüsü
+        run: |
+          set -euo pipefail
+          bash runner/offline_test.sh \
+            "ghcr.io/${{ github.repository }}-runner:${{ steps.etiket.outputs.deger }}"
+
       - name: Backend imajı
         run: |
           set -euo pipefail
