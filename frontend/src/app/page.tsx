@@ -245,15 +245,9 @@ export default function DashboardPage() {
 function KpiStrip({ data }: { data: ReportSummary }) {
   const t = data.totals;
   const p = data.previous;
-  const d = data.daily;
 
   const finished = t.runs - t.active;
   const prevFinished = p.runs - p.active;
-
-  const dailyRate = d.map((x) => {
-    const done = x.runs - x.active;
-    return done > 0 ? (x.succeeded / done) * 100 : 0;
-  });
 
   const note = "öncekine göre";
 
@@ -263,7 +257,6 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       value: formatCount(t.runs),
       current: t.runs,
       previous: p.runs,
-      spark: d.map((x) => x.runs),
       upIsGood: true,
       periodNote: note,
     },
@@ -272,7 +265,6 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       value: formatCount(t.succeeded),
       current: t.succeeded,
       previous: p.succeeded,
-      spark: d.map((x) => x.succeeded),
       upIsGood: true,
       periodNote: note,
     },
@@ -281,7 +273,6 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       value: formatPercent(t.succeeded, finished),
       current: finished > 0 ? t.succeeded / finished : 0,
       previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
-      spark: dailyRate,
       upIsGood: true,
       periodNote: note,
     },
@@ -290,7 +281,6 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       value: formatCount(t.prsOpened),
       current: t.prsOpened,
       previous: p.prsOpened,
-      spark: d.map((x) => x.prsOpened),
       upIsGood: true,
       periodNote: note,
     },
@@ -307,7 +297,6 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       value: formatMoney(t.costUsd),
       current: t.costUsd,
       previous: p.costUsd,
-      spark: d.map((x) => x.costUsd),
       // Şeridin TEK "aşağısı iyi" kartı: ölçek büyürken maliyetin artması
       // normaldir, yönetilebilir olan birim maliyettir.
       upIsGood: false,
@@ -532,7 +521,12 @@ function Outcomes({ data }: { data: ReportSummary }) {
       }
     >
       <div className="py-2">
-        <Donut slices={slices} total={t.runs} totalLabel="çalıştırma" />
+        <Donut
+          slices={slices}
+          centerValue={formatCount(t.runs)}
+          centerNote="çalıştırma"
+          formatValue={formatCount}
+        />
       </div>
 
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4">

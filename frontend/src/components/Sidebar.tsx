@@ -41,7 +41,7 @@ const NAV = [
     items: [
       { href: "/workflows", label: "Akışlar", Icon: IconWorkflow },
       { href: "/runs", label: "Çalıştırmalar", Icon: IconPlay },
-      { href: "/reports", label: "Rapor", Icon: IconReport },
+      { href: "/reports", label: "Raporlar", Icon: IconReport },
     ],
   },
   {

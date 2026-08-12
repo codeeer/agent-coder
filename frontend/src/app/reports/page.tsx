@@ -6,14 +6,14 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { readableFailure } from "@/lib/failure";
 import { describeError } from "@/lib/errors";
-import type { ReportGroup, ReportSummary, ReportTotals } from "@/lib/types";
+import type { ReportGroup, ReportSummary, ReportTotals, Run } from "@/lib/types";
 import { BarList } from "@/components/charts/BarList";
-import { StatCard, type StatCardProps } from "@/components/ui/StatCard";
+import { Donut } from "@/components/charts/Donut";
+import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
 import { CostTrendChart } from "@/components/charts/CostTrendChart";
-import {
-  RunsByDayChart,
-  RunsByDayTable,
-} from "@/components/charts/RunsByDayChart";
+import { RunsByDayTable } from "@/components/charts/RunsByDayChart";
+import { StatCard, type StatCardProps } from "@/components/ui/StatCard";
+import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import {
   formatCompact,
   formatCount,
@@ -22,27 +22,46 @@ import {
   formatPercent,
   formatPerUnit,
 } from "@/components/charts/format";
-import { IconAgent } from "@/components/ui/icons";
+import {
+  IconAgent,
+  IconAlert,
+  IconCheck,
+  IconChip,
+  IconComment,
+  IconCost,
+  IconEdit,
+  IconFolder,
+  IconPlay,
+  IconPullRequest,
+  IconRefresh,
+} from "@/components/ui/icons";
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
   Notice,
   PageHeader,
-  Section,
+  Panel,
   Segmented,
   Select,
   Skeleton,
   Toolbar,
+  formatRelative,
+  panelLinkClass,
 } from "@/components/ui/primitives";
 
 /**
  * Rapor — yönetici özeti.
  *
  * Tek soruya cevap verir: "para nereye gitti, karşılığında ne üretildi, ne
- * kadarı tuttu?" Agent'ın nasıl çalıştırıldığı (arayüz, API, ileride workflow)
- * fark etmez; hepsi aynı çalıştırma geçmişine düştüğü için rapor eksiksizdir.
+ * kadarı tuttu?" Agent'ın nasıl çalıştırıldığı (arayüz, API, akış) fark
+ * etmez; hepsi aynı çalıştırma geçmişine düştüğü için rapor eksiksizdir.
+ *
+ * DÖNEM SEÇENEKLERİ 7/30/90 İLE SINIRLI ve bu bilinçli. Uç yalnızca "kaç
+ * gün geriye" parametresi alıyor; "geçen ay" ya da serbest tarih aralığı
+ * bugünden geriye sayan bir pencereyle ifade edilemez. Eklenseydi seçilen
+ * aralık ile gösterilen aralık birbirini tutmazdı. Ekranda yazan tarihler
+ * seçimden türetilmiyor, yanıtın kendi `from`/`to` alanlarından okunuyor.
  */
 
 const PERIODS = [
@@ -51,11 +70,17 @@ const PERIODS = [
   { id: "90", label: "90 gün" },
 ] as const;
 
+/** Son çalıştırmalar panosunun penceresi. */
+const RECENT_LIMIT = 8;
+
 export default function ReportsPage() {
   const [days, setDays] = useState<(typeof PERIODS)[number]["id"]>("30");
   const [project, setProject] = useState("");
 
-  const projects = useQuery({ queryKey: ["projects"], queryFn: () => api.projects.list({ limit: 200 }) });
+  const projects = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => api.projects.list({ limit: 200 }),
+  });
 
   const report = useQuery({
     queryKey: ["report", days, project],
@@ -63,25 +88,30 @@ export default function ReportsPage() {
       api.reports.summary({ days: Number(days), project: project || undefined }),
   });
 
+  // Son çalıştırmalar rapor ucunda yok; mevcut liste ucundan geliyor.
+  const runs = useQuery({
+    queryKey: ["runs", "reports-panel", project],
+    queryFn: () =>
+      api.runs.list({ limit: RECENT_LIMIT, project: project || undefined }),
+    refetchInterval: (query) =>
+      query.state.data?.items.some((r) => isActive(r.status)) ? 5000 : false,
+  });
+
   const data = report.data;
 
   return (
-    <div className="space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title="Rapor"
-        description={
-          data
-            ? `${data.days} günlük dönem · ${data.timezone} saatiyle`
-            : "Agent'ların ne yaptığını ve neye mal olduğunu özetler."
-        }
+        title="Raporlar"
+        description="Agent'ların ne yaptığını ve neye mal olduğunu özetler."
       />
 
-      {/* Süzgeçler başlığın DEĞİL listenin üstünde: dönem ve proje seçimi
-          sayfanın tamamına uygulanır ve her ekranda aynı yerde durur. */}
       <Toolbar>
-        {/* Genişlik SARMALAYICIDAN gelir: Select'in kendi sınıfı w-full
-            içerir ve dışarıdan verilen bir genişlik onu yenemez. */}
-        <div className="w-48 shrink-0">
+        <Segmented label="Dönem" options={PERIODS} value={days} onChange={setDays} />
+
+        {/* Genişlik SARMALAYICIDAN gelir: Select'in kendi sınıfı `w-full`
+            taşır ve dışarıdan verilen bir genişlik onu yenemez. */}
+        <div className="w-44 shrink-0">
           <Select
             className="h-8 text-xs"
             value={project}
@@ -97,149 +127,223 @@ export default function ReportsPage() {
           </Select>
         </div>
 
-        <Segmented label="Dönem" options={PERIODS} value={days} onChange={setDays} />
+        {/* Dönemin GERÇEK sınırları — gün sayısından hesaplanmıyor, yanıttan
+            okunuyor. Backend saat dilimini kendisi uyguluyor ve iki hesap
+            birbirini tutmayabilir. */}
+        {data && (
+          <span className="hidden text-xs text-ink-2 tabular-nums lg:block">
+            {formatRange(data.from, data.to)}
+          </span>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {report.isFetching && (
+            <span className="text-2xs text-ink-3">tazeleniyor…</span>
+          )}
+          <Button
+            size="sm"
+            icon={<IconRefresh className="size-4" />}
+            onClick={() => {
+              void report.refetch();
+              void runs.refetch();
+            }}
+          >
+            Yenile
+          </Button>
+        </div>
       </Toolbar>
 
-      {report.isPending && <Skeleton rows={4} />}
-      {report.isError && (
-        <Notice tone="error" title={describeError(report.error).message}>
-          {describeError(report.error).hint}
-        </Notice>
-      )}
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
+        {report.isPending && <Skeleton rows={4} />}
+        {report.isError && (
+          <Notice tone="error" title={describeError(report.error).message}>
+            {describeError(report.error).hint}
+          </Notice>
+        )}
 
-      {data && data.totals.runs === 0 && data.previous.runs === 0 && (
-        <EmptyState
-          icon={<IconAgent className="size-4" />}
-          title="Bu dönemde çalıştırma yok"
-          description="Bir agent çalıştırdığınızda maliyet, üretilen değişiklik ve başarı oranı burada toplanır."
-          action={
-            <Link href="/agents">
-              <Button variant="primary">Agent çalıştır</Button>
-            </Link>
-          }
-        />
-      )}
+        {data && data.totals.runs === 0 && data.previous.runs === 0 && (
+          <EmptyState
+            icon={<IconAgent className="size-4" />}
+            title="Bu dönemde çalıştırma yok"
+            description="Bir agent çalıştırdığınızda maliyet, üretilen değişiklik ve başarı oranı burada toplanır."
+            action={
+              <Link href="/agents">
+                <Button variant="primary">Agent çalıştır</Button>
+              </Link>
+            }
+          />
+        )}
 
-      {data && (data.totals.runs > 0 || data.previous.runs > 0) && (
-        <>
-          <KpiStrip data={data} />
-          <Headline data={data} />
-          <Charts data={data} />
-          <Breakdowns data={data} />
-        </>
-      )}
+        {data && (data.totals.runs > 0 || data.previous.runs > 0) && (
+          <div className="space-y-4">
+            <KpiStrip data={data} />
+
+            <div className="grid items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
+              <Panel
+                title="Gün gün seyir"
+                action={
+                  <span className="text-2xs text-ink-3">
+                    {data.days} gün · {data.timezone}
+                  </span>
+                }
+              >
+                <DailyTrendChart days={data.daily} />
+              </Panel>
+
+              <TokenByModel data={data} />
+            </div>
+
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              <AgentPerformance rows={data.byAgent} />
+              <RecentRuns runs={runs.data?.items ?? []} loading={runs.isPending} />
+            </div>
+
+            <div className="grid items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
+              <Panel
+                title="Gün gün maliyet"
+                action={
+                  <span className="font-mono text-xs tabular-nums text-ink-2">
+                    {formatMoney(data.totals.costUsd)}
+                  </span>
+                }
+              >
+                <CostTrendChart days={data.daily} />
+              </Panel>
+
+              <Balance data={data} />
+            </div>
+
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              <Panel title="Proje bazında">
+                <BarList
+                  rows={data.byProject.map((g) => ({
+                    key: g.key,
+                    label: g.label,
+                    value: g.runs,
+                    valueLabel: `${formatCount(g.runs)} iş`,
+                    note: `${formatMoney(g.costUsd)} · +${formatCompact(
+                      g.additions,
+                    )} −${formatCompact(g.deletions)} satır`,
+                  }))}
+                />
+              </Panel>
+
+              {data.failures.length > 0 ? (
+                <Panel
+                  title="Tekrar eden hatalar"
+                  action={
+                    <span className="text-2xs text-ink-3">
+                      {formatCount(data.failures.length)} tür
+                    </span>
+                  }
+                  padded={false}
+                >
+                  <ul className="divide-y divide-line">
+                    {data.failures.map((f) => (
+                      <li
+                        key={f.message}
+                        className="flex items-start justify-between gap-4 px-4 py-2.5"
+                      >
+                        <span
+                          className="min-w-0 flex-1 text-xs text-ink-2"
+                          title={f.message}
+                        >
+                          {readableFailure(f.message)}
+                        </span>
+                        <Badge tone="danger">{formatCount(f.count)}×</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </Panel>
+              ) : (
+                /* Hata yoksa yeri boş bırakılmıyor: gün gün döküm buraya
+                   geliyor. Tablo isteğe bağlı bir süs değil — grafikteki
+                   sarı, açık temada 3:1 kontrastın altında kalıyor ve
+                   sayıya renkten bağımsız bir yol her zaman açık olmalı. */
+                <Panel title="Gün gün döküm" padded={false}>
+                  <div className="max-h-80 overflow-y-auto px-4 py-3">
+                    <RunsByDayTable days={data.daily} />
+                  </div>
+                </Panel>
+              )}
+            </div>
+
+            <Panel
+              title="Model bazında"
+              action={
+                <span className="text-2xs text-ink-3">
+                  {formatCount(data.byModel.length)} model
+                </span>
+              }
+              padded={false}
+            >
+              <GroupTable rows={data.byModel} totals={data.totals} />
+            </Panel>
+
+            {/* Verinin tazeliği. Referanstaki "şu tarihte güncellendi"
+                satırının karşılığı ve GERÇEK: sorgu yanıtı ne zaman
+                aldığını biliyor. */}
+            <p className="flex items-center justify-center gap-1.5 pb-2 text-2xs text-ink-3">
+              <IconRefresh className="size-3.5" />
+              Veriler {formatRelative(new Date(report.dataUpdatedAt).toISOString())}
+              &nbsp;güncellendi
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ── KPI şeridi ──────────────────────────────────────────────────────────── */
+/* ── Rakam şeridi ────────────────────────────────────────────────────────── */
 
 /**
- * Dönemin tamamını tek bakışta veren rakam şeridi.
+ * Dönemin on rakamı — her biri yönüyle birlikte.
  *
- * Öncesinde bu bilgiler kahraman kartının altında tek satırlık düz metin
- * olarak duruyordu ("Çalıştırma: 42 · Kod üreten: 9 · …"): sekiz rakam aynı
- * puntoda, aynı renkte, yan yana. Hiçbiri diğerinden ayrılmıyordu ve
- * hiçbirinin YÖNÜ görünmüyordu — 42 çalıştırma iyi mi kötü mü, artmış mı
- * azalmış mı, okunamıyordu.
- *
- * Her kart üç şey söylüyor: ne olduğu, kaç olduğu, hangi yöne gittiği.
- *
- * ÖLÇÜLMEYEN HİÇBİR ŞEY YOK. Bu tür panolarda sık görülen "birleştirilen PR",
- * "reddedilen PR" ya da "kazanılan süre" gibi rakamlar burada bilerek yok:
- * sistem PR'ın sonrasını takip etmiyor ve "kazanılan süre" ölçülen değil
- * uydurulan bir sayıdır. Ekran, bilmediği şeyi ima etmez (spec 012 K4).
+ * ÖLÇÜLMEYEN HİÇBİR ŞEY YOK. Referans tasarımda "Jira yorum" ve "aktif
+ * agent" kutuları vardı; ikisinin de bu üründe karşılığı yok — Jira
+ * yorumları sayılmıyor ve agent'lar sürekli çalışan süreçler değil, iş
+ * başına açılıp kapanan container'lar. Yerlerine gerçekten ölçülen iki
+ * rakam kondu: gönderilen branch ve değişen satır.
  */
 function KpiStrip({ data }: { data: ReportSummary }) {
   const t = data.totals;
   const p = data.previous;
-  const d = data.daily;
-
-  /** Günlük başarı oranı — biten kayıtlar üzerinden; süren işler payda dışı. */
-  const dailyRate = d.map((x) => {
-    const finished = x.runs - x.active;
-    return finished > 0 ? (x.succeeded / finished) * 100 : 0;
-  });
 
   const finished = t.runs - t.active;
   const prevFinished = p.runs - p.active;
-
-  /*
-   * İlk kart SONUÇ rakamıdır ve şeridin en soldaki, yani en çok okunan yeri.
-   *
-   * PR düğümü olmayan bir kurulumda "Açılan PR: 0" yazmak, en görünür yere
-   * sistemin hiç çalışmadığı izlenimini koymak olurdu. Böyle bir kurulumda
-   * sonuç rakamı tamamlanan işe düşer — bu ayrım kahraman karttan devralındı.
-   */
-  const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
-
   const note = "öncekine göre";
 
   const cards: StatCardProps[] = [
-    usePRs
-      ? {
-          label: "Açılan PR",
-          value: formatCount(t.prsOpened),
-          current: t.prsOpened,
-          previous: p.prsOpened,
-          spark: d.map((x) => x.prsOpened),
-          upIsGood: true,
-          periodNote: note,
-        }
-      : {
-          label: "Tamamlanan iş",
-          value: formatCount(t.succeeded),
-          current: t.succeeded,
-          previous: p.succeeded,
-          spark: d.map((x) => x.succeeded),
-          upIsGood: true,
-          periodNote: note,
-        },
     {
       label: "Çalıştırma",
       value: formatCount(t.runs),
       current: t.runs,
       previous: p.runs,
-      spark: d.map((x) => x.runs),
       upIsGood: true,
       periodNote: note,
+      icon: <IconPlay className="size-3.5" />,
+      tone: "accent",
     },
     {
-      label: "Başarı",
-      value: formatPercent(t.succeeded, finished),
-      current: finished > 0 ? t.succeeded / finished : 0,
-      previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
-      spark: dailyRate,
+      label: "Açılan PR",
+      value: formatCount(t.prsOpened),
+      current: t.prsOpened,
+      previous: p.prsOpened,
       upIsGood: true,
       periodNote: note,
+      icon: <IconPullRequest className="size-3.5" />,
+      tone: "success",
     },
     {
-      label: "Kod üreten",
-      value: formatCount(t.runsWithCode),
-      current: t.runsWithCode,
-      previous: p.runsWithCode,
+      label: "Jira'dan",
+      value: formatCount(t.jiraTasks),
+      current: t.jiraTasks,
+      previous: p.jiraTasks,
       upIsGood: true,
       periodNote: note,
-    },
-    {
-      label: "Değişen dosya",
-      value: formatCompact(t.filesChanged),
-      current: t.filesChanged,
-      previous: p.filesChanged,
-      /* Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
-         Yeşil/kırmızı boyamak olmayan bir yargı üretirdi. */
-      upIsGood: null,
-      periodNote: note,
-    },
-    {
-      // Etiket KISA: sekiz kart tek sıraya dizildiğinde "GÖNDERİLEN BRAN…"
-      // diye kırpılıyordu.
-      label: "Branch",
-      value: formatCount(t.pushedBranches),
-      current: t.pushedBranches,
-      previous: p.pushedBranches,
-      upIsGood: true,
-      periodNote: note,
+      icon: <IconComment className="size-3.5" />,
+      tone: "info",
     },
     {
       label: "Token",
@@ -248,33 +352,79 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       previous: p.promptTokens + p.completionTokens,
       upIsGood: null,
       periodNote: note,
+      icon: <IconChip className="size-3.5" />,
+      tone: "series",
     },
     {
       label: "Maliyet",
       value: formatMoney(t.costUsd),
       current: t.costUsd,
       previous: p.costUsd,
-      spark: d.map((x) => x.costUsd),
-      /* TEK "aşağısı iyi" kart. Maliyetin artması, ölçek büyürken normaldir;
-         asıl yönetilebilir olan birim maliyet ve o aşağıdaki kartta duruyor. */
+      // Şeridin TEK "aşağısı iyi" kartı: ölçek büyürken maliyetin artması
+      // normaldir, yönetilebilir olan birim maliyettir (aşağıdaki denge
+      // panosunda).
       upIsGood: false,
       periodNote: note,
+      icon: <IconCost className="size-3.5" />,
+      tone: "warning",
+    },
+    {
+      label: "Başarı",
+      value: formatPercent(t.succeeded, finished),
+      current: finished > 0 ? t.succeeded / finished : 0,
+      previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
+      upIsGood: true,
+      periodNote: note,
+      icon: <IconCheck className="size-3.5" />,
+      tone: "success",
+    },
+    {
+      label: "Ort. süre",
+      value: formatDuration(t.avgDurationSec),
+      current: t.avgDurationSec,
+      previous: p.avgDurationSec,
+      upIsGood: false,
+      periodNote: note,
+      icon: <IconPlay className="size-3.5" />,
+      tone: "info",
+    },
+    {
+      label: "Değişen dosya",
+      value: formatCompact(t.filesChanged),
+      current: t.filesChanged,
+      previous: p.filesChanged,
+      // Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
+      upIsGood: null,
+      periodNote: note,
+      icon: <IconEdit className="size-3.5" />,
+      tone: "series",
+    },
+    {
+      label: "Değişen kod satırı",
+      value: formatCompact(t.additions + t.deletions),
+      current: t.additions + t.deletions,
+      previous: p.additions + p.deletions,
+      upIsGood: null,
+      periodNote: note,
+      icon: <IconEdit className="size-3.5" />,
+      tone: "accent",
+    },
+    {
+      label: "Gönderilen branch",
+      value: formatCount(t.pushedBranches),
+      current: t.pushedBranches,
+      previous: p.pushedBranches,
+      upIsGood: true,
+      periodNote: note,
+      icon: <IconFolder className="size-3.5" />,
+      tone: "info",
     },
   ];
 
   return (
-    /*
-      Sekiz kart TEK SIRAYA değil, dörtlü iki sıraya diziliyor.
-      İçerik sütunu 1280px; sekize bölününce karta ~140px kalıyor ve o
-      genişlikte hem etiket ("GÖNDERİLEN BR…") hem değişim metni ("önceki
-      dönemde …") kesiliyordu. Kesilen bir rakam şeridi yoğun değil, bozuk
-      görünür. Dörtlüde karta ~290px düşüyor ve hiçbir şey kırpılmıyor.
-    */
-    /* Ekran genişledikçe sıra sayısı düşer: dar ekranda 2, orta ekranda 4,
-       geniş ekranda sekizi tek sıra. Sabit dörtlü bırakmak 1920px'de üst
-       yarıyı boşa harcıyordu; sabit sekizli bırakmak 1280px'de etiketleri
-       kesiyordu. */
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
+    /* İki sıra beşli. Onunu tek sıraya dizmek karta ~130px bırakırdı ve
+       "GÖNDERİLEN BRANCH" gibi etiketler kırpılırdı. */
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
       {cards.map((c) => (
         <StatCard key={c.label} {...c} />
       ))}
@@ -282,277 +432,323 @@ function KpiStrip({ data }: { data: ReportSummary }) {
   );
 }
 
-/* ── Başlık rakamları ────────────────────────────────────────────────────── */
+/* ── Token dağılımı ──────────────────────────────────────────────────────── */
 
-/*
- * Kahraman rakam + destekleyici kutucuklar.
+/**
+ * Model başına token — halka.
  *
- * ÖNCEKİ HALİ TOPLAM MALİYETTİ ve yanlıştı (spec 012). Maliyet bir girdidir;
- * bir yöneticinin ilk sorusu "ne kadar harcadık" değil "karşılığında ne aldık"
- * olur. Üstelik küçük bir maliyet rakamı sistemi değersiz gösteriyordu.
+ * Referanstaki "Token Kullanımı (Modele Göre)" panosunun karşılığı ve
+ * verisi gerçekten var: `byModel[].tokens`.
  *
- * Şimdi kahraman rakam ÜRETİLEN İŞ, maliyet ise onun paydası: "PR başına
- * $0,004". Toplam maliyet ekranda duruyor ama küçük puntoda.
- *
- * Dört destek rakamı rastgele seçilmedi — biri sonuç, biri güvenilirlik, biri
- * RİSK, biri birim maliyet. Hız gösteren bir rakam asla yalnız durmaz
- * (spec 012 K3): PR sayısının arttığı ama değişiklik boyutunun da büyüdüğü bir
- * dönem ilerleme değil, biriken risktir.
+ * Beşten fazla model varsa kalanı "Diğer" altında toplanıyor: on dilimlik
+ * bir halkada renkler birbirinden ayırt edilemez ve grafik okunmaz olur.
  */
-function Headline({ data }: { data: ReportSummary }) {
+function TokenByModel({ data }: { data: ReportSummary }) {
+  const COLORS = [
+    "var(--color-series)",
+    "var(--color-chart-good)",
+    "var(--color-accent)",
+    "var(--color-chart-other)",
+    "var(--color-info)",
+  ];
+
+  const sorted = [...data.byModel]
+    .filter((g) => g.tokens > 0)
+    .sort((a, b) => b.tokens - a.tokens);
+
+  const head = sorted.slice(0, 5);
+  const rest = sorted.slice(5);
+  const restTokens = rest.reduce((sum, g) => sum + g.tokens, 0);
+
+  const slices = [
+    ...head.map((g, i) => ({
+      key: g.key,
+      label: g.label,
+      value: g.tokens,
+      color: COLORS[i]!,
+    })),
+    ...(restTokens > 0
+      ? [
+          {
+            key: "diger",
+            label: `Diğer (${rest.length} model)`,
+            value: restTokens,
+            color: "var(--color-line-strong)",
+          },
+        ]
+      : []),
+  ];
+
+  const total = data.totals.promptTokens + data.totals.completionTokens;
+
+  return (
+    <Panel
+      title="Token kullanımı"
+      action={
+        <Link href="/models" className={panelLinkClass}>
+          Modeller
+        </Link>
+      }
+    >
+      {slices.length === 0 ? (
+        <p className="text-sm text-ink-3">Bu dönemde token harcanmadı.</p>
+      ) : (
+        <>
+          <Donut
+            slices={slices}
+            centerValue={formatCompact(total)}
+            centerNote="toplam token"
+            size={140}
+            formatValue={formatCompact}
+          />
+          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3">
+            <MiniStat label="Girdi" value={formatCompact(data.totals.promptTokens)} />
+            <MiniStat
+              label="Çıktı"
+              value={formatCompact(data.totals.completionTokens)}
+            />
+          </dl>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
+        {label}
+      </dt>
+      <dd className="mt-0.5 text-sm font-semibold tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/* ── Agent performansı ───────────────────────────────────────────────────── */
+
+/**
+ * Agent başına üretim tablosu.
+ *
+ * Öncesinde çubuk listesiydi: tek bir büyüklüğü (iş sayısı) çiziyor,
+ * kalanını alt satıra düz metin olarak sıkıştırıyordu. Oysa buradaki soru
+ * KARŞILAŞTIRMA — hangi agent daha çok iş yapıyor, hangisi daha pahalı,
+ * hangisi daha çok kod değiştiriyor. Karşılaştırma sütunlarla okunur.
+ */
+function AgentPerformance({ rows }: { rows: ReportGroup[] }) {
+  const top = rows.slice(0, 6);
+
+  return (
+    <Panel
+      title="Agent performansı"
+      action={
+        <Link href="/agents" className={panelLinkClass}>
+          Agent&apos;lar
+        </Link>
+      }
+      padded={false}
+    >
+      {top.length === 0 ? (
+        <p className="px-4 py-3.5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-125 text-sm">
+            <thead>
+              <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
+                <th className="py-2 pl-4 font-medium">Agent</th>
+                <th className="py-2 pr-3 text-right font-medium">İş</th>
+                <th className="py-2 pr-3 text-right font-medium">Token</th>
+                <th className="py-2 pr-3 text-right font-medium">Dosya</th>
+                {/* Maliyet sütunu yerine DEĞİŞTİRİLEN KOD SATIRI: bir
+                    agent'ın ürettiği işin büyüklüğünü dosya sayısından çok
+                    bu anlatıyor. Maliyet ekranda kayıp değil — rakam
+                    şeridinde, model tablosunda ve proje kırılımında
+                    duruyor. */}
+                <th
+                  className="py-2 pr-3 text-right font-medium"
+                  title="Değiştirilen kod satırı (eklenen + silinen)"
+                >
+                  Kod satırı
+                </th>
+                <th className="py-2 pr-4 text-right font-medium">Başarı</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {top.map((g) => {
+                const rate = g.runs > 0 ? g.succeeded / g.runs : 0;
+                return (
+                  <tr key={g.key} className="transition-colors hover:bg-raised">
+                    <td className="max-w-0 py-2.5 pl-4">
+                      <div className="truncate font-mono text-xs">{g.label}</div>
+                    </td>
+                    <td className="py-2.5 pr-3 text-right tabular-nums">
+                      {formatCount(g.runs)}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right text-xs tabular-nums text-ink-2">
+                      {formatCompact(g.tokens)}
+                    </td>
+                    <td className="py-2.5 pr-3 text-right text-xs tabular-nums text-ink-2">
+                      {formatCompact(g.filesChanged)}
+                    </td>
+                    <td
+                      className="py-2.5 pr-3 text-right text-xs tabular-nums text-ink-2"
+                      title={`+${formatCount(g.additions)} −${formatCount(g.deletions)}`}
+                    >
+                      {formatCompact(g.additions + g.deletions)}
+                    </td>
+                    {/* Başarı oranı TEK renkli sütun: yorumlanabilir olan
+                        yalnızca o. Diğerlerini de boyamak renge sahte bir
+                        anlam yüklerdi. */}
+                    <td
+                      className={`py-2.5 pr-4 text-right font-medium tabular-nums ${
+                        rate >= 0.8 ? "text-ok" : "text-warn"
+                      }`}
+                    >
+                      {formatPercent(g.succeeded, g.runs)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ── Son çalıştırmalar ───────────────────────────────────────────────────── */
+
+function RecentRuns({ runs, loading }: { runs: Run[]; loading: boolean }) {
+  return (
+    <Panel
+      title="Son çalıştırmalar"
+      action={
+        <Link href="/runs" className={panelLinkClass}>
+          Tümü
+        </Link>
+      }
+      padded={false}
+    >
+      {loading ? (
+        <p className="px-4 py-3.5 text-sm text-ink-3">Yükleniyor…</p>
+      ) : runs.length === 0 ? (
+        <p className="px-4 py-3.5 text-sm text-ink-3">Kayıt yok.</p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {runs.map((r) => (
+            <li key={r.id}>
+              <Link
+                href={`/runs/${r.id}`}
+                className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-raised"
+              >
+                <span className="shrink-0">
+                  <RunStatusBadge status={r.status} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs">{r.task}</span>
+                  <span className="mt-0.5 block truncate font-mono text-2xs text-ink-3">
+                    {r.agentSlug} · {r.projectName}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-mono text-2xs tabular-nums">
+                    {r.costUsd > 0 ? formatMoney(r.costUsd) : "—"}
+                  </span>
+                  <span className="mt-0.5 block text-2xs text-ink-3">
+                    {formatRelative(r.createdAt)}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+/* ── Rakamların dengesi ──────────────────────────────────────────────────── */
+
+/**
+ * Hız rakamlarını dengeleyen okuma.
+ *
+ * Bu pano SÜS DEĞİL, projenin kendi kuralı: hız gösteren bir rakam asla
+ * yalnız durmaz (AGENTS.md → Yönetici rakamları). PR sayısının arttığı ama
+ * değişiklik boyutunun da büyüdüğü bir dönem ilerleme değil, biriken
+ * risktir.
+ */
+function Balance({ data }: { data: ReportSummary }) {
   const t = data.totals;
   const p = data.previous;
 
-  // PR açmayan kurulumlarda (akışında PR düğümü olmayan) dev bir sıfır,
-  // sistemin çalışmadığı izlenimi verirdi; kahraman rakam tamamlanan işe düşer.
   const usePRs = t.prsOpened > 0 || p.prsOpened > 0;
-
-  // Değişiklik boyutu PR başına hesaplanır; PR yoksa çalıştırma başına.
   const changeUnits = usePRs ? t.prsOpened : t.runsWithCode;
   const linesPerUnit =
     changeUnits > 0 ? Math.round((t.additions + t.deletions) / changeUnits) : 0;
 
   return (
-    <Card>
-      {/*
-        Kahraman rakam ve kıvılcımı KPI şeridine taşındı — şeridin ilk kartı.
-        Burada tekrarlanması aynı sayıyı iki kez göstermek olurdu.
-        Geriye kalan, bu kartın asıl işi: DENGE.
-
-        Dört rakam rastgele seçilmedi (spec 012 K3) — biri sonuç, biri
-        güvenilirlik, biri RİSK, biri birim maliyet. Hız gösteren bir rakam
-        asla yalnız durmaz: PR sayısının arttığı ama değişiklik boyutunun da
-        büyüdüğü bir dönem ilerleme değil, biriken risktir. Şerit hızı
-        gösteriyor; bu kart onu dengeleyen okumayı veriyor.
-      */}
-      {/* Açıklama paragrafı kaldırıldı. Panel başlığı ne olduğunu söylüyor;
-          altındaki dört rakam kendini anlatıyor. Bir panonun her kutusuna
-          ne işe yaradığını anlatan bir paragraf koymak, panoyu belge yapar. */}
-      <h2 className="text-sm font-semibold tracking-[-0.01em]">
-        Rakamların dengesi
-      </h2>
-
-      <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
-        <Stat
-          label="Jira'dan otomatik"
-          value={formatCount(t.jiraTasks)}
-          note={t.jiraTasks > 0 ? "task, insan başlatmadan" : "Jira tetikleyici yok"}
+    <Panel title="Rakamların dengesi">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+        <MiniStat label="Kod üreten iş" value={formatCount(t.runsWithCode)} />
+        <MiniStat
+          label={usePRs ? "PR başına satır" : "İş başına satır"}
+          value={linesPerUnit > 0 ? formatCount(linesPerUnit) : "—"}
         />
-        <Stat
-          label="Başarı oranı"
-          value={formatPercent(t.succeeded, t.runs)}
-          note={`${formatCount(t.succeeded)} / ${formatCount(t.runs)} çalıştırma`}
-        />
-        <Stat
-          label={usePRs ? "PR başına değişiklik" : "İş başına değişiklik"}
-          value={linesPerUnit > 0 ? `${formatCount(linesPerUnit)} satır` : "—"}
-          note={`+${formatCompact(t.additions)} −${formatCompact(t.deletions)} toplam`}
-        />
-        <Stat
+        <MiniStat
           label={usePRs ? "PR başına maliyet" : "İş başına maliyet"}
-          value={formatPerUnit(t.costUsd, usePRs ? t.prsOpened : t.succeeded, usePRs ? "PR" : "iş")}
-          note={`toplam ${formatMoney(t.costUsd)}`}
+          value={formatPerUnit(
+            t.costUsd,
+            usePRs ? t.prsOpened : t.succeeded,
+            usePRs ? "PR" : "iş",
+          )}
         />
+        <MiniStat label="Kullanılan agent" value={formatCount(data.byAgent.length)} />
       </dl>
 
-      {/* Bu satır SÜS DEĞİL (spec 012 K4). "Açılan PR" ile "işe yarayan PR"
-          aynı şey değil ve sistem aradaki farkı bilmiyor; bilmediğini söylemek
-          tasarımın parçası. */}
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-3 text-2xs text-ink-2">
+        <span>
+          Başarısız:{" "}
+          <strong className="font-medium text-ink">{formatCount(t.failed)}</strong>
+        </span>
+        {t.timeout > 0 && (
+          <span>
+            Zaman aşımı:{" "}
+            <strong className="font-medium text-ink">{formatCount(t.timeout)}</strong>
+          </span>
+        )}
+        {t.cancelled > 0 && (
+          <span>
+            İptal:{" "}
+            <strong className="font-medium text-ink">{formatCount(t.cancelled)}</strong>
+          </span>
+        )}
+        {t.interrupted > 0 && (
+          <span>
+            Kesildi:{" "}
+            <strong className="font-medium text-ink">
+              {formatCount(t.interrupted)}
+            </strong>
+          </span>
+        )}
+      </div>
+
+      {/* Bu satır SÜS DEĞİL: "açılan PR" ile "işe yarayan PR" aynı şey değil
+          ve sistem aradaki farkı bilmiyor. Bilmediğini söylemek tasarımın
+          parçası (spec 012 K4). */}
       {usePRs && (
-        <p className="mt-4 border-t border-line pt-3 text-xs text-ink-3">
-          Açılan PR sayısıdır — birleştirilip birleştirilmediğini, incelemeden
-          geçip geçmediğini bu sistem takip etmiyor.
+        <p className="mt-3 flex items-start gap-1.5 text-2xs text-ink-3">
+          <IconAlert className="mt-px size-3.5 shrink-0" />
+          Açılan PR sayısıdır — birleştirilip birleştirilmediğini bu sistem
+          takip etmiyor.
         </p>
       )}
-
-      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 text-xs text-ink-2">
-        {/* Çalıştırma, kod üreten, gönderilen branch ve token buradan
-            kaldırıldı: dördü de artık KPI şeridinde, kendi yönleriyle
-            birlikte duruyor. Burada yalnızca şeritte KARŞILIĞI OLMAYANLAR
-            kalıyor — süre ve başarısızlık kırılımı. */}
-        <SubStat label="Ortalama süre" value={formatDuration(t.avgDurationSec)} />
-        <SubStat label="Başarısız" value={formatCount(t.failed)} />
-        {t.timeout > 0 && <SubStat label="Zaman aşımı" value={formatCount(t.timeout)} />}
-        {t.cancelled > 0 && <SubStat label="İptal" value={formatCount(t.cancelled)} />}
-        {t.interrupted > 0 && <SubStat label="Kesildi" value={formatCount(t.interrupted)} />}
-      </div>
-    </Card>
+    </Panel>
   );
 }
 
-function Stat({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-}) {
-  return (
-    <div>
-      <dt className="text-2xs tracking-wide text-ink-3 uppercase">{label}</dt>
-      {/* Büyük tek sayı orantılı rakamlarla yazılır; tabular-nums bu boyutta gevşek görünür. */}
-      <dd className="mt-1 text-xl leading-none font-semibold tracking-[-0.01em]">
-        {value}
-      </dd>
-      {note && <p className="mt-1 text-2xs text-ink-3">{note}</p>}
-    </div>
-  );
-}
+/* ── Model tablosu ───────────────────────────────────────────────────────── */
 
-function SubStat({ label, value }: { label: string; value: string }) {
-  return (
-    <span>
-      {label}: <strong className="font-medium text-ink">{value}</strong>
-    </span>
-  );
-}
-
-/* ── Grafikler ───────────────────────────────────────────────────────────── */
-
-function Charts({ data }: { data: ReportSummary }) {
-  // Yığındaki sarı açık temada 3:1 kontrastın altında; sayıya renkten bağımsız
-  // bir yol her zaman açık kalmalı.
-  const [asTable, setAsTable] = useState(false);
-
-  return (
-    <div className="grid items-start gap-5 xl:grid-cols-2">
-      {/*
-        Panel başlıkları TEK SATIR: ad solda, eylem/değer sağda.
-
-        Öncesinde her başlığın altında bir açıklama paragrafı vardı ("Sonuca
-        göre; kaydı olmayan günler de eksende durur.", "…iki ölçek birbirini
-        yanlış anlatır."). Bunlar TASARIM GEREKÇESİYDİ, kullanıcının bilgisi
-        değil — yeri kod yorumu, ekran değil. Panonun her kutusuna kendini
-        savunan bir paragraf koymak panoyu belgeye çeviriyordu.
-      */}
-      <Card>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-[-0.01em]">
-            Günlük çalıştırma
-          </h2>
-          <Button size="sm" onClick={() => setAsTable((v) => !v)}>
-            {asTable ? "Grafik" : "Tablo"}
-          </Button>
-        </div>
-
-        {asTable ? (
-          <RunsByDayTable days={data.daily} />
-        ) : (
-          <RunsByDayChart days={data.daily} />
-        )}
-      </Card>
-
-      <Card>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-[-0.01em]">
-            Günlük maliyet
-          </h2>
-          {/* Dönem toplamı paragrafın içinde bir cümleydi; artık başlığın
-              karşısında bir değer. Aynı bilgi, taranabilir yerde. */}
-          <span className="font-mono text-xs tabular-nums text-ink-2">
-            {formatMoney(data.totals.costUsd)}
-          </span>
-        </div>
-        <CostTrendChart days={data.daily} />
-      </Card>
-    </div>
-  );
-}
-
-/* ── Kırılımlar ──────────────────────────────────────────────────────────── */
-
-function Breakdowns({ data }: { data: ReportSummary }) {
-  return (
-    /*
-      Üç sütunlu bant.
-
-      İkili ızgarada "Proje bazında" iki satır içeriyor, komşusu beş; yanında
-      ekranın yarısı kadar ölü alan kalıyordu. Hatalar paneli ise en altta tek
-      başına tam genişlik kaplıyordu — oysa içeriği birkaç satırlık metin.
-      Üçü aynı bantta yan yana durunca hem boşluk kapanıyor hem de "hangi
-      agent / hangi proje / neden başarısız" aynı bakışta okunuyor.
-    */
-    <div className="space-y-5">
-      <div className="grid items-start gap-5 xl:grid-cols-3">
-        <Card>
-          <Section
-            title="Agent bazında"
-          >
-            <BarList
-              rows={data.byAgent.map((g) => ({
-                key: g.key,
-                label: g.label,
-                value: g.runs,
-                valueLabel: `${formatCount(g.runs)} iş`,
-                note: `${formatMoney(g.costUsd)} · ${formatPercent(
-                  g.succeeded,
-                  g.runs,
-                )} başarı · ${formatCompact(g.filesChanged)} dosya`,
-              }))}
-            />
-          </Section>
-        </Card>
-
-        <Card>
-          <Section title="Proje bazında">
-            <BarList
-              rows={data.byProject.map((g) => ({
-                key: g.key,
-                label: g.label,
-                value: g.runs,
-                valueLabel: `${formatCount(g.runs)} iş`,
-                note: `${formatMoney(g.costUsd)} · +${formatCompact(
-                  g.additions,
-                )} −${formatCompact(g.deletions)} satır`,
-              }))}
-            />
-          </Section>
-        </Card>
-
-        {data.failures.length > 0 && (
-          <Card>
-            <Section
-              title="Tekrar eden hatalar"
-            >
-              <ul className="divide-y divide-line">
-                {data.failures.map((f) => (
-                  <li
-                    key={f.message}
-                    className="flex items-start justify-between gap-4 py-2.5 first:pt-0 last:pb-0"
-                  >
-                    <span
-                      className="min-w-0 flex-1 text-sm text-ink-2"
-                      title={f.message}
-                    >
-                      {readableFailure(f.message)}
-                    </span>
-                    <Badge tone="danger">{formatCount(f.count)} kez</Badge>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          </Card>
-        )}
-      </div>
-
-      <Card padded={false}>
-        <div className="flex items-center justify-between gap-3 p-5 pb-3">
-          <h2 className="text-sm font-semibold tracking-[-0.01em]">
-            Model bazında
-          </h2>
-          <span className="text-xs text-ink-3">
-            {formatCount(data.byModel.length)} model
-          </span>
-        </div>
-        <GroupTable rows={data.byModel} totals={data.totals} />
-      </Card>
-    </div>
-  );
-}
-
-/** Model kırılımı tablosu — sütunlar hizalı okunsun diye tabular rakamlar. */
 function GroupTable({
   rows,
   totals,
@@ -561,31 +757,29 @@ function GroupTable({
   totals: ReportTotals;
 }) {
   if (rows.length === 0) {
-    return (
-      <p className="px-5 pb-5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>
-    );
+    return <p className="px-4 py-3.5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>;
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-sm">
+      <table className="w-full min-w-180 text-sm">
         <thead>
-          <tr className="border-y border-line text-left text-2xs tracking-wide text-ink-3 uppercase">
-            <th className="py-2 pl-5 font-medium">Model</th>
+          <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
+            <th className="py-2 pl-4 font-medium">Model</th>
             <th className="py-2 pr-4 text-right font-medium">İş</th>
             <th className="py-2 pr-4 text-right font-medium">Başarı</th>
             <th className="py-2 pr-4 text-right font-medium">Maliyet</th>
             <th className="py-2 pr-4 text-right font-medium">Pay</th>
             <th className="py-2 pr-4 text-right font-medium">Token</th>
-            <th className="py-2 pr-5 text-right font-medium">Ort. süre</th>
+            <th className="py-2 pr-4 text-right font-medium">Ort. süre</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-line">
           {rows.map((g) => (
-            <tr key={g.key} className="border-b border-line last:border-0">
-              <td className="py-2.5 pl-5">
-                <div className="font-mono text-xs">{g.label}</div>
-                <div className="mt-0.5 text-2xs text-ink-3">
+            <tr key={g.key} className="transition-colors hover:bg-raised">
+              <td className="max-w-0 py-2.5 pl-4">
+                <div className="truncate font-mono text-xs">{g.label}</div>
+                <div className="mt-0.5 truncate text-2xs text-ink-3">
                   {g.key.split(" / ")[0]}
                 </div>
               </td>
@@ -595,7 +789,7 @@ function GroupTable({
               <td className="py-2.5 pr-4 text-right tabular-nums">
                 {formatPercent(g.succeeded, g.runs)}
               </td>
-              <td className="py-2.5 pr-4 text-right tabular-nums">
+              <td className="py-2.5 pr-4 text-right font-mono text-xs tabular-nums">
                 {formatMoney(g.costUsd)}
               </td>
               <td className="py-2.5 pr-4 text-right tabular-nums text-ink-2">
@@ -604,7 +798,7 @@ function GroupTable({
               <td className="py-2.5 pr-4 text-right tabular-nums text-ink-2">
                 {formatCompact(g.tokens)}
               </td>
-              <td className="py-2.5 pr-5 text-right tabular-nums text-ink-2">
+              <td className="py-2.5 pr-4 text-right tabular-nums text-ink-2">
                 {formatDuration(g.avgDurationSec)}
               </td>
             </tr>
@@ -613,4 +807,26 @@ function GroupTable({
       </table>
     </div>
   );
+}
+
+/* ── Yardımcı ────────────────────────────────────────────────────────────── */
+
+/**
+ * Dönemin tarih aralığı — "4 Ağu – 10 Ağu 2025".
+ *
+ * Yıl yalnızca SONDA yazılıyor: iki tarih neredeyse her zaman aynı yılda ve
+ * yılı iki kez yazmak şeridin en dar yerinde gürültü ediyor.
+ */
+function formatRange(from: string, to: string): string {
+  const f = new Date(from);
+  const t = new Date(to);
+  if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return "";
+
+  const day = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
+  const full = new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `${day.format(f)} – ${full.format(t)}`;
 }

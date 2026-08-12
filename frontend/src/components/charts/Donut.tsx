@@ -25,15 +25,24 @@ export interface Slice {
 
 export function Donut({
   slices,
-  total,
-  totalLabel,
+  centerValue,
+  centerNote,
   size = 132,
+  /** Dilim değerlerinin listede nasıl yazılacağı. Verilmezse ham sayı. */
+  formatValue = (v) => String(v),
 }: {
   slices: Slice[];
-  /** Ortada yazan sayı — dilimlerin toplamı. */
-  total: number;
-  totalLabel: string;
+  /**
+   * Ortada yazan değer — BİÇİMLENDİRİLMİŞ metin, ham sayı değil.
+   *
+   * Ham sayı alsaydı token gibi büyük değerlerde "3421904" yazardı;
+   * biçimlendirme çağıranın işi çünkü birimini yalnızca o biliyor
+   * (çalıştırma sayısı mı, token mı, para mı).
+   */
+  centerValue: string;
+  centerNote: string;
   size?: number;
+  formatValue?: (value: number) => string;
 }) {
   const sum = slices.reduce((acc, s) => acc + s.value, 0);
   const radius = size / 2;
@@ -85,9 +94,9 @@ export function Donut({
 
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xl leading-none font-semibold tabular-nums">
-            {total}
+            {centerValue}
           </span>
-          <span className="mt-1 text-2xs text-ink-3">{totalLabel}</span>
+          <span className="mt-1 text-2xs text-ink-3">{centerNote}</span>
         </div>
       </div>
 
@@ -100,7 +109,7 @@ export function Donut({
               style={{ background: s.color }}
             />
             <span className="min-w-0 flex-1 truncate text-ink-2">{s.label}</span>
-            <span className="shrink-0 tabular-nums">{s.value}</span>
+            <span className="shrink-0 tabular-nums">{formatValue(s.value)}</span>
             <span className="w-10 shrink-0 text-right tabular-nums text-ink-3">
               {sum > 0 ? `%${Math.round((s.value / sum) * 100)}` : "—"}
             </span>

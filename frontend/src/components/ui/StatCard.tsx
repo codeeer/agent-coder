@@ -1,7 +1,7 @@
 "use client";
 
-import { Sparkline } from "@/components/charts/Sparkline";
 import { changeRatio, formatPercent } from "@/components/charts/format";
+import { IconTile, type TileTone } from "@/components/ui/primitives";
 
 /**
  * Rakam kartı — panonun ve raporun ortak KPI parçası.
@@ -20,8 +20,6 @@ export interface StatCardProps {
   /** Değişim oranı bu ikisinden hesaplanır. */
   current: number;
   previous: number;
-  /** Günlük seri — yalnızca gerçekten varsa verilir. */
-  spark?: number[];
   /** true: artış iyi · false: artış kötü · null: yön yorumlanmaz. */
   upIsGood: boolean | null;
   /**
@@ -33,6 +31,16 @@ export interface StatCardProps {
    * bir karşılaştırma, karşılaştırma değildir.
    */
   periodNote: string;
+  /**
+   * Rakamın simgesi.
+   *
+   * SÜS DEĞİL: on kart yan yana dizildiğinde göz aradığı rakamı etiketi
+   * okuyarak değil, simgesinden buluyor. Verilmezse kart simgesiz çizilir —
+   * dört kartlık bir şeritte simge kazanç sağlamaz, gürültü olur.
+   */
+  icon?: React.ReactNode;
+  /** Simge karosunun tonu. Rakamı DEĞİL yalnızca karoyu boyar. */
+  tone?: TileTone;
 }
 
 export function StatCard({
@@ -40,9 +48,10 @@ export function StatCard({
   value,
   current,
   previous,
-  spark,
   upIsGood,
   periodNote,
+  icon,
+  tone = "accent",
 }: StatCardProps) {
   const ratio = changeRatio(current, previous);
   const flat = ratio !== null && Math.abs(ratio) < 0.005;
@@ -50,22 +59,28 @@ export function StatCard({
 
   return (
     <div className="rounded-card border border-line bg-surface px-4 py-3.5 shadow-(--shadow-card)">
-      <div className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
-        {label}
+      <div className="flex items-center gap-2">
+        {icon && (
+          <IconTile tone={tone} size="sm">
+            {icon}
+          </IconTile>
+        )}
+        <div className="min-w-0 flex-1 truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
+          {label}
+        </div>
       </div>
 
-      <div className="mt-2.5 flex items-end justify-between gap-3">
-        <div className="text-xl leading-none font-semibold tabular-nums">
-          {value}
-        </div>
-        {/* Kıvılcım YALNIZCA günlük serisi gerçekten olan kartlarda. Serisi
-            olmayan bir karta düz bir çizgi koymak, olmayan bir veriyi varmış
-            gibi göstermek olurdu. */}
-        {spark && spark.length > 1 && (
-          <div className="hidden w-16 shrink-0 sm:block">
-            <Sparkline values={spark} label={`${label} — günlük seyir`} height={28} />
-          </div>
-        )}
+      {/*
+        Kıvılcım grafiği KALDIRILDI.
+
+        Karta sığan genişlik ~64px'ti ve otuz günlük bir seri o genişlikte
+        okunmuyordu: eğrinin yönü bile seçilemiyordu, yalnızca rakamın
+        yanında bir gürültü lekesi duruyordu. Yönü zaten altındaki değişim
+        satırı SÖZLE söylüyor ve günlük seyrin okunur hali "Günlük özet"
+        panosunda tam boy duruyor.
+      */}
+      <div className="mt-2.5 text-xl leading-none font-semibold tabular-nums">
+        {value}
       </div>
 
       <div className="mt-2.5 truncate text-2xs">
