@@ -138,7 +138,8 @@ func run() error {
 	}
 	defer sandboxMgr.Close()
 
-	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network)
+	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network,
+		cfg.Runner.ExtraCACert)
 
 	// Docker ve runner imajı hazır mı? Eksikse çalıştırma denenene kadar
 	// fark edilmez; açılışta uyarmak kullanıcıyı erken bilgilendirir.

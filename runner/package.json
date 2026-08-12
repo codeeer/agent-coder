@@ -1,0 +1,10 @@
+{
+  "name": "opencode-runner-drivers",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Çalıştırma motorunun KOŞU ANINDA indirmeye çalıştığı paketler. İmaj derlemesinde kurulurlar ki koşu sırasında paket deposuna hiç istek çıkmasın — spec 003, 2026-08-12 kararı.",
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "3.0.30",
+    "@opencode-ai/plugin": "1.18.15"
+  }
+}

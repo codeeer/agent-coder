@@ -20,11 +20,19 @@ type Runner struct {
 	sandbox *sandbox.Manager
 	image   string
 	network string
+	// extraCACert, HOST üzerindeki kurumsal kök sertifikanın yolu; boşsa
+	// hiçbir şey bağlanmaz (bkz. sandbox.Spec.ExtraCACert).
+	extraCACert string
 }
 
 // New yeni runner üretir.
-func New(mgr *sandbox.Manager, image, network string) *Runner {
-	return &Runner{sandbox: mgr, image: image, network: network}
+func New(mgr *sandbox.Manager, image, network, extraCACert string) *Runner {
+	return &Runner{
+		sandbox:     mgr,
+		image:       image,
+		network:     network,
+		extraCACert: extraCACert,
+	}
 }
 
 // Ping, altyapının hazır olduğunu doğrular (Docker + runner imajı).
@@ -60,13 +68,14 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	emit(runner.Event{Level: runner.LevelInfo, Message: "çalışma ortamı hazırlanıyor"})
 
 	ct, err := r.sandbox.Create(runCtx, sandbox.Spec{
-		RunID:    req.RunID.String(),
-		Image:    r.image,
-		Network:  r.network,
-		Env:      buildEnv(req),
-		CPUCores: req.Limits.CPUCores,
-		MemoryGB: req.Limits.MemoryGB,
-		Files:    toSandboxFiles(configFiles),
+		RunID:       req.RunID.String(),
+		Image:       r.image,
+		Network:     r.network,
+		Env:         buildEnv(req, r.extraCACert),
+		CPUCores:    req.Limits.CPUCores,
+		MemoryGB:    req.Limits.MemoryGB,
+		Files:       toSandboxFiles(configFiles),
+		ExtraCACert: r.extraCACert,
 	})
 	if err != nil {
 		return nil, classify(err, runCtx, ctx)
@@ -124,6 +133,11 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	}
 
 	if msg.Info.Error != nil {
+		// Sürücü yüklenememişse asıl sebep motorun logunda; model hatası
+		// diye göstermek kullanıcıyı yanlış yere bakmaya gönderir.
+		if cause, ok := driverFailure(ctx, ct); ok {
+			return nil, fmt.Errorf("%w: %s", runner.ErrProviderDriver, cause)
+		}
 		return nil, fmt.Errorf("%w: %v", runner.ErrModel, msg.Info.Error)
 	}
 
@@ -151,6 +165,30 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 		emit(runner.Event{Level: runner.LevelInfo, Message: "çalışma tamamlandı, değişiklik yok"})
 	}
 	return result, nil
+}
+
+/*
+ * driverFailure, sağlayıcı sürücüsünün yüklenip yüklenemediğini loglardan okur.
+ *
+ * NEDEN LOGDAN: motor, sürücü paketini indiremediğinde çalıştırmayı
+ * durdurmuyor — yalnızca WARN düşürüp devam ediyor ve sağlayıcı ayağa
+ * kalkmadığı için mesaj "durum 500: UnknownError" ile geri geliyor. O 500
+ * kullanıcıya hiçbir şey anlatmıyor; asıl cümle logda duruyor.
+ *
+ * Sürücüler imaja gömüldükten sonra (spec 003, 2026-08-12) bu yol nadiren
+ * tetikleniyor. Yine de duruyor: bir sonraki motor sürümü yeni bir paket
+ * isteyebilir ve o gün ekranda yine sebepsiz bir 500 görmek istemiyoruz.
+ */
+func driverFailure(ctx context.Context, ct *sandbox.Container) (string, bool) {
+	logs, err := ct.Logs(context.WithoutCancel(ctx), "200")
+	if err != nil || logs == "" {
+		return "", false
+	}
+	if !strings.Contains(logs, "NpmInstallFailedError") &&
+		!strings.Contains(logs, "background dependency install failed") {
+		return "", false
+	}
+	return firstMeaningfulLine(logs), true
 }
 
 // readyFailure, container hazır olmadığında asıl nedeni loglardan çıkarır.
@@ -245,11 +283,26 @@ func (r *Runner) warnFailedMCP(ctx context.Context, cli *client, req runner.Requ
 // Sağlayıcı anahtarı buradan geçer; yapılandırma dosyası ona referans verir.
 // Depo kimlik bilgisi de burada — entrypoint bunu credential store'a yazar ve
 // remote URL'e gömmez.
-func buildEnv(req runner.Request) map[string]string {
+func buildEnv(req runner.Request, extraCACert string) map[string]string {
 	env := map[string]string{
 		runner.APIKeyEnvVar: req.Provider.APIKey,
 		"REPO_URL":          req.Repo.URL,
 		"OPENCODE_PORT":     fmt.Sprint(Port),
+	}
+
+	/*
+	 * Kurumsal CA — yalnızca tanımlıysa.
+	 *
+	 * NODE_EXTRA_CA_CERTS Node'un güven deposuna EKLER, yerine geçmez:
+	 * genel sertifikalar geçerli kalır. GIT_SSL_CAINFO ise git'in klonlama
+	 * yaptığı HTTPS bağlantısı için — kurumsal ağda ilk kırılan yer orası,
+	 * çünkü container daha hazır olmadan klonlama düşüyor.
+	 *
+	 * TLS doğrulaması KAPATILMIYOR; yalnızca güvenilen kök ekleniyor.
+	 */
+	if extraCACert != "" {
+		env["NODE_EXTRA_CA_CERTS"] = sandbox.ExtraCACertPath
+		env["GIT_SSL_CAINFO"] = sandbox.ExtraCACertPath
 	}
 	if req.Repo.Branch != "" {
 		env["REPO_BRANCH"] = req.Repo.Branch

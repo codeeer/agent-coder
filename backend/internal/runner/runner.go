@@ -185,4 +185,15 @@ var (
 
 	// ErrSandbox, sandbox kurulamadı veya beklenmedik şekilde öldü.
 	ErrSandbox = errors.New("çalışma ortamı hazırlanamadı")
+
+	/*
+	 * ErrProviderDriver, yerleşik olmayan sağlayıcının sürücüsü yüklenemedi.
+	 *
+	 * Sürücüler artık imaja gömülü (spec 003, 2026-08-12) ve bu yol nadiren
+	 * tetikleniyor; ama kalmak zorunda. Öncesinde sürücü indirilemediğinde
+	 * motor yalnızca WARN düşürüyor, çalıştırma ise kullanıcıya "durum 500:
+	 * UnknownError" olarak yansıyordu — yani ekranda sebebi olmayan bir
+	 * hata vardı ve asıl neden yalnızca backend logunda duruyordu.
+	 */
+	ErrProviderDriver = errors.New("sağlayıcı sürücüsü yüklenemedi")
 )

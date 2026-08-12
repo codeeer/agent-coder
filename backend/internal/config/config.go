@@ -64,6 +64,18 @@ type RunnerConfig struct {
 	Network string
 	// ServerPassword, backend ile runner içindeki opencode arasındaki basic auth parolası.
 	ServerPassword string
+	/*
+	 * ExtraCACert, HOST üzerindeki kurumsal kök sertifikanın (PEM) yolu.
+	 *
+	 * SSL denetimi yapan kurumsal ağlar TLS'i kendi sertifikalarıyla açıp
+	 * kapatıyor; bu ağlarda runner'ın yaptığı her HTTPS isteği (depo
+	 * klonlama, model kataloğu, paket deposu) "unable to get local issuer
+	 * certificate" ile düşer. Bu değer doluysa dosya container'a SALT
+	 * OKUNUR bağlanır ve NODE_EXTRA_CA_CERTS ile gösterilir.
+	 *
+	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez.
+	 */
+	ExtraCACert string
 }
 
 // Load ortam değişkenlerini okur ve doğrular.
@@ -94,6 +106,7 @@ func Load() (*Config, error) {
 			Image:          getString("RUNNER_IMAGE", "agent-coder/opencode-runner:latest"),
 			Network:        getString("RUNNER_NETWORK", "agent-coder_internal"),
 			ServerPassword: getString("OPENCODE_SERVER_PASSWORD", ""),
+			ExtraCACert:    getString("RUNNER_EXTRA_CA_CERT", ""),
 		},
 
 		OpenRouterAPIKey:    getString("OPENROUTER_API_KEY", ""),

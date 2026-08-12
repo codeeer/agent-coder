@@ -157,6 +157,57 @@ CORS_ORIGINS=https://agent.sirket.com
 > ⚠️ **Kimlik doğrulama yok.** Sunucuya kuruyorsanız yalnızca özel ağa açın —
 > internete açık bırakmayın. Ayrıntı: [Güvenlik notları](#güvenlik-notları).
 
+### SSL inspection yapan kurumsal ağlar
+
+**Ev/ofis ağındaysanız bu bölümü atlayın.**
+
+Bazı kurumsal ağlar giden HTTPS trafiğini kendi sertifikalarıyla açıp yeniden
+imzalar (SSL inspection / TLS interception). Böyle bir ağda runner
+container'ının yaptığı HTTPS istekleri şu hatayla düşer:
+
+```
+unable to get local issuer certificate
+```
+
+En görünür sonucu **depo klonlamanın** başarısız olmasıdır: container hazır
+olamaz ve çalıştırma "çalışma ortamı hazırlanamadı" ile biter.
+
+**Çözüm: kurumun kök sertifikasını tanıtın.**
+
+1. Kök sertifikayı PEM olarak edinin. Genelde BT'den istenir; tarayıcıdan da
+   çıkarılabilir. Sunucuda çoğu zaman zaten kuruludur:
+
+   ```bash
+   # Debian/Ubuntu
+   ls /usr/local/share/ca-certificates/
+   # RHEL/Rocky
+   ls /etc/pki/ca-trust/source/anchors/
+   ```
+
+2. Yolu `.env` dosyasına yazın:
+
+   ```env
+   RUNNER_EXTRA_CA_CERT=/etc/pki/ca-trust/source/anchors/kurum-kok.pem
+   ```
+
+3. `make restart`.
+
+Bundan sonra dosya her runner container'ına **salt okunur** bağlanır ve
+`NODE_EXTRA_CA_CERTS` ile `GIT_SSL_CAINFO` üzerinden gösterilir. Bu, güvenilen
+kök listesine **ekleme** yapar; genel sertifikalar geçerli kalır.
+
+> **TLS doğrulamasını kapatan bir ayar yoktur ve eklenmeyecektir.**
+> `NODE_TLS_REJECT_UNAUTHORIZED=0`, `npm config set strict-ssl false` veya
+> `git config http.sslVerify false` sorunu görünmez yapar, ortadan kaldırmaz —
+> ve bu imaj başka kurumlarda da çalışıyor. Kurumun kök sertifikası da imaja
+> **gömülmez**: imaj herkese dağıtılıyor.
+
+> **Sağlayıcı sürücüleri için artık internet gerekmiyor.** Runner imajı,
+> OpenAI-uyumlu sağlayıcıların ihtiyaç duyduğu sürücü paketlerini derleme
+> anında içine alır (sürümler `runner/package-lock.json` ile sabit). Bir
+> çalıştırma sırasında paket deposuna **hiç istek çıkmaz**; air-gapped
+> ortamlarda da koşar.
+
 ## 4. Başlatın
 
 İki yol var. **Yalnızca denemek istiyorsanız hızlı olanı seçin.**

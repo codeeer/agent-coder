@@ -215,3 +215,60 @@ Kabul kriterleri:
   erişimine.
 - Bu spec Faz 3'ün (workflow motoru) önkoşuludur: workflow adımları aynı çalıştırma
   altyapısını kullanacak.
+
+---
+
+## Karar geçmişi
+
+### 2026-08-12 — sürücüler imaja alındı, koşu anında npm'e çıkılmıyor
+
+**Sorun.** `litellm` / `openai_compatible` türü bir sağlayıcıyla koşu
+başlatıldığında runner içindeki motor, yapılandırmadaki sürücü paketini
+(`@ai-sdk/openai-compatible`) ve kendi eklenti paketini
+(`@opencode-ai/plugin`) **çalışma anında** `registry.npmjs.org`'dan
+indirmeye çalışıyordu.
+
+SSL denetimi yapan kurumsal ağlarda bu istek düşüyor:
+
+```
+level=WARN message="background dependency install failed"
+error="...NpmInstallFailedError (cause: FetchError: request to
+https://registry.npmjs.org/@opencode-ai%2fplugin failed,
+reason: unable to get local issuer certificate)..."
+```
+
+Sürücü yüklenemeyince sağlayıcı ayağa kalkmıyor ve mesaj sağlayıcıya **hiç
+çıkmadan** `500 UnknownError` olarak yansıyordu: durum "başarısız", maliyet
+sıfır, sağlayıcının logunda hiçbir istek yok. OpenRouter etkilenmiyordu
+çünkü o motorda yerleşik.
+
+**Ölçüm (2026-08-12).** Kurulumun nereye yapıldığı imaj içinde koşturularak
+bulundu: motor paketleri **yapılandırma dizinine** kuruyor —
+`/home/agent/.config/opencode/node_modules`. Oraya kendi `package.json`'ını
+da yazıyor ve eklentiyi kendi sürümüne sabitliyor
+(`{"dependencies": {"@opencode-ai/plugin": "<motor sürümü>"}}`).
+
+Aynı ölçümde ikinci bir dış bağımlılık görüldü: model kataloğu
+(`models.json`, ~3,6 MB) da koşu anında indiriliyor ve
+`~/.cache/opencode/models.json` altına yazılıyor.
+
+**Karar.**
+
+1. Sürücü paketleri **imaj derlemesinde** kurulur ve motorun aradığı dizine
+   yerleştirilir. Hedef: koşu sırasında paket deposuna **sıfır istek**.
+   Sürümler `runner/package.json` + `package-lock.json` ile sabitlenir ve
+   `npm ci` ile kurulur — kayan `latest` kullanılmaz, imaj tekrarlanabilir
+   olur.
+2. Kurumsal CA **isteğe bağlı** olarak tanıtılabilir: `RUNNER_EXTRA_CA_CERT`
+   dolu ise backend, PEM dosyasını container'a **salt okunur** bağlar ve
+   `NODE_EXTRA_CA_CERTS` ile gösterir. İmaja hiçbir kurumun CA'sı
+   **gömülmez** — imaj herkese dağıtılıyor.
+3. Sürücü yine de yüklenemezse koşu **net bir mesajla** düşer
+   ("sağlayıcı sürücüsü yüklenemedi: …"), anlamsız bir 500 ile değil.
+
+**TLS doğrulaması hiçbir koşulda kapatılmaz.**
+`NODE_TLS_REJECT_UNAUTHORIZED=0`, `npm config set strict-ssl false`,
+`git -c http.sslVerify=false` ve benzerleri yasaktır: kurumsal ağın çözümü
+CA'yı tanıtmaktır, doğrulamayı kaldırmak değil. Kaldırıldığında sorun
+görünmez olur ama ortadan kalkmaz — ve bu imaj başka kurumlarda da
+çalışıyor.

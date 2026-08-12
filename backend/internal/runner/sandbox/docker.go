@@ -50,7 +50,26 @@ type Spec struct {
 
 	// Files, container BAŞLATILMADAN ÖNCE içine kopyalanacak dosyalar.
 	Files []File
+
+	/*
+	 * ExtraCACert, HOST üzerindeki bir kök sertifika dosyasının (PEM) yolu.
+	 *
+	 * Boşsa hiçbir şey bağlanmaz — varsayılan davranış değişmez. Doluysa
+	 * dosya container'a SALT OKUNUR bağlanır ve `NODE_EXTRA_CA_CERTS` ile
+	 * gösterilir (env'i çağıran veriyor).
+	 *
+	 * NEDEN İMAJA GÖMÜLMÜYOR: imaj herkese dağıtılıyor ve bir kurumun kök
+	 * sertifikası oraya girerse o sertifika bütün kullanıcılara dağıtılmış
+	 * olur. Kurumsal ağın çözümü CA'yı TANITMAK; TLS doğrulamasını kapatmak
+	 * (NODE_TLS_REJECT_UNAUTHORIZED=0, strict-ssl=false, sslVerify=false)
+	 * hiçbir koşulda kabul edilmez — sorunu görünmez yapar, ortadan
+	 * kaldırmaz.
+	 */
+	ExtraCACert string
 }
+
+/** Kurumsal CA'nın container içindeki yolu. */
+const ExtraCACertPath = "/etc/ssl/certs/kurumsal-ca.pem"
 
 // File, container'a kopyalanacak bir dosya.
 type File struct {
@@ -111,6 +130,23 @@ func (m *Manager) EnsureImage(ctx context.Context, ref string) error {
 	return fmt.Errorf("%w: imaj kontrol edilemedi: %w", ErrCreate, err)
 }
 
+/*
+ * caBind, kurumsal CA için salt okunur bağlama listesini üretir.
+ *
+ * Yol boşsa nil döner: `Binds: nil` ile hiçbir bağlama yapılmaz ve
+ * varsayılan davranış aynen korunur.
+ *
+ * `:ro` PAZARLIKSIZ. Container non-root koşuyor ama yazılabilir bir
+ * sertifika deposu, çalıştırılan agent'ın güven zincirini değiştirebilmesi
+ * demek olurdu.
+ */
+func caBind(hostPath string) []string {
+	if hostPath == "" {
+		return nil
+	}
+	return []string{hostPath + ":" + ExtraCACertPath + ":ro"}
+}
+
 // Create, container'ı oluşturur, dosyaları içine kopyalar ve başlatır.
 //
 // Hata durumunda yarım kalan container temizlenir — çağıranın elinde sızıntı kalmaz.
@@ -137,6 +173,9 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (c *Container, err erro
 		&container.HostConfig{
 			// Dışarıya port yayınlanmaz; backend izole ağ üzerinden erişir.
 			NetworkMode: container.NetworkMode(spec.Network),
+			// Kurumsal CA yalnızca AÇIKÇA tanımlandıysa bağlanır ve her
+			// zaman salt okunur.
+			Binds: caBind(spec.ExtraCACert),
 			Resources: container.Resources{
 				NanoCPUs: int64(spec.CPUCores) * 1_000_000_000,
 				Memory:   int64(spec.MemoryGB) << 30,

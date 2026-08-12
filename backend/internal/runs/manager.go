@@ -275,6 +275,12 @@ func userMessage(status Status, cause error) string {
 		return "depoya erişilemedi: " + cause.Error()
 	case errors.Is(cause, runner.ErrProviderAuth):
 		return "sağlayıcı anahtarı geçersiz — ayarlardan güncelleyin"
+	// Sürücü hatası model hatasının ÖNÜNDE: ikisi de mesaj gönderimi
+	// sırasında çıkıyor ama sebepleri ve çözümleri bambaşka. Sürücü
+	// yüklenemediyse modelde bir sorun yok, ortamda var.
+	case errors.Is(cause, runner.ErrProviderDriver):
+		return "sağlayıcı sürücüsü yüklenemedi: " + cause.Error() +
+			" — kurumsal ağdaysanız RUNNER_EXTRA_CA_CERT ile kök sertifikayı tanıtın"
 	case errors.Is(cause, runner.ErrModel):
 		return "model çağrısı başarısız: " + cause.Error()
 	case errors.Is(cause, runner.ErrSandbox):
