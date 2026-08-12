@@ -36,6 +36,7 @@ import {
   EmptyState,
   IconTile,
   Input,
+  Metric,
   Notice,
   PageHeader,
   Panel,
@@ -163,8 +164,7 @@ export default function AgentsPage() {
 
   // Seçim listeden düşerse (süzgeç, arama, silme) ilk sıradakine kayar:
   // detay sütununun boş kalması, ekranın yarısını boşa harcamak olurdu.
-  const selected =
-    items.find((a) => a.id === selectedId) ?? items[0] ?? null;
+  const selected = items.find((a) => a.id === selectedId) ?? items[0] ?? null;
 
   function select(agent: Agent) {
     setSelectedId(agent.id);
@@ -279,10 +279,13 @@ export default function AgentsPage() {
                       m.id === selected.defaultModel &&
                       m.providerId === selected.defaultProviderId,
                   )}
-                  usage={report.data?.byAgent.find((g) => g.key === selected.slug)}
+                  usage={report.data?.byAgent.find(
+                    (g) => g.key === selected.slug,
+                  )}
                   runs={
-                    runs.data?.items.filter((r) => r.agentSlug === selected.slug) ??
-                    []
+                    runs.data?.items.filter(
+                      (r) => r.agentSlug === selected.slug,
+                    ) ?? []
                   }
                   mcpNames={(mcpServers.data ?? [])
                     .filter((s) => selected.mcpServerIds.includes(s.id))
@@ -372,7 +375,9 @@ function AgentList({
 
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{a.name}</span>
+                    <span className="truncate text-sm font-medium">
+                      {a.name}
+                    </span>
                     {a.source === "custom" && <Badge tone="info">özel</Badge>}
                     {a.isModified && <Badge tone="warning">değişik</Badge>}
                   </span>
@@ -457,7 +462,9 @@ function CapabilityStrip({ agent }: { agent: Agent }) {
           className="flex items-center gap-0.5 text-info"
         >
           <IconPlug className="size-3.5" />
-          <span className="text-2xs tabular-nums">{agent.mcpServerIds.length}</span>
+          <span className="text-2xs tabular-nums">
+            {agent.mcpServerIds.length}
+          </span>
         </span>
       )}
     </span>
@@ -524,7 +531,9 @@ function AgentDetail({
                 ) : (
                   <Badge>hazır</Badge>
                 )}
-                {agent.isModified && <Badge tone="warning">değiştirilmiş</Badge>}
+                {agent.isModified && (
+                  <Badge tone="warning">değiştirilmiş</Badge>
+                )}
               </div>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
                 <span className="font-mono">{agent.slug}</span>
@@ -607,12 +616,18 @@ function AgentDetail({
           <Metric
             label={`Çalıştırma (${USAGE_DAYS}g)`}
             value={usage ? formatCount(usage.runs) : "—"}
-            note={usage ? `${formatCount(usage.succeeded)} tamamlandı` : "kayıt yok"}
+            note={
+              usage ? `${formatCount(usage.succeeded)} tamamlandı` : "kayıt yok"
+            }
           />
           <Metric
             label="Başarı"
             value={usage ? formatPercent(usage.succeeded, usage.runs) : "—"}
-            note={usage && usage.failed > 0 ? `${usage.failed} başarısız` : undefined}
+            note={
+              usage && usage.failed > 0
+                ? `${usage.failed} başarısız`
+                : undefined
+            }
             tone={
               usage && usage.runs > 0
                 ? usage.succeeded / usage.runs >= 0.8
@@ -629,7 +644,11 @@ function AgentDetail({
           <Metric
             label="Ort. süre"
             value={usage ? formatDuration(usage.avgDurationSec) : "—"}
-            note={usage ? `${formatCompact(usage.filesChanged)} dosya değişti` : undefined}
+            note={
+              usage
+                ? `${formatCompact(usage.filesChanged)} dosya değişti`
+                : undefined
+            }
           />
         </div>
       </Card>
@@ -678,7 +697,9 @@ function AgentDetail({
             {agent.defaultModel ? (
               <div className="space-y-3">
                 <div className="min-w-0">
-                  <p className="truncate font-mono text-sm">{agent.defaultModel}</p>
+                  <p className="truncate font-mono text-sm">
+                    {agent.defaultModel}
+                  </p>
                   <p className="mt-0.5 text-xs text-ink-3">
                     {provider?.name ?? "sağlayıcı bulunamadı"}
                   </p>
@@ -693,17 +714,17 @@ function AgentDetail({
                           ? "—"
                           : formatCompact(model.contextLength)
                       }
-                      small
+                      size="sm"
                     />
                     <Metric
                       label="Girdi /M"
                       value={formatMoney(model.promptPricePerMTok)}
-                      small
+                      size="sm"
                     />
                     <Metric
                       label="Çıktı /M"
                       value={formatMoney(model.completionPricePerMTok)}
-                      small
+                      size="sm"
                     />
                   </dl>
                 ) : (
@@ -828,38 +849,6 @@ function AgentDetail({
   );
 }
 
-/** Etiket + rakam. `small`, kart içindeki ikincil ölçüler için. */
-function Metric({
-  label,
-  value,
-  note,
-  tone,
-  small = false,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  /** Yalnızca yorumlanabilir bir değer varsa: başarı oranı gibi. */
-  tone?: "ok" | "warn";
-  small?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
-        {label}
-      </dt>
-      <dd
-        className={`mt-1 truncate font-semibold tabular-nums ${
-          small ? "text-sm" : "text-lg leading-none"
-        } ${tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : ""}`}
-      >
-        {value}
-      </dd>
-      {note && <p className="mt-1 truncate text-2xs text-ink-3">{note}</p>}
-    </div>
-  );
-}
-
 function PermissionRow({
   Icon,
   label,
@@ -882,7 +871,9 @@ function PermissionRow({
         </span>
         {on && <span className="mt-0.5 block text-2xs text-ink-3">{note}</span>}
       </span>
-      <span className="shrink-0 text-2xs text-ink-3">{on ? "açık" : "kapalı"}</span>
+      <span className="shrink-0 text-2xs text-ink-3">
+        {on ? "açık" : "kapalı"}
+      </span>
     </li>
   );
 }
@@ -921,9 +912,7 @@ function ToolList({
           ))}
         </div>
       )}
-      {warning && (
-        <p className="mt-1.5 text-2xs text-warn">{warning}</p>
-      )}
+      {warning && <p className="mt-1.5 text-2xs text-warn">{warning}</p>}
     </div>
   );
 }
@@ -948,18 +937,26 @@ function AgentForm({
   const [description, setDescription] = useState(agent?.description ?? "");
   const [prompt, setPrompt] = useState(agent?.prompt ?? "");
   // Varsayılan model (sağlayıcı, model) çiftidir; ikisi birlikte seçilir.
-  const [model, setModel] = useState<{ providerId: string; modelId: string } | null>(
+  const [model, setModel] = useState<{
+    providerId: string;
+    modelId: string;
+  } | null>(
     agent?.defaultModel && agent.defaultProviderId
       ? { providerId: agent.defaultProviderId, modelId: agent.defaultModel }
       : null,
   );
   const [allowEdit, setAllowEdit] = useState(agent?.allowEdit ?? true);
   const [allowBash, setAllowBash] = useState(agent?.allowBash ?? true);
-  const [allowWebfetch, setAllowWebfetch] = useState(agent?.allowWebfetch ?? false);
+  const [allowWebfetch, setAllowWebfetch] = useState(
+    agent?.allowWebfetch ?? false,
+  );
   const [mcpIds, setMcpIds] = useState<string[]>(agent?.mcpServerIds ?? []);
   const [scriptIds, setScriptIds] = useState<string[]>(agent?.scriptIds ?? []);
 
-  const mcpServers = useQuery({ queryKey: ["mcp-servers"], queryFn: api.mcpServers.list });
+  const mcpServers = useQuery({
+    queryKey: ["mcp-servers"],
+    queryFn: api.mcpServers.list,
+  });
   // Seçim listesi olduğu için tek sayfa yetmez; sınır yüksek tutuluyor.
   const scripts = useQuery({
     queryKey: ["scripts", "all"],
@@ -1070,8 +1067,8 @@ function AgentForm({
         {selected && selected.supportsTools === false && (
           <div className="mt-3">
             <Notice tone="warning">
-              Seçilen model araç çağıramıyor. Agent dosya okuyup değiştiremeyeceği
-              için büyük olasılıkla işe yaramaz.
+              Seçilen model araç çağıramıyor. Agent dosya okuyup
+              değiştiremeyeceği için büyük olasılıkla işe yaramaz.
             </Notice>
           </div>
         )}
@@ -1147,7 +1144,9 @@ function AgentForm({
                         checked={mcpIds.includes(srv.id)}
                         onChange={(on) =>
                           setMcpIds((prev) =>
-                            on ? [...prev, srv.id] : prev.filter((id) => id !== srv.id),
+                            on
+                              ? [...prev, srv.id]
+                              : prev.filter((id) => id !== srv.id),
                           )
                         }
                       />
@@ -1171,7 +1170,8 @@ function AgentForm({
               <p className="mt-1 text-xs text-ink-3">Yükleniyor…</p>
             ) : scripts.data.items.length === 0 ? (
               <p className="mt-1 text-xs text-ink-3">
-                Tanımlı betik yok. Ayarlar → Betikler bölümünden ekleyebilirsiniz.
+                Tanımlı betik yok. Ayarlar → Betikler bölümünden
+                ekleyebilirsiniz.
               </p>
             ) : (
               <>
@@ -1186,7 +1186,9 @@ function AgentForm({
                         checked={scriptIds.includes(s.id)}
                         onChange={(on) =>
                           setScriptIds((prev) =>
-                            on ? [...prev, s.id] : prev.filter((id) => id !== s.id),
+                            on
+                              ? [...prev, s.id]
+                              : prev.filter((id) => id !== s.id),
                           )
                         }
                       />
@@ -1204,8 +1206,8 @@ function AgentForm({
                   <div className="mt-2">
                     <Notice tone="warning">
                       Bu agent&apos;ın <strong>komut çalıştırma</strong> yetkisi
-                      kapalı. Seçilen betikler kaydedilir ama çalıştırma ortamına
-                      kopyalanmaz.
+                      kapalı. Seçilen betikler kaydedilir ama çalıştırma
+                      ortamına kopyalanmaz.
                     </Notice>
                   </div>
                 ) : (
@@ -1294,7 +1296,9 @@ function PickerRow({
         <span className={`block text-sm ${mono ? "font-mono" : "font-medium"}`}>
           {title}
         </span>
-        {note && <span className="mt-0.5 block text-xs text-ink-2">{note}</span>}
+        {note && (
+          <span className="mt-0.5 block text-xs text-ink-2">{note}</span>
+        )}
       </span>
     </label>
   );

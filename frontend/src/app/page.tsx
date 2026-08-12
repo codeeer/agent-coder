@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { readableFailure } from "@/lib/failure";
-import { TRIGGER_TEXT, type ReportSummary, type Run, type WorkflowRun } from "@/lib/types";
+import {
+  TRIGGER_TEXT,
+  type ReportSummary,
+  type Run,
+  type WorkflowRun,
+} from "@/lib/types";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import { WorkflowRunBadge } from "@/components/workflows/WorkflowStatusBadge";
 import { BarList } from "@/components/charts/BarList";
@@ -31,6 +36,7 @@ import {
   Button,
   Card,
   IconTile,
+  Metric,
   Panel,
   PageHeader,
   Segmented,
@@ -72,16 +78,26 @@ export default function DashboardPage() {
   const [days, setDays] = useState<(typeof PERIODS)[number]["id"]>("7");
   const [project, setProject] = useState("");
 
-  const providers = useQuery({ queryKey: ["llm-providers"], queryFn: api.llmProviders.list });
+  const providers = useQuery({
+    queryKey: ["llm-providers"],
+    queryFn: api.llmProviders.list,
+  });
   const projects = useQuery({
     queryKey: ["projects"],
     queryFn: () => api.projects.list({ limit: 200 }),
   });
-  const workflows = useQuery({ queryKey: ["workflows"], queryFn: () => api.workflows.list() });
+  const workflows = useQuery({
+    queryKey: ["workflows"],
+    queryFn: () => api.workflows.list(),
+  });
 
   const report = useQuery({
     queryKey: ["report", "dashboard", days, project],
-    queryFn: () => api.reports.summary({ days: Number(days), project: project || undefined }),
+    queryFn: () =>
+      api.reports.summary({
+        days: Number(days),
+        project: project || undefined,
+      }),
   });
 
   const runs = useQuery({
@@ -98,7 +114,8 @@ export default function DashboardPage() {
     queryFn: () => api.workflowRuns.list({ limit: 8 }),
   });
 
-  const setupLoading = providers.isPending || projects.isPending || workflows.isPending;
+  const setupLoading =
+    providers.isPending || projects.isPending || workflows.isPending;
 
   const steps = [
     {
@@ -213,18 +230,21 @@ export default function DashboardPage() {
           <Skeleton rows={4} />
         ) : (
           <div className="space-y-4">
-          <KpiStrip data={data} />
+            <KpiStrip data={data} />
 
-          <div className="grid items-start gap-4 xl:grid-cols-3">
-            <LiveActivity runs={runs.data?.items ?? []} loading={runs.isPending} />
-            <Timeline runs={workflowRuns.data?.items ?? []} />
-            <Outcomes data={data} />
-          </div>
+            <div className="grid items-start gap-4 xl:grid-cols-3">
+              <LiveActivity
+                runs={runs.data?.items ?? []}
+                loading={runs.isPending}
+              />
+              <Timeline runs={workflowRuns.data?.items ?? []} />
+              <Outcomes data={data} />
+            </div>
 
-          <div className="grid items-start gap-4 xl:grid-cols-3">
-            <ModelUsage data={data} />
-            <TopRuns runs={runs.data?.items ?? []} />
-            <AgentBreakdown data={data} />
+            <div className="grid items-start gap-4 xl:grid-cols-3">
+              <ModelUsage data={data} />
+              <TopRuns runs={runs.data?.items ?? []} />
+              <AgentBreakdown data={data} />
             </div>
           </div>
         )}
@@ -365,7 +385,9 @@ function LiveActivity({ runs, loading }: { runs: Run[]; loading: boolean }) {
       {loading ? (
         <p className="p-4 text-sm text-ink-3">Yükleniyor…</p>
       ) : shown.length === 0 ? (
-        <p className="p-4 text-sm text-ink-3">Bu projede henüz çalıştırma yok.</p>
+        <p className="p-4 text-sm text-ink-3">
+          Bu projede henüz çalıştırma yok.
+        </p>
       ) : (
         <>
           {active.length === 0 && (
@@ -393,7 +415,9 @@ function LiveActivity({ runs, loading }: { runs: Run[]; loading: boolean }) {
                         {r.projectName}
                       </span>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-2">{r.task}</p>
+                    <p className="mt-0.5 truncate text-xs text-ink-2">
+                      {r.task}
+                    </p>
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-1">
@@ -453,8 +477,8 @@ function Timeline({ runs }: { runs: WorkflowRun[] }) {
                       (`steps` boş geliyor) ve "0 adım" yazmak, olmayan bir
                       bilgiyi sıfırmış gibi göstermek olurdu. */}
                   <p className="mt-0.5 truncate text-2xs text-ink-3">
-                    {TRIGGER_TEXT[r.triggerKind].long} · {formatMoney(r.costUsd)} ·{" "}
-                    {formatCompact(r.tokens)} token
+                    {TRIGGER_TEXT[r.triggerKind].long} ·{" "}
+                    {formatMoney(r.costUsd)} · {formatCompact(r.tokens)} token
                   </p>
                 </div>
 
@@ -508,7 +532,12 @@ function Outcomes({ data }: { data: ReportSummary }) {
       value: t.cancelled + t.timeout + t.interrupted,
       color: "var(--color-chart-other)",
     },
-    { key: "bad", label: "Başarısız", value: t.failed, color: "var(--color-chart-bad)" },
+    {
+      key: "bad",
+      label: "Başarısız",
+      value: t.failed,
+      color: "var(--color-chart-bad)",
+    },
   ].filter((s) => s.value > 0);
 
   return (
@@ -532,22 +561,19 @@ function Outcomes({ data }: { data: ReportSummary }) {
       <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4">
         {/* Etiketler KISA: üç kutu panonun üçte birini paylaşıyor ve
             "Gönderilen branch" orada "GÖNDERİLEN BRAN…" diye kırpılıyordu. */}
-        <MiniStat label="Kod üreten" value={formatCount(t.runsWithCode)} />
-        <MiniStat label="Branch" value={formatCount(t.pushedBranches)} />
-        <MiniStat label="Jira'dan" value={formatCount(t.jiraTasks)} />
+        <Metric
+          size="sm"
+          label="Kod üreten"
+          value={formatCount(t.runsWithCode)}
+        />
+        <Metric
+          size="sm"
+          label="Branch"
+          value={formatCount(t.pushedBranches)}
+        />
+        <Metric size="sm" label="Jira'dan" value={formatCount(t.jiraTasks)} />
       </dl>
     </Panel>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-2xs tracking-wide text-ink-3 uppercase">
-        {label}
-      </dt>
-      <dd className="mt-1 text-sm font-semibold tabular-nums">{value}</dd>
-    </div>
   );
 }
 
@@ -566,13 +592,18 @@ function ModelUsage({ data }: { data: ReportSummary }) {
       }
     >
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MiniStat
+        <Metric
+          size="sm"
           label="Toplam token"
           value={formatCompact(t.promptTokens + t.completionTokens)}
         />
-        <MiniStat label="Girdi" value={formatCompact(t.promptTokens)} />
-        <MiniStat label="Çıktı" value={formatCompact(t.completionTokens)} />
-        <MiniStat label="Maliyet" value={formatMoney(t.costUsd)} />
+        <Metric size="sm" label="Girdi" value={formatCompact(t.promptTokens)} />
+        <Metric
+          size="sm"
+          label="Çıktı"
+          value={formatCompact(t.completionTokens)}
+        />
+        <Metric size="sm" label="Maliyet" value={formatMoney(t.costUsd)} />
       </dl>
 
       <div className="mt-4 border-t border-line pt-4">
@@ -678,8 +709,14 @@ function AgentBreakdown({ data }: { data: ReportSummary }) {
           </p>
           <ul className="space-y-1.5">
             {failures.map((f) => (
-              <li key={f.message} className="flex items-start justify-between gap-3">
-                <span className="min-w-0 flex-1 truncate text-xs text-ink-2" title={f.message}>
+              <li
+                key={f.message}
+                className="flex items-start justify-between gap-3"
+              >
+                <span
+                  className="min-w-0 flex-1 truncate text-xs text-ink-2"
+                  title={f.message}
+                >
                   {readableFailure(f.message)}
                 </span>
                 <Badge tone="danger">{formatCount(f.count)}×</Badge>
@@ -716,7 +753,11 @@ function SetupStep({
   first: boolean;
 }) {
   const Icon =
-    href === "/settings" ? IconChip : href === "/projects" ? IconFolder : IconWorkflow;
+    href === "/settings"
+      ? IconChip
+      : href === "/projects"
+        ? IconFolder
+        : IconWorkflow;
 
   return (
     <Card className={done ? "opacity-60" : undefined}>

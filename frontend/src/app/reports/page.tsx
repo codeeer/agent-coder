@@ -6,7 +6,12 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { readableFailure } from "@/lib/failure";
 import { describeError } from "@/lib/errors";
-import type { ReportGroup, ReportSummary, ReportTotals, Run } from "@/lib/types";
+import type {
+  ReportGroup,
+  ReportSummary,
+  ReportTotals,
+  Run,
+} from "@/lib/types";
 import { BarList } from "@/components/charts/BarList";
 import { Donut } from "@/components/charts/Donut";
 import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
@@ -40,6 +45,7 @@ import {
   Button,
   EmptyState,
   Notice,
+  Metric,
   PageHeader,
   Panel,
   Segmented,
@@ -85,7 +91,10 @@ export default function ReportsPage() {
   const report = useQuery({
     queryKey: ["report", days, project],
     queryFn: () =>
-      api.reports.summary({ days: Number(days), project: project || undefined }),
+      api.reports.summary({
+        days: Number(days),
+        project: project || undefined,
+      }),
   });
 
   // Son çalıştırmalar rapor ucunda yok; mevcut liste ucundan geliyor.
@@ -107,7 +116,12 @@ export default function ReportsPage() {
       />
 
       <Toolbar>
-        <Segmented label="Dönem" options={PERIODS} value={days} onChange={setDays} />
+        <Segmented
+          label="Dönem"
+          options={PERIODS}
+          value={days}
+          onChange={setDays}
+        />
 
         {/* Genişlik SARMALAYICIDAN gelir: Select'in kendi sınıfı `w-full`
             taşır ve dışarıdan verilen bir genişlik onu yenemez. */}
@@ -195,7 +209,10 @@ export default function ReportsPage() {
 
             <div className="grid items-start gap-4 xl:grid-cols-2">
               <AgentPerformance rows={data.byAgent} />
-              <RecentRuns runs={runs.data?.items ?? []} loading={runs.isPending} />
+              <RecentRuns
+                runs={runs.data?.items ?? []}
+                loading={runs.isPending}
+              />
             </div>
 
             <div className="grid items-start gap-4 xl:grid-cols-[1.6fr_1fr]">
@@ -285,7 +302,8 @@ export default function ReportsPage() {
                 aldığını biliyor. */}
             <p className="flex items-center justify-center gap-1.5 pb-2 text-2xs text-ink-3">
               <IconRefresh className="size-3.5" />
-              Veriler {formatRelative(new Date(report.dataUpdatedAt).toISOString())}
+              Veriler{" "}
+              {formatRelative(new Date(report.dataUpdatedAt).toISOString())}
               &nbsp;güncellendi
             </p>
           </div>
@@ -506,8 +524,13 @@ function TokenByModel({ data }: { data: ReportSummary }) {
             formatValue={formatCompact}
           />
           <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3">
-            <MiniStat label="Girdi" value={formatCompact(data.totals.promptTokens)} />
-            <MiniStat
+            <Metric
+              size="sm"
+              label="Girdi"
+              value={formatCompact(data.totals.promptTokens)}
+            />
+            <Metric
+              size="sm"
               label="Çıktı"
               value={formatCompact(data.totals.completionTokens)}
             />
@@ -515,17 +538,6 @@ function TokenByModel({ data }: { data: ReportSummary }) {
         </>
       )}
     </Panel>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-sm font-semibold tabular-nums">{value}</dd>
-    </div>
   );
 }
 
@@ -583,7 +595,9 @@ function AgentPerformance({ rows }: { rows: ReportGroup[] }) {
                 return (
                   <tr key={g.key} className="transition-colors hover:bg-raised">
                     <td className="max-w-0 py-2.5 pl-4">
-                      <div className="truncate font-mono text-xs">{g.label}</div>
+                      <div className="truncate font-mono text-xs">
+                        {g.label}
+                      </div>
                     </td>
                     <td className="py-2.5 pr-3 text-right tabular-nums">
                       {formatCount(g.runs)}
@@ -694,12 +708,18 @@ function Balance({ data }: { data: ReportSummary }) {
   return (
     <Panel title="Rakamların dengesi">
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
-        <MiniStat label="Kod üreten iş" value={formatCount(t.runsWithCode)} />
-        <MiniStat
+        <Metric
+          size="sm"
+          label="Kod üreten iş"
+          value={formatCount(t.runsWithCode)}
+        />
+        <Metric
+          size="sm"
           label={usePRs ? "PR başına satır" : "İş başına satır"}
           value={linesPerUnit > 0 ? formatCount(linesPerUnit) : "—"}
         />
-        <MiniStat
+        <Metric
+          size="sm"
           label={usePRs ? "PR başına maliyet" : "İş başına maliyet"}
           value={formatPerUnit(
             t.costUsd,
@@ -707,24 +727,34 @@ function Balance({ data }: { data: ReportSummary }) {
             usePRs ? "PR" : "iş",
           )}
         />
-        <MiniStat label="Kullanılan agent" value={formatCount(data.byAgent.length)} />
+        <Metric
+          size="sm"
+          label="Kullanılan agent"
+          value={formatCount(data.byAgent.length)}
+        />
       </dl>
 
       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-3 text-2xs text-ink-2">
         <span>
           Başarısız:{" "}
-          <strong className="font-medium text-ink">{formatCount(t.failed)}</strong>
+          <strong className="font-medium text-ink">
+            {formatCount(t.failed)}
+          </strong>
         </span>
         {t.timeout > 0 && (
           <span>
             Zaman aşımı:{" "}
-            <strong className="font-medium text-ink">{formatCount(t.timeout)}</strong>
+            <strong className="font-medium text-ink">
+              {formatCount(t.timeout)}
+            </strong>
           </span>
         )}
         {t.cancelled > 0 && (
           <span>
             İptal:{" "}
-            <strong className="font-medium text-ink">{formatCount(t.cancelled)}</strong>
+            <strong className="font-medium text-ink">
+              {formatCount(t.cancelled)}
+            </strong>
           </span>
         )}
         {t.interrupted > 0 && (
@@ -761,7 +791,9 @@ function GroupTable({
   totals: ReportTotals;
 }) {
   if (rows.length === 0) {
-    return <p className="px-4 py-3.5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>;
+    return (
+      <p className="px-4 py-3.5 text-sm text-ink-3">Bu dönemde kayıt yok.</p>
+    );
   }
 
   return (
@@ -826,7 +858,10 @@ function formatRange(from: string, to: string): string {
   const t = new Date(to);
   if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return "";
 
-  const day = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short" });
+  const day = new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "short",
+  });
   const full = new Intl.DateTimeFormat("tr-TR", {
     day: "numeric",
     month: "short",

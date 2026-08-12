@@ -6,7 +6,13 @@ import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
-import type { GitProvider, Project, ReportGroup, Run, Workflow } from "@/lib/types";
+import type {
+  GitProvider,
+  Project,
+  ReportGroup,
+  Run,
+  Workflow,
+} from "@/lib/types";
 import { repoLabel } from "@/components/projects/repo-url";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import {
@@ -28,6 +34,7 @@ import {
   EmptyState,
   IconTile,
   Input,
+  Metric,
   Notice,
   PageHeader,
   Panel,
@@ -239,7 +246,9 @@ export default function ProjectsPage() {
                         provider={gitProviders.data?.find(
                           (g) => g.id === p.gitProviderId,
                         )}
-                        usage={report.data?.byProject.find((g) => g.key === p.id)}
+                        usage={report.data?.byProject.find(
+                          (g) => g.key === p.id,
+                        )}
                         lastRun={lastRunOf(p.id)}
                         workflows={
                           workflows.data?.items.filter(
@@ -412,7 +421,10 @@ function ProjectCard({
       <div className="mt-auto border-t border-line px-4 py-3">
         {usage ? (
           <dl className="grid grid-cols-3 gap-3">
-            <Metric label={`Çalıştırma (${USAGE_DAYS}g)`} value={formatCount(usage.runs)} />
+            <Metric
+              label={`Çalıştırma (${USAGE_DAYS}g)`}
+              value={formatCount(usage.runs)}
+            />
             <Metric
               label="Başarı"
               value={formatPercent(usage.succeeded, usage.runs)}
@@ -453,7 +465,9 @@ function ProjectCard({
             <span>
               {project.runCount > 0 ? (
                 <>
-                  <strong>{formatCount(project.runCount)} çalıştırma geçmişi</strong>{" "}
+                  <strong>
+                    {formatCount(project.runCount)} çalıştırma geçmişi
+                  </strong>{" "}
                   de silinecek. Bu geri alınamaz.
                 </>
               ) : (
@@ -485,32 +499,6 @@ function ProjectCard({
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  /** Yalnızca yorumlanabilir bir değer için: başarı oranı gibi. */
-  tone?: "ok" | "warn";
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
-        {label}
-      </dt>
-      <dd
-        className={`mt-0.5 truncate text-sm font-semibold tabular-nums ${
-          tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : ""
-        }`}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
 /* ── Form ────────────────────────────────────────────────────────────────── */
 
 function ProjectForm({
@@ -528,7 +516,9 @@ function ProjectForm({
   const [name, setName] = useState(project?.name ?? "");
   const [repoUrl, setRepoUrl] = useState(project?.repoUrl ?? "");
   const [branch, setBranch] = useState(project?.defaultBranch ?? "main");
-  const [gitProviderId, setGitProviderId] = useState(project?.gitProviderId ?? "");
+  const [gitProviderId, setGitProviderId] = useState(
+    project?.gitProviderId ?? "",
+  );
 
   const save = useMutation({
     mutationFn: () => {

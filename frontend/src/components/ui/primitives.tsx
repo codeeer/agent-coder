@@ -708,6 +708,50 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
 
 // ─── Veri gösterimi ─────────────────────────────────────────────────────────
 
+/**
+ * Ölçü — etiket, rakam ve isteğe bağlı alt not.
+ *
+ * ÜÇ KOPYASI VARDI: Agent'lar, Projeler ve Rapor ekranlarının her biri aynı
+ * kalıbı kendi içinde yeniden yazmıştı (sonuncusu `MiniStat` adıyla). Üçü
+ * de neredeyse aynıydı ama tam değil — biri `mt-1`, diğeri `mt-0.5`
+ * kullanıyordu ve yan yana konsalar hizasızlıkları görünürdü. Kalıbın
+ * ekranın içine yazılması, ikinci ve üçüncü kopyayı davet ediyor.
+ *
+ * `tone` YALNIZCA yorumlanabilir bir değer için: başarı oranı iyi ya da
+ * kötü olabilir, token sayısı olamaz. Her rakamı renklendirmek renge sahte
+ * bir anlam yükler.
+ */
+export function Metric({
+  label,
+  value,
+  note,
+  tone,
+  /** md: kart içindeki kahraman rakam · sm: ikincil ölçü. */
+  size = "md",
+}: {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  note?: React.ReactNode;
+  tone?: "ok" | "warn";
+  size?: "sm" | "md";
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="truncate text-2xs font-medium tracking-wide text-ink-3 uppercase">
+        {label}
+      </dt>
+      <dd
+        className={`truncate font-semibold tabular-nums ${
+          size === "sm" ? "mt-0.5 text-sm" : "mt-1 text-lg leading-none"
+        } ${tone === "ok" ? "text-ok" : tone === "warn" ? "text-warn" : ""}`}
+      >
+        {value}
+      </dd>
+      {note && <p className="mt-1 truncate text-2xs text-ink-3">{note}</p>}
+    </div>
+  );
+}
+
 /** Etiket + değer çifti. */
 export function Field({
   label,

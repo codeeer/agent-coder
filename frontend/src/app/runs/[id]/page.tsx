@@ -10,28 +10,39 @@ import { useRunEvents } from "@/lib/use-run-events";
 import type { Run } from "@/lib/types";
 import { Markdown } from "@/components/markdown/Markdown";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
-import { IconExternal } from "@/components/ui/icons";
+import {
+  formatCompact,
+  formatCount,
+  formatDuration,
+  formatMoney,
+} from "@/components/charts/format";
+import { IconAgent, IconAlert, IconExternal } from "@/components/ui/icons";
 import {
   Badge,
   Button,
   Card,
-  Field,
+  IconTile,
   Input,
-  Mono,
+  Metric,
   Notice,
-  PageHeader,
-  Section,
+  Panel,
   Skeleton,
   StatusDot,
   Well,
   formatDate,
+  formatRelative,
 } from "@/components/ui/primitives";
 
 export default function RunDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
 
-  const { data: run, isPending, isError, error } = useQuery({
+  const {
+    data: run,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["run", id],
     queryFn: () => api.runs.get(id),
   });
@@ -49,93 +60,187 @@ export default function RunDetailPage() {
   }, [terminalStatus, id, queryClient]);
 
   if (isPending) return <Skeleton rows={4} />;
-  if (isError) return <Notice tone="error">{describeError(error).message}</Notice>;
+  if (isError)
+    return <Notice tone="error">{describeError(error).message}</Notice>;
+
+  const tokens = run.promptTokens + run.completionTokens;
+  const adds = run.files.reduce((sum, f) => sum + f.additions, 0);
+  const dels = run.files.reduce((sum, f) => sum + f.deletions, 0);
 
   return (
-    <div>
-      <PageHeader
-        title={run.task.length > 70 ? run.task.slice(0, 70) + "…" : run.task}
-        description={
-          <span className="flex flex-wrap items-center gap-2">
-            <RunStatusBadge status={run.status} />
-            <span className="text-ink-3">·</span>
-            <Link href="/runs" className="underline">
-              tüm çalıştırmalar
+    /* Tam yükseklik: künye üstte sabit, içerik ortada kayar — arayüzün
+       geri kalanıyla aynı kabuk düzeni. */
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/*
+        KÜNYE KARTI.
+
+        Öncesinde başlık `PageHeader` idi ve görev metninin ilk 70 karakteri
+        H1 olarak basılıyordu — bir cümlenin ortasından kesilmiş hâli sayfa
+        başlığı olmuyordu. Şimdi görev iki satıra kadar açılıyor, kimlik
+        bilgisi (agent, model, proje, branch) altına iniyor ve ölçüler
+        kartın kendi şeridinde duruyor.
+      */}
+      <Card className="mb-4 shrink-0">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <IconTile tone={toneOf(run)}>
+              <IconAgent className="size-4" />
+            </IconTile>
+
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <RunStatusBadge status={run.status} />
+                {run.workflowName && (
+                  <Badge tone="accent">
+                    {run.workflowName} · {run.stepName}
+                  </Badge>
+                )}
+                {run.pushedBranch && (
+                  <Badge tone="info">→ {run.pushedBranch}</Badge>
+                )}
+              </div>
+
+              {/* Görev metni KIRPILMIYOR, iki satıra sarılıyor. Bu ekranın
+                  konusu bu cümle. */}
+              <h1 className="mt-2 line-clamp-2 text-lg font-semibold tracking-[-0.02em]">
+                {run.task}
+              </h1>
+
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+                <span className="font-mono text-ink-2">{run.agentSlug}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono">{run.modelId}</span>
+                <span aria-hidden="true">·</span>
+                <span>{run.projectName}</span>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono">{run.branch}</span>
+                <span aria-hidden="true">·</span>
+                <span>{formatRelative(run.createdAt)}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <RunActions run={run} />
+            <Link
+              href="/runs"
+              className="rounded text-xs text-ink-3 transition-colors hover:text-accent"
+            >
+              Tüm çalıştırmalar
             </Link>
-          </span>
-        }
-        actions={<RunActions run={run} />}
-      />
-
-      {run.error && (
-        <div className="mb-5">
-          <Notice tone="error" title="Çalıştırma başarısız">
-            {run.error}
-          </Notice>
+          </div>
         </div>
-      )}
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
-        <div className="min-w-0 space-y-5">
-          <Section
-            title="İlerleme"
-            description={
-              active
-                ? connected
-                  ? "Canlı akış bağlı."
-                  : "Bağlantı kurulmaya çalışılıyor…"
+        {/*
+          ÖLÇÜLER.
+
+          Öncesinde sağda 260px'lik bir sütunda sekiz eşit ağırlıklı `Field`
+          satırı vardı ve o sütun yüzünden bu ekranın asıl içeriği — diff ve
+          olay akışı — dar kalıyordu. Dördü buraya çıktı, kalanı üstteki
+          üstveri satırına indi.
+
+          SÜRE İLK KEZ GÖRÜNÜYOR: eskiden yalnızca "başladı" ve "bitti"
+          damgaları vardı ve farkı kullanıcının kendisi hesaplıyordu.
+        */}
+        <dl className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+          <Metric
+            label="Süre"
+            value={durationOf(run)}
+            note={run.finishedAt ? formatDate(run.finishedAt) : "sürüyor"}
+          />
+          <Metric
+            label="Token"
+            value={tokens > 0 ? formatCompact(tokens) : "—"}
+            note={
+              tokens > 0
+                ? `${formatCount(run.promptTokens)} girdi · ${formatCount(run.completionTokens)} çıktı`
                 : undefined
             }
-          >
-            <EventLog runId={id} live={events} active={active} />
-          </Section>
+          />
+          <Metric
+            label="Maliyet"
+            value={run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
+            note={run.providerSlug || undefined}
+          />
+          <Metric
+            label="Değişiklik"
+            value={
+              run.files.length > 0
+                ? `${formatCount(run.files.length)} dosya`
+                : "—"
+            }
+            note={
+              run.files.length > 0
+                ? `+${formatCount(adds)} −${formatCount(dels)} satır`
+                : "kod değişmedi"
+            }
+          />
+        </dl>
 
-          {run.output && <AgentOutput output={run.output} />}
+        {/* Hata künyenin İÇİNDE: ayrı bir kutuya alınsaydı çalıştırmanın
+            kimliğinden kopardı ve sayfanın en önemli cümlesi bağlamsız
+            kalırdı. */}
+        {run.error && (
+          <div className="mt-4 rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5">
+            <p className="flex items-start gap-2 text-xs">
+              <IconAlert className="mt-px size-4 shrink-0 text-danger" />
+              <span className="min-w-0">
+                <span className="font-medium text-danger">
+                  Çalıştırma başarısız
+                </span>
+                <span className="mt-0.5 block break-words text-ink-2">
+                  {run.error}
+                </span>
+              </span>
+            </p>
+          </div>
+        )}
+      </Card>
 
-          {run.diff && (
-            <Section
-              title="Değişiklikler"
-              description={`${run.files.length} dosya`}
-            >
-              <DiffView run={run} />
-            </Section>
-          )}
-        </div>
+      {/* Kayan bölge: künye sabit kalırken içerik kayıyor. */}
+      <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
+        <Panel
+          title="İlerleme"
+          action={
+            active ? (
+              <span className="flex items-center gap-1.5 text-2xs text-ink-3">
+                <StatusDot tone={connected ? "accent" : "neutral"} pulse />
+                {connected ? "canlı" : "bağlanıyor…"}
+              </span>
+            ) : undefined
+          }
+          padded={false}
+        >
+          <EventLog runId={id} live={events} active={active} />
+        </Panel>
 
-        <aside className="space-y-3">
-          <Card>
-            <dl className="space-y-3">
-              <Field label="Proje" value={run.projectName} />
-              <Field label="Branch" value={run.branch} mono />
-              <Field label="Agent" value={run.agentSlug} mono />
-              <Field label="Model" value={run.modelId} mono />
-              <Field
-                label="Token"
-                value={`${run.promptTokens.toLocaleString("tr")} + ${run.completionTokens.toLocaleString("tr")}`}
-                mono
-              />
-              <Field
-                label="Maliyet"
-                value={run.costUsd > 0 ? `$${run.costUsd.toFixed(6)}` : "—"}
-                mono
-              />
-              <Field label="Başladı" value={formatDate(run.startedAt)} />
-              <Field label="Bitti" value={formatDate(run.finishedAt)} />
-            </dl>
-          </Card>
+        {run.output && <AgentOutput output={run.output} />}
 
-          {run.pushedBranch && (
-            <Card>
-              <Field
-                label="Gönderilen branch"
-                value={<Mono>{run.pushedBranch}</Mono>}
-              />
-            </Card>
-          )}
-        </aside>
+        {run.diff && <Changes run={run} />}
       </div>
     </div>
   );
+}
+
+/** Künye karosunun tonu — durumdan geliyor, dekoratif değil. */
+function toneOf(run: Run) {
+  if (isActive(run.status)) return "accent" as const;
+  if (run.status === "succeeded") return "success" as const;
+  if (run.status === "failed") return "danger" as const;
+  return "warning" as const;
+}
+
+/**
+ * Çalıştırma süresi.
+ *
+ * Süren işler için başlangıçtan ŞU ANA kadar; bitenler için gerçek süre.
+ * Liste ekranındaki hesapla aynı.
+ */
+function durationOf(run: Run): string {
+  if (!run.startedAt) return "—";
+  const end = run.finishedAt ? new Date(run.finishedAt) : new Date();
+  const seconds = (end.getTime() - new Date(run.startedAt).getTime()) / 1000;
+  return seconds > 0 ? formatDuration(seconds) : "—";
 }
 
 function RunActions({ run }: { run: Run }) {
@@ -144,7 +249,8 @@ function RunActions({ run }: { run: Run }) {
 
   const cancel = useMutation({
     mutationFn: () => api.runs.cancel(run.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["run", run.id] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["run", run.id] }),
   });
 
   if (isActive(run.status)) {
@@ -247,7 +353,14 @@ function EventLog({
       return text
         .split("\n")
         .filter((l) => l.startsWith("data: "))
-        .map((l) => JSON.parse(l.slice(6)) as { seq: number; level: string; message: string })
+        .map(
+          (l) =>
+            JSON.parse(l.slice(6)) as {
+              seq: number;
+              level: string;
+              message: string;
+            },
+        )
         .filter((e) => e.message);
     },
     enabled: !active,
@@ -257,47 +370,45 @@ function EventLog({
 
   if (items.length === 0) {
     return (
-      <Well className="p-4">
-        <p className="text-sm text-ink-3">
-          {active ? "Çalışma başlatılıyor…" : "Kayıtlı olay yok."}
-        </p>
-      </Well>
+      <p className="px-4 py-3.5 text-sm text-ink-3">
+        {active ? "Çalışma başlatılıyor…" : "Kayıtlı olay yok."}
+      </p>
     );
   }
 
   return (
-    <Well>
-      <div ref={boxRef} className="max-h-80 overflow-auto p-3.5">
-        <ul className="space-y-1.5">
-          {items.map((e) => (
-            <li key={e.seq} className="flex items-start gap-2.5 text-xs">
-              <span className="mt-1.5">
-                <StatusDot
-                  tone={
-                    e.level === "error"
-                      ? "danger"
-                      : e.level === "warn"
-                        ? "warning"
-                        : "neutral"
-                  }
-                />
-              </span>
-              <span
-                className={
+    /* Kendi kutusu YOK: pano zaten bir kutu ve `Well` ile sarılınca iç içe
+       iki çerçeve çıkıyordu. Kayan alan doğrudan panonun gövdesi. */
+    <div ref={boxRef} className="max-h-80 overflow-auto px-4 py-3.5">
+      <ul className="space-y-1.5">
+        {items.map((e) => (
+          <li key={e.seq} className="flex items-start gap-2.5 text-xs">
+            <span className="mt-1.5">
+              <StatusDot
+                tone={
                   e.level === "error"
-                    ? "text-danger"
+                    ? "danger"
                     : e.level === "warn"
-                      ? "text-warn"
-                      : "text-ink-2"
+                      ? "warning"
+                      : "neutral"
                 }
-              >
-                {e.message}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Well>
+              />
+            </span>
+            <span
+              className={
+                e.level === "error"
+                  ? "text-danger"
+                  : e.level === "warn"
+                    ? "text-warn"
+                    : "text-ink-2"
+              }
+            >
+              {e.message}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -312,33 +423,51 @@ function AgentOutput({ output }: { output: string }) {
   const [raw, setRaw] = useState(false);
 
   return (
-    <Section
+    <Panel
       title="Agent çıktısı"
-      actions={
+      action={
         <Button size="sm" onClick={() => setRaw((v) => !v)}>
           {raw ? "Biçimli" : "Ham metin"}
         </Button>
       }
     >
-      <Card>
-        {raw ? (
-          <pre className="overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap">
-            {output}
-          </pre>
-        ) : (
-          <Markdown source={output} />
-        )}
-      </Card>
-    </Section>
+      {raw ? (
+        <pre className="overflow-x-auto font-mono text-xs leading-relaxed whitespace-pre-wrap">
+          {output}
+        </pre>
+      ) : (
+        <Markdown source={output} />
+      )}
+    </Panel>
   );
 }
 
-function DiffView({ run }: { run: Run }) {
+/**
+ * Değişiklikler — dosya çipleri + diff.
+ *
+ * Diff bu ekranın en geniş içeriği; yan sütun kaldırıldığı için artık tam
+ * genişlikte duruyor ve satırlar sarmadan okunuyor.
+ */
+function Changes({ run }: { run: Run }) {
+  const adds = run.files.reduce((sum, f) => sum + f.additions, 0);
+  const dels = run.files.reduce((sum, f) => sum + f.deletions, 0);
+
   return (
-    <div className="space-y-3">
+    <Panel
+      title="Değişiklikler"
+      action={
+        <span className="text-2xs tabular-nums text-ink-3">
+          {formatCount(run.files.length)} dosya · +{formatCount(adds)} −
+          {formatCount(dels)}
+        </span>
+      }
+    >
       <div className="flex flex-wrap gap-2">
         {run.files.map((f) => (
-          <Badge key={f.file} tone={f.status === "added" ? "success" : "neutral"}>
+          <Badge
+            key={f.file}
+            tone={f.status === "added" ? "success" : "neutral"}
+          >
             <span className="font-mono">{f.file}</span>
             <span className="ml-1.5 text-ok">+{f.additions}</span>
             <span className="ml-1 text-danger">−{f.deletions}</span>
@@ -346,8 +475,8 @@ function DiffView({ run }: { run: Run }) {
         ))}
       </div>
 
-      <Well>
-        <pre className="max-h-[28rem] overflow-auto p-3.5 font-mono text-xs leading-relaxed">
+      <Well className="mt-3">
+        <pre className="max-h-112 overflow-auto p-3.5 font-mono text-xs leading-relaxed">
           {run.diff.split("\n").map((line, i) => (
             <div
               key={i}
@@ -368,6 +497,6 @@ function DiffView({ run }: { run: Run }) {
           ))}
         </pre>
       </Well>
-    </div>
+    </Panel>
   );
 }
