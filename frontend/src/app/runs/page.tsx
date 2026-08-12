@@ -22,6 +22,7 @@ import {
   EmptyState,
   Notice,
   PageHeader,
+  RowAction,
   SearchField,
   Segmented,
   Select,
@@ -527,9 +528,11 @@ function DeleteRunButton({ run }: { run: Run }) {
 
   if (engel) {
     return (
-      <Button size="sm" variant="danger" disabled title={engel} aria-label={engel}>
-        <IconTrash className="size-4" />
-      </Button>
+      <RowAction>
+        <Button size="sm" variant="danger" disabled title={engel} aria-label={engel}>
+          <IconTrash className="size-4" />
+        </Button>
+      </RowAction>
     );
   }
 
@@ -552,16 +555,17 @@ function DeleteRunButton({ run }: { run: Run }) {
   }
 
   return (
-    <Button
-      size="sm"
-      variant="danger"
-      onClick={() => setAsking(true)}
-      aria-label="Bu çalıştırmayı sil"
-      title={`Sil — ${formatMoney(run.costUsd)} raporlardan düşecek`}
-      className="opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-    >
-      <IconTrash className="size-4" />
-    </Button>
+    <RowAction>
+      <Button
+        size="sm"
+        variant="danger"
+        onClick={() => setAsking(true)}
+        aria-label="Bu çalıştırmayı sil"
+        title={`Sil — ${formatMoney(run.costUsd)} raporlardan düşecek`}
+      >
+        <IconTrash className="size-4" />
+      </Button>
+    </RowAction>
   );
 }
 

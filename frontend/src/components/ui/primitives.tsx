@@ -663,6 +663,37 @@ export function Notice({
 }
 
 /**
+ * Satır eylemi: durgunken görünmez, hover ve odakta belirir.
+ *
+ * Bir `.group` içinde kullanılır. Her satırda duran bir silme düğmesi,
+ * listenin asıl işinin (açmak) önüne geçiyordu; odakla da beliriyor çünkü
+ * klavyeyle gezen kullanıcı için görünmezlik erişilemezlik olmamalı. Dar
+ * ekranda hover yok, orada hep görünür.
+ *
+ * SAYDAMLIK DÜĞMEDE DEĞİL SARMALAYICIDA — bu bir hatanın kaydı: `Button`
+ * pasifken kendi `disabled:opacity-60`ını uyguluyor ve düğmeye verilen
+ * `sm:opacity-0`ı eziyor. Sınıf doğrudan düğmeye konduğunda sonuç tersine
+ * dönmüştü: tabloda yalnızca SİLİNEMEYEN satırlarda düğme duruyor,
+ * silinebilenlerde görünmüyordu. Sürekli görünen tek eylem, işe yaramayan
+ * eylemdi.
+ */
+export function RowAction({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`inline-flex shrink-0 opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100 ${className}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
  * Geri alınamayan bir eylemin yerinde onayı.
  *
  * Modal DEĞİL, şerit: onay silinecek şeyin yanında açılır, kullanıcı neyi

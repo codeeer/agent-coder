@@ -21,6 +21,7 @@ import {
   Input,
   Notice,
   PageHeader,
+  RowAction,
   SearchField,
   Segmented,
   Select,
@@ -295,15 +296,16 @@ function WorkflowRow({ workflow: w }: { workflow: Workflow }) {
           )}
         </Link>
 
-        <Button
-          size="sm"
-          variant="danger"
-          onClick={() => setConfirming(true)}
-          aria-label={`${w.name} akışını sil`}
-          className="shrink-0 opacity-100 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
-        >
-          <IconTrash className="size-4" />
-        </Button>
+        <RowAction>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setConfirming(true)}
+            aria-label={`${w.name} akışını sil`}
+          >
+            <IconTrash className="size-4" />
+          </Button>
+        </RowAction>
       </div>
 
       {confirming && (
