@@ -41,6 +41,16 @@ export interface StatCardProps {
   icon?: React.ReactNode;
   /** Simge karosunun tonu. Rakamı DEĞİL yalnızca karoyu boyar. */
   tone?: TileTone;
+  /**
+   * Rakamın yanındaki kırılım — "+9 −0" gibi.
+   *
+   * Bir rakam tek başına iki farklı şeye benzeyebiliyorsa ayrımı bu satır
+   * yapar. Gerçek bir vaka: "değişen dosya 9" ile "değişen kod satırı 9"
+   * yan yana duruyordu ve aynı sayı olmaları hata sanıldı — oysa dokuz
+   * çalıştırmanın her biri bir dosyada bir satır değiştirmişti. Kırılım
+   * yazılınca ikisinin farklı şeyi saydığı okunuyor.
+   */
+  detail?: string;
 }
 
 export function StatCard({
@@ -52,6 +62,7 @@ export function StatCard({
   periodNote,
   icon,
   tone = "accent",
+  detail,
 }: StatCardProps) {
   const ratio = changeRatio(current, previous);
   const flat = ratio !== null && Math.abs(ratio) < 0.005;
@@ -79,8 +90,13 @@ export function StatCard({
         satırı SÖZLE söylüyor ve günlük seyrin okunur hali "Günlük özet"
         panosunda tam boy duruyor.
       */}
-      <div className="mt-2.5 text-xl leading-none font-semibold tabular-nums">
-        {value}
+      <div className="mt-2.5 flex items-baseline gap-2">
+        <span className="text-xl leading-none font-semibold tabular-nums">
+          {value}
+        </span>
+        {detail && (
+          <span className="truncate text-2xs tabular-nums text-ink-3">{detail}</span>
+        )}
       </div>
 
       <div className="mt-2.5 truncate text-2xs">

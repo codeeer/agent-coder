@@ -408,6 +408,10 @@ function KpiStrip({ data }: { data: ReportSummary }) {
       periodNote: note,
       icon: <IconEdit className="size-3.5" />,
       tone: "accent",
+      // Kırılım, komşu "değişen dosya" kartından ayırt edilmesini sağlıyor:
+      // ikisi tesadüfen aynı sayıya düştüğünde (her çalıştırma bir dosyada
+      // bir satır değiştirdiğinde) aynı şeyi sayıyorlar sanılıyor.
+      detail: `+${formatCompact(t.additions)} −${formatCompact(t.deletions)}`,
     },
     {
       label: "Gönderilen branch",
