@@ -220,6 +220,18 @@ Kabul kriterleri:
 
 ## Karar geçmişi
 
+### 2026-08-12 — `offline` kısıtının KAPSAMI düzeltildi
+
+Aşağıdaki kararın ilk uygulaması bayrağı imaj geneli bir ortam değişkeniyle
+veriyordu. Değişken container'daki **her** süreci bağladığı için agent'ın
+kendi paket kurulumlarını da kesti — kurumsal ağda değil, hiçbir yerde
+çalışmıyordu.
+
+Kısıt artık yalnızca motorun çalışma dizinini kapsıyor. Karar (koşu anında
+npm'e çıkılmaz) değişmedi, kapsamı düzeltildi. Ölçüm ve gerekçe:
+[spec 014 K1](../014-kurumsal-paket-deposu/spec.md) ve
+[014 → Ölçüm 1-2](../014-kurumsal-paket-deposu/tasks.md).
+
 ### 2026-08-12 — sürücüler imaja alındı, koşu anında npm'e çıkılmıyor
 
 **Sorun.** `litellm` / `openai_compatible` türü bir sağlayıcıyla koşu

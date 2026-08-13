@@ -86,13 +86,21 @@ make psql             # Postgres kabuğu
 make test             # birim testleri (veritabanı gerekmez)
 make test-integration # gerçek Postgres'e karşı testler (stack ayakta olmalı)
 make lint             # gofmt + go vet + eslint
-make runner           # opencode-runner image'ını build et
+make runner           # opencode-runner imajı — taban VE sürümlü varyantlar
 make ps               # servis durumları
 ```
 
 `make test` veritabanı olmadan çalışır — entegrasyon testleri `TEST_DATABASE_URL`
 tanımlı değilse atlanır. Bunlar `make test-integration` ile ayrı çalıştırılır ve
 tek veritabanını paylaştıkları için `-p 1` ile sırayla koşarlar.
+
+**`runner/Dockerfile` değiştiyse `docker build` YETMEZ, `make runner` gerekir.**
+Koşular çoğu zaman taban imajı değil, projenin varsayılan Node sürümüne ait
+varyantı (`node-<sürüm>`) kullanıyor; `docker build` yalnızca tabanı yeniler ve
+varyant bayat kalır. Bir düzeltme bu yüzden bir gün boyunca üretimde çalışmadı:
+`latest` doğruydu, çalışan imaj değildi (spec 013 Ölçüm 5). Bir düzeltmenin
+"doğrulandı" sayılması için doğrulamanın **gerçekte kullanılan imaj** üzerinde
+yapılmış olması gerekir.
 
 Go veya Node host'a kurulu olmak zorunda değil — her şey container içinde derlenir.
 
@@ -303,6 +311,14 @@ Center farklı kimlik doğrulama ve API yüzeyi kullanır, desteklenmiyor.
 YAZILMAZ — `{env:AGENT_CODER_MCP_<AD>}` referansı yazılır, değer container ortamından gelir.
 Sağlayıcı anahtarındaki desenin aynısı; iki sızıntı testi bunu koruyor.
 
+**Başsız koşuda ONAY İSTEYEN her izin bir kilitlenmedir.** Motorun izin sözlüğü
+`ask` değerini destekliyor ama çalıştırmaları cevaplayacak kimse yok: soru sorulur ve
+çalıştırma zaman aşımına kadar **sıfır token'da** asılı kalır. Ölçüldü — bir koşu
+dokuz dakika beklerken düzeltmeden sonra aynı iş 20 saniyede bitti (spec 015 Ölçüm 1).
+Bu yüzden `question`, `plan_enter` ve `external_directory` **sorulmaz, reddedilir**;
+`BuildPermissions` bunu bir testle kilitliyor. Yeni bir izin türü eklenirken sorulacak
+tek soru şudur: *bu izin `ask` üretebilir mi?* Üretebiliyorsa reddedilmelidir.
+
 **MCP sunucusu bağlanamazsa çalıştırma motoru SESSİZ KALIR.** Araçları modele hiç sunmuyor,
 hata da vermiyor (ölçüldü — spec 011). Bu yüzden mesaj gönderilmeden önce motorun `GET /mcp`
 ucu sorgulanıyor ve bağlanamayan sunucu olay akışına **uyarı** olarak düşüyor. Çalıştırma
@@ -466,6 +482,34 @@ ve hepsi veritabanında **AES-256-GCM ile şifreli** saklanır. Uyulması gereke
   geri gelir — istemeyen değişkeni boşaltır.
 
 ## Durum
+
+**Motor logları tamamlandı** ([spec 015](specs/015-motor-loglari/spec.md)):
+
+- **Container'la birlikte kaybolan teşhis verisi saklanıyor** — üç kaynak: container
+  çıktısı, motorun log dosyaları, agent'ın tam oturum geçmişi. Toplama container
+  **silinmeden önce**; koşu nasıl biterse bitsin çalışıyor
+- **Oturum geçmişi ilerleme akışının yedeği** — ilerleme SSE ile besleniyor ve o
+  bağlantı kopabiliyor; koptuğunda ne konuşulduğu yalnızca burada kalıyor
+- **Sırlar yazılmadan önce maskeleniyor** — koruma kaldırılınca kırmızıya dönen bir
+  testle kilitli
+- **Başsız koşuda `ask` izni kilitlenmedir** — bu özellik sayesinde bulundu: bir koşu
+  dokuz dakika sıfır token'da asılı kaldı, düzeltmeden sonra aynı iş 20 saniyede bitti
+
+**Kurumsal paket deposu tamamlandı** ([spec 014](specs/014-kurumsal-paket-deposu/spec.md)):
+
+- **npm kayıt defteri adresi ayarlardan** — kimlik opsiyonel, dosyaya yazılır, ortam
+  değişkenine değil
+- **Agent'ın npm'i onarıldı** — kapalı ağ düzeltmesinin `ENV NPM_CONFIG_OFFLINE`'ı
+  imaj geneliydi ve agent'ın kurulumlarını her yerde kırıyordu
+
+**Node sürümlü runner imajları tamamlandı** ([spec 013](specs/013-node-surumlu-runner-imajlari/spec.md)):
+
+- **Sürüm koşudan önce seçilir**, imaj derleme anında hazırlanır — koşu anında hiçbir
+  şey indirilmez (kapalı ağ şartı)
+- **Tek kaynak** `runner/node-versions.txt`: backend, CI matrisi ve `make runner`
+- **Dockerfile değişince `make runner`** — `docker build` tek başına varyantları
+  yenilemez; bir düzeltme bu yüzden bir gün boyunca üretimde çalışmadı
+  (spec 013 Ölçüm 5)
 
 **Betikler tamamlandı** ([spec 012](specs/012-betikler/spec.md)):
 

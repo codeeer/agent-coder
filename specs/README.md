@@ -20,6 +20,9 @@ anlaşılıyordu. Birleştirildi.
 | [009](009-jira-ve-depo-dugumleri/spec.md) | Jira ve kod deposu düğümleri | PR açma, Jira yorumu, Jira tetikleyici | Uygulandı |
 | [011](011-mcp/spec.md) | MCP desteği | agent'lara dış araçlar, `mcp.call` düğümü, MCP sunucusu | Uygulandı |
 | [012](012-betikler/spec.md) | Betikler | merkezî betik kütüphanesi, agent'ın çalıştırabildiği hazır prosedürler | Uygulandı |
+| [013](013-node-surumlu-runner-imajlari/spec.md) | Node sürümlü runner imajları | koşu öncesi sürüm seçimi, sürüm başına imaj | Uygulandı · **spec geriye dönük** |
+| [014](014-kurumsal-paket-deposu/spec.md) | Kurumsal paket deposu | npm kayıt defteri adresi ve opsiyonel kimlik | Uygulandı · **spec geriye dönük** |
+| [015](015-motor-loglari/spec.md) | Motor logları | ham logların toplanması, maskelenmesi, saklanması ve gösterimi | Uygulandı · **spec geriye dönük** |
 
 ## Hangi spec'e bakmalı?
 

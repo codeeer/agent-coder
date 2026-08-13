@@ -17,8 +17,9 @@ CREATE TABLE run_engine_logs (
     -- 2026-08-12 kararı).
     run_id  UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
 
-    -- 'stdout' → container'ın stdout/stderr'i
-    -- 'file'   → opencode'un kendi log dosyaları
+    -- 'stdout'  → container'ın stdout/stderr'i
+    -- 'file'    → opencode'un kendi log dosyaları
+    -- 'session' → agent'ın tam konuşma ve araç geçmişi
     source  TEXT NOT NULL,
 
     -- İçerik GZIP'li. Metin olarak tutulsaydı tipik bir koşu için tablo
