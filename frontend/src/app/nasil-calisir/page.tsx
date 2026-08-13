@@ -57,8 +57,9 @@ export default function HowItWorksPage() {
       >
         <ProductFlow />
         <Note>
-          Adımlar birbirine bağlı, her adım <b>kendi modeliyle</b> çalışır: analiz için ucuz ve hızlı
-          bir model, kod yazımı için güçlü bir model. Aradaki fark hem faturada hem sürede görünür.
+          Adımlar birbirine bağlı, her adım <b>kendi modeliyle</b> çalışır:
+          analiz için ucuz ve hızlı bir model, kod yazımı için güçlü bir model.
+          Aradaki fark hem faturada hem sürede görünür.
         </Note>
       </Step>
 
@@ -70,13 +71,16 @@ export default function HowItWorksPage() {
         <Architecture />
         <div className="grid gap-3 sm:grid-cols-3">
           <Mini title="Tuval">
-            Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi talimat.
+            Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi
+            talimat.
           </Mini>
           <Mini title="Motor">
-            Grafı seviyelere ayırır, sırayı ve paralelliği belirler, her adımı kaydeder.
+            Grafı seviyelere ayırır, sırayı ve paralelliği belirler, her adımı
+            kaydeder.
           </Mini>
           <Mini title="Sandbox">
-            Agent&apos;ı kendi container&apos;ında çalıştırır. Kod dışarı sızmaz, kimlik bilgisi içeri girmez.
+            Agent&apos;ı kendi container&apos;ında çalıştırır. Kod dışarı
+            sızmaz, kimlik bilgisi içeri girmez.
           </Mini>
         </div>
       </Step>
@@ -91,19 +95,39 @@ export default function HowItWorksPage() {
         anlatana bir duraklama noktası veriyor.
       */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Trait icon={<IconShield className="size-4" />} tone="success" title="Güvenli">
+        <Trait
+          icon={<IconShield className="size-4" />}
+          tone="success"
+          title="Güvenli"
+        >
           İzole ağ, dışarıya port açmaz.
         </Trait>
-        <Trait icon={<IconCost className="size-4" />} tone="info" title="Ekonomik">
+        <Trait
+          icon={<IconCost className="size-4" />}
+          tone="info"
+          title="Ekonomik"
+        >
           Ek altyapı yok, sadece üç servis.
         </Trait>
-        <Trait icon={<IconBolt className="size-4" />} tone="accent" title="Hızlı">
+        <Trait
+          icon={<IconBolt className="size-4" />}
+          tone="accent"
+          title="Hızlı"
+        >
           Bağımsız adımlar aynı anda koşar.
         </Trait>
-        <Trait icon={<IconEye className="size-4" />} tone="series" title="Şeffaf">
-          Her adımın girdisi, çıktısı ve maliyeti kayıtlı.
+        <Trait
+          icon={<IconEye className="size-4" />}
+          tone="series"
+          title="Şeffaf"
+        >
+          Girdi, çıktı ve maliyetin yanında motorun ham logu da kayıtlı.
         </Trait>
-        <Trait icon={<IconTrash className="size-4" />} tone="warning" title="Temiz">
+        <Trait
+          icon={<IconTrash className="size-4" />}
+          tone="warning"
+          title="Temiz"
+        >
           İş bitince container ve volume silinir.
         </Trait>
       </div>
@@ -115,10 +139,30 @@ export default function HowItWorksPage() {
       >
         <StepLifecycle />
         <Note>
-          Son adım pazarlık konusu değil: zaman aşımı, iptal ya da sunucunun yeniden başlaması —
-          hangisi olursa olsun container ve volume siliniyor. Doğrulaması kolay:
-          <code className="mx-1 rounded bg-raised px-1.5 py-0.5 font-mono text-xs">docker ps -a</code>
+          Son adım pazarlık konusu değil: zaman aşımı, iptal ya da sunucunun
+          yeniden başlaması — hangisi olursa olsun container ve volume
+          siliniyor. Doğrulaması kolay:
+          <code className="mx-1 rounded bg-raised px-1.5 py-0.5 font-mono text-xs">
+            docker ps -a
+          </code>
           çalışma sonrası boş olmalı.
+        </Note>
+        <Note>
+          <b>Sonuncudan bir önceki adım da pazarlık konusu değil.</b> Container
+          silinince motorun teşhis verisi de gider; oysa asıl ihtiyaç tam olarak
+          düşen ve zaman aşımına uğrayan koşularda. Bu yüzden loglar{" "}
+          <b>silmeden hemen önce</b> toplanıyor: koşu detayındaki{" "}
+          <b>Motor logları</b> sekmesinde container&apos;ın çıktısı, motorun
+          kendi log dosyaları ve agent&apos;ın tam konuşma geçmişi ayrı ayrı
+          duruyor.
+        </Note>
+        <Note>
+          <b>Node sürümü koşudan önce seçilir.</b> Her desteklenen sürüm için
+          runner imajı
+          <b> build anında</b> hazırlanır; koşu anında hiçbir şey indirilmez.
+          Seçilmezse projenin varsayılanı, o da yoksa taban imaj geçerli olur.
+          Seçilen sürümün imajı yoksa çalıştırma <b>klonlama başlamadan</b>, ne
+          yapılacağını söyleyen bir satırla düşer — yarım iş bırakmaz.
         </Note>
       </Step>
 
@@ -129,8 +173,9 @@ export default function HowItWorksPage() {
       >
         <Parallelism />
         <Note>
-          Ölçüldü: tuvalden kurulan iki dallı bir akışta iki adım <b>10 saniye örtüştü</b>. Sıraya
-          dizilseydi toplam süre ikisinin toplamı olurdu.
+          Ölçüldü: tuvalden kurulan iki dallı bir akışta iki adım{" "}
+          <b>10 saniye örtüştü</b>. Sıraya dizilseydi toplam süre ikisinin
+          toplamı olurdu.
         </Note>
       </Step>
 
@@ -141,9 +186,10 @@ export default function HowItWorksPage() {
       >
         <TriggerPaths />
         <Note>
-          Aynı task&apos;ın iki kez işlenmemesi <b>veritabanı kısıtıyla</b> garanti ediliyor. Uygulama
-          içinde &quot;önce sor, sonra yaz&quot; biçiminde bir kontrol olsaydı iki yol aynı anda gelince
-          ikisi de &quot;işlenmemiş&quot; görür ve akış iki kez başlardı.
+          Aynı task&apos;ın iki kez işlenmemesi <b>veritabanı kısıtıyla</b>{" "}
+          garanti ediliyor. Uygulama içinde &quot;önce sor, sonra yaz&quot;
+          biçiminde bir kontrol olsaydı iki yol aynı anda gelince ikisi de
+          &quot;işlenmemiş&quot; görür ve akış iki kez başlardı.
         </Note>
       </Step>
 
@@ -154,11 +200,12 @@ export default function HowItWorksPage() {
       >
         <MCPDirections />
         <Note>
-          Üç kullanım aynı protokolün üç yüzü. <b>Agent karar verirse</b> esnektir:
-          &quot;bu hatayı düzelt&quot; dediğinizde yığın izini kendisi çeker.{" "}
-          <b>Akış karar verirse</b> tekrarlanabilir: her çalıştırmada aynı araç, aynı
-          argümanlarla. <b>Ters yönde</b> ise Agent Coder başka bir agent&apos;ın aracı
-          olur — akışlarınız Claude Desktop&apos;tan tetiklenebilir.
+          Üç kullanım aynı protokolün üç yüzü. <b>Agent karar verirse</b>{" "}
+          esnektir: &quot;bu hatayı düzelt&quot; dediğinizde yığın izini kendisi
+          çeker. <b>Akış karar verirse</b> tekrarlanabilir: her çalıştırmada
+          aynı araç, aynı argümanlarla. <b>Ters yönde</b> ise Agent Coder başka
+          bir agent&apos;ın aracı olur — akışlarınız Claude Desktop&apos;tan
+          tetiklenebilir.
         </Note>
       </Step>
 
@@ -169,11 +216,11 @@ export default function HowItWorksPage() {
       >
         <ScriptDeterminism />
         <Note>
-          Ayarlar&apos;da bir <b>betik kütüphanesi</b> var: bir kez yazarsınız, birden
-          fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
-          <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği bugün de
-          kendisi yazıp çalıştırabiliyordu. Değişen tek şey, çalıştırdığı metnin sizin
-          gözden geçirdiğiniz metin olması.
+          Ayarlar&apos;da bir <b>betik kütüphanesi</b> var: bir kez yazarsınız,
+          birden fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
+          <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği
+          bugün de kendisi yazıp çalıştırabiliyordu. Değişen tek şey,
+          çalıştırdığı metnin sizin gözden geçirdiğiniz metin olması.
         </Note>
       </Step>
 
@@ -184,8 +231,16 @@ export default function HowItWorksPage() {
       >
         <DataModel />
         <Note>
-          Maliyet hiçbir yerde ikinci kez tutulmuyor: rapordaki rakamlar çalıştırma kayıtlarından
-          toplanıyor. Ayrı bir özet tablosu olsaydı iki kaynak olur ve er geç ayrışırlardı.
+          Maliyet hiçbir yerde ikinci kez tutulmuyor: rapordaki rakamlar
+          çalıştırma kayıtlarından toplanıyor. Ayrı bir özet tablosu olsaydı iki
+          kaynak olur ve er geç ayrışırlardı.
+        </Note>
+        <Note>
+          <b>Motor logları ayrı yaşar.</b> Çalıştırma kaydı yıllarca değerli
+          olabilir; iki megabaytlık ham logu bir haftadan sonra değil. Bu yüzden
+          ham log kendi tablosunda, kendi saklama süresiyle duruyor — süresi
+          dolunca yalnızca o siliniyor, koşu geçmişi ve maliyet raporu yerinde
+          kalıyor. Koşu silinirse logu da onunla gider.
         </Note>
       </Step>
 
@@ -196,17 +251,20 @@ export default function HowItWorksPage() {
       >
         <div className="grid gap-3 md:grid-cols-3">
           <Decision title="Agent motoru değiştirilebilir">
-            Bugün opencode kullanılıyor ama kod ona değil, tek bir <b>Runner</b> arayüzüne bakıyor.
-            Motoru değiştirmek bir paketi değiştirmek demek; akış motoruna dokunulmuyor.
+            Bugün opencode kullanılıyor ama kod ona değil, tek bir <b>Runner</b>{" "}
+            arayüzüne bakıyor. Motoru değiştirmek bir paketi değiştirmek demek;
+            akış motoruna dokunulmuyor.
           </Decision>
           <Decision title="Davranış kodda değil veritabanında">
-            Süre sınırı, eşzamanlılık, bellek, tarama aralığı — hiçbiri koda gömülü değil. Kod
-            yalnızca <b>tanımı</b> tutuyor (varsayılan ve aralık), veritabanı sapmayı. Değişiklik
-            yeniden başlatma gerektirmiyor.
+            Süre sınırı, eşzamanlılık, bellek, tarama aralığı — hiçbiri koda
+            gömülü değil. Kod yalnızca <b>tanımı</b> tutuyor (varsayılan ve
+            aralık), veritabanı sapmayı. Değişiklik yeniden başlatma
+            gerektirmiyor.
           </Decision>
           <Decision title="Adım = çalıştırma">
-            Bir akış adımı, elle başlatılan bir çalıştırmayla <b>aynı kaydı</b> yazıyor. Bu yüzden
-            rapor, akışları hiçbir kod değişikliği olmadan kapsadı.
+            Bir akış adımı, elle başlatılan bir çalıştırmayla <b>aynı kaydı</b>{" "}
+            yazıyor. Bu yüzden rapor, akışları hiçbir kod değişikliği olmadan
+            kapsadı.
           </Decision>
         </div>
       </Step>
@@ -218,45 +276,66 @@ export default function HowItWorksPage() {
       >
         <div className="grid gap-3 md:grid-cols-2">
           <Decision title="Anahtarlar şifreli">
-            API anahtarları ve token&apos;lar veritabanında AES-256-GCM ile saklanıyor. Hiçbir API
-            yanıtında ve hiçbir log satırında görünmüyorlar — testlerle doğrulanıyor. Arayüzde
-            yalnızca son dört karakter gösteriliyor.
+            API anahtarları ve token&apos;lar veritabanında AES-256-GCM ile
+            saklanıyor. Hiçbir API yanıtında ve hiçbir log satırında
+            görünmüyorlar — testlerle doğrulanıyor. Arayüzde yalnızca son dört
+            karakter gösteriliyor.
           </Decision>
           <Decision title="Agent'a token geçmez">
-            PR açmak ve Jira&apos;ya yazmak <b>akışın</b> işi, agent&apos;ın değil; git kimlik bilgisi
-            agent&apos;a hiç ulaşmaz. Dış araçlarda (MCP) anahtar container&apos;ın ortam
-            değişkeninde durur ve isteğe başlık olarak eklenir — <b>modele hiç gösterilmez</b>.
+            PR açmak ve Jira&apos;ya yazmak <b>akışın</b> işi, agent&apos;ın
+            değil; git kimlik bilgisi agent&apos;a hiç ulaşmaz. Dış araçlarda
+            (MCP) anahtar container&apos;ın ortam değişkeninde durur ve isteğe
+            başlık olarak eklenir — <b>modele hiç gösterilmez</b>.
           </Decision>
           <Decision title="Container'lar izole">
-            Runner&apos;lar ayrı bir ağda çalışır, dışarıya port açmaz, CPU ve bellek sınırlıdır.
+            Runner&apos;lar ayrı bir ağda çalışır, dışarıya port açmaz, CPU ve
+            bellek sınırlıdır.
+          </Decision>
+          <Decision title="Loglar maskelenerek saklanır">
+            Motor logları veritabanına <b>yazılmadan önce</b> temizlenir:
+            sağlayıcı anahtarı, git token&apos;ı, MCP sırları ve paket deposu
+            kimliği — <code className="font-mono text-xs">.npmrc</code>
+            &apos;deki base64 hâli dahil — maskelenir. Sonradan temizlemek bir
+            kez yazılmış sırrı geri almaz, bu yüzden temizlik yazma anında.
+          </Decision>
+          <Decision title="Agent onay bekleyemez">
+            Çalıştırmalar başsız (headless): soruyu cevaplayacak kimse yok. Onay
+            isteyen her izin bir kilitlenmedir — ölçüldü, bir koşu{" "}
+            <b>dokuz dakika</b> sıfır token&apos;da asılı kaldı. Bu yüzden soru,
+            plan ve ev dizini erişimi <b>sorulmaz, reddedilir</b>.
           </Decision>
 
           <Decision title="Paketler kurumsal depodan">
-            Bir npm kayıt defteri tanımlarsanız agent bağımlılıkları oradan çeker; adres ve
-            kimlik container&apos;a dosya olarak girer, ortam değişkenine değil — agent
-            &lt;code&gt;env&lt;/code&gt; yazdırdığında token görünmez. Tanımlanmazsa npm&apos;in genel
-            deposu kullanılır.
+            Bir npm kayıt defteri tanımlarsanız agent bağımlılıkları oradan
+            çeker; adres ve kimlik container&apos;a dosya olarak girer, ortam
+            değişkenine değil — agent{" "}
+            <code className="font-mono text-xs">env</code> yazdırdığında token
+            görünmez. Tanımlanmazsa npm&apos;in genel deposu kullanılır.
           </Decision>
           <Decision title="Dış araçlar agent başına açılır">
-            Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi agent&apos;ın
-            kullanabileceği ayrı seçilir; seçilmeyenlere araçlar <b>hiç sunulmaz</b>.
-            Bağlanamayan bir sunucu sessiz kalmaz, uyarı üretir.
+            Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi
+            agent&apos;ın kullanabileceği ayrı seçilir; seçilmeyenlere araçlar{" "}
+            <b>hiç sunulmaz</b>. Bağlanamayan bir sunucu sessiz kalmaz, uyarı
+            üretir.
           </Decision>
           <Decision title="Betikler yeni bir kapı açmaz">
-            Bir betik yalnızca <b>komut çalıştırma yetkisi zaten açık</b> agent&apos;a
-            kopyalanır; kapalıysa dosya ortama hiç girmez. Yetki kuralları bu özellik
-            için değişmedi. &quot;Bash kapalı ama şu betiğe izinli&quot; gibi bir ara mod
-            bilinçli olarak <b>yapılmadı</b>: izin eşleşmesi ham komut metnine yapıldığı
-            için kapalı bir kapıyı açardı.
+            Bir betik yalnızca <b>komut çalıştırma yetkisi zaten açık</b>{" "}
+            agent&apos;a kopyalanır; kapalıysa dosya ortama hiç girmez. Yetki
+            kuralları bu özellik için değişmedi. &quot;Bash kapalı ama şu betiğe
+            izinli&quot; gibi bir ara mod bilinçli olarak <b>yapılmadı</b>: izin
+            eşleşmesi ham komut metnine yapıldığı için kapalı bir kapıyı açardı.
           </Decision>
           <Decision title="Dışarıya açılan adres bir anahtardır" tone="warn">
-            Agent Coder&apos;ı MCP olarak kullanmanın adresi, bilen herkesin akış
-            başlatabileceği anlamına gelir. Ayarlar&apos;dan yenilenebilir. Kimlik
-            doğrulama gelene kadar bu adres paylaşılırken dikkat edilmeli.
+            Agent Coder&apos;ı MCP olarak kullanmanın adresi, bilen herkesin
+            akış başlatabileceği anlamına gelir. Ayarlar&apos;dan yenilenebilir.
+            Kimlik doğrulama gelene kadar bu adres paylaşılırken dikkat
+            edilmeli.
           </Decision>
           <Decision title="Kimlik doğrulama henüz yok" tone="warn">
-            v1 tek kullanıcılıktır ve <b>internete açık bir sunucuda çalıştırılmamalıdır</b>. Şema
-            baştan <code className="font-mono text-xs">user_id</code> taşıyor; auth sonradan eklenecek.
+            v1 tek kullanıcılıktır ve{" "}
+            <b>internete açık bir sunucuda çalıştırılmamalıdır</b>. Şema baştan{" "}
+            <code className="font-mono text-xs">user_id</code> taşıyor; auth
+            sonradan eklenecek.
           </Decision>
         </div>
       </Step>
@@ -277,7 +356,9 @@ export default function HowItWorksPage() {
             <IconSparkle className="size-4" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-[-0.01em]">Sonuç</h2>
+            <h2 className="text-base font-semibold tracking-[-0.01em]">
+              Sonuç
+            </h2>
             <p className="mt-1.5 max-w-3xl text-sm leading-relaxed text-ink-2">
               Koddan pull request&apos;e kadar tüm yol otomatik, izlenebilir ve
               tekrarlanabilir. Siz akışı tasarlarsınız; sırayı, paralelliği,
@@ -341,8 +422,12 @@ function Step({
           {no}
         </span>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-[-0.01em]">{title}</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">{lead}</p>
+          <h2 className="text-base font-semibold tracking-[-0.01em]">
+            {title}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">
+            {lead}
+          </p>
         </div>
       </div>
 
@@ -361,7 +446,13 @@ function Note({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Mini({ title, children }: { title: string; children: React.ReactNode }) {
+function Mini({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-lg border border-line bg-raised p-3">
       <p className="text-sm font-medium">{title}</p>
@@ -382,7 +473,9 @@ function Decision({
   return (
     <div
       className={`rounded-lg border p-3.5 ${
-        tone === "warn" ? "border-warn/40 bg-warn-soft" : "border-line bg-raised"
+        tone === "warn"
+          ? "border-warn/40 bg-warn-soft"
+          : "border-line bg-raised"
       }`}
     >
       <p className="text-sm font-medium">{title}</p>
