@@ -225,6 +225,12 @@ daha önemli", açık zeminde "daha koyu = daha önemli"dir. Değerleri ters
 
 Koyu tema güzel görünüyor diye açık temayı ihmal etmeyin — ve tersi.
 
+Burası temanın **nasıl değerlendirileceğini** anlatır. Temanın **mekanizması**
+— seçimin nerede saklandığı, üç durum, ilk boyamada sıçramanın önlenmesi ve
+Tailwind'in `dark:` varyantının işletim sistemini takip etmesi tuzağı —
+[spec 006](../../specs/006-tema-secimi/spec.md) dosyasındadır. İkisi ayrı
+şeydir: biri tasarım kuralı, diğeri ürün kararı.
+
 ---
 
 ## Uydurulmayacaklar
