@@ -311,9 +311,16 @@ func TestBuildPermissions(t *testing.T) {
 
 	t.Run("her zaman insan etkileşimi kapatılır", func(t *testing.T) {
 		// Onay bekleyen bir agent sandbox'ta sonsuza kadar bekler.
+		//
+		// `external_directory` ÖLÇÜLMÜŞ bir olaydan geliyor: agent `~/.npmrc`
+		// okumak isteyince motor izin sordu, cevaplayacak kimse yoktu ve
+		// çalıştırma dokuz dakika 0 token'da asılı kaldı. Headless koşuda
+		// soran her izin bir kilitlenmedir.
 		rules := BuildPermissions(AgentSpec{AllowEdit: true, AllowBash: true, AllowWebfetch: true})
 		require.True(t, has(rules, "question"))
 		require.True(t, has(rules, "plan_enter"))
+		require.True(t, has(rules, "external_directory"),
+			"container ev dizinine erişim reddedilmeli — hem kilitlenme hem sır riski")
 	})
 
 	t.Run("tam yetkili agent", func(t *testing.T) {

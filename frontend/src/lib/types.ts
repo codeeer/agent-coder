@@ -484,6 +484,23 @@ export interface StartRunRequest {
 }
 
 /** SSE ile gelen tek bir ilerleme olayı. */
+/**
+ * Motorun ham logu — koşu detayındaki teşhis katmanı.
+ *
+ * İlerleme akışı (`RunEvent`) kullanıcı dostu olay listesidir; bu ham
+ * gerçektir. İkisi birbirinin yerine geçmez.
+ */
+export interface EngineLog {
+  /** `stdout` → container çıktısı, `file` → motorun kendi log dosyaları. */
+  source: string;
+  content: string;
+  /** Sıkıştırılmamış boyut — kırpıldıysa kullanıcı ne kaçırdığını görür. */
+  rawSize: number;
+  /** true ise BAŞTAN kırpılmıştır; son kısım korunur. */
+  truncated: boolean;
+  createdAt: string;
+}
+
 export interface RunEvent {
   seq: number;
   level: "info" | "warn" | "error";

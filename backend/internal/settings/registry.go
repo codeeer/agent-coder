@@ -47,6 +47,10 @@ type Definition struct {
 
 // Ayar anahtarları. Kod bu sabitleri kullanır, düz metin yazmaz.
 const (
+	KeyEngineLogPersist   = "runner.engine_log_persist"
+	KeyEngineLogRetention = "runner.engine_log_retention_days"
+	KeyEngineLogMaxKB     = "runner.engine_log_max_kb"
+
 	KeyNPMRegistry = "packages.npm_registry"
 	KeyNPMUsername = "packages.npm_username"
 
@@ -185,6 +189,38 @@ var Registry = []Definition{
 	 * şifreli durur (kind: nexus). Anonim okumaya açık depolarda hiç
 	 * tanımlanmaz.
 	 */
+	/*
+	 * Motor logları — koşunun ham teşhis katmanı.
+	 *
+	 * Runner container'ı geçici; loglar saklanmazsa koşu bitince kaybolur ve
+	 * "neden başarısız oldu" sorusunun cevabı kalmaz. Saklama AÇIK geliyor
+	 * çünkü asıl ihtiyaç duyulan an, kimsenin önceden açmayı düşünmediği
+	 * başarısız koşudur.
+	 */
+	{
+		Key: KeyEngineLogPersist, Group: GroupRunner, Kind: KindBool,
+		Label: "Motor loglarını sakla",
+		Help: "Çalıştırma bitince motorun ham logları veritabanına yazılır ve " +
+			"koşu detayında görünür. Kapatılırsa loglar container ile birlikte " +
+			"silinir ve sonradan incelenemez.",
+		Default: "true",
+	},
+	{
+		Key: KeyEngineLogRetention, Group: GroupRunner, Kind: KindInt,
+		Label: "Motor logu saklama süresi", Unit: "gün",
+		Help: "Bu süreden eski motor logları düzenli olarak silinir. " +
+			"Çalıştırma kaydının kendisi silinmez, yalnızca ham logu.",
+		Default: "7", Min: p(1), Max: p(365),
+	},
+	{
+		Key: KeyEngineLogMaxKB, Group: GroupRunner, Kind: KindInt,
+		Label: "Motor logu boyut sınırı", Unit: "KB",
+		Help: "Kaynak başına saklanacak azami ham boyut. Aşılırsa SON kısım " +
+			"korunur — hata genelde sonda olur — ve kayıt kırpılmış olarak " +
+			"işaretlenir.",
+		Default: "2048", Min: p(64), Max: p(65536),
+	},
+
 	{
 		Key: KeyNPMRegistry, Group: GroupPackages, Kind: KindText, Optional: true,
 		Label: "npm kayıt defteri adresi",

@@ -331,9 +331,24 @@ type PermissionRule struct {
 // İki kural agent'tan bağımsız olarak HER ZAMAN eklenir: insan onayı bekleyen bir
 // agent, kimsenin izlemediği bir sandbox'ta sonsuza kadar bekler ve slot'u işgal eder.
 func BuildPermissions(a AgentSpec) []PermissionRule {
+	/*
+	 * SORAN HER İZİN REDDEDİLİR.
+	 *
+	 * Koşu HEADLESS: soruyu cevaplayacak kimse yok. `ask` davranışı, motorun
+	 * yanıt beklerken sonsuza kadar durmasına yol açıyor — çalıştırma 0
+	 * token'da asılı kalıyor ve ancak zaman aşımıyla (varsayılan 30 dk)
+	 * kapanıyor. ÖLÇÜLDÜ: agent `~/.npmrc` okumak isteyince motor
+	 * `permission=external_directory … action=ask` yazıp bekledi; koşu
+	 * dokuz dakika sonra hâlâ 0 token'daydı.
+	 *
+	 * `external_directory`: /work dışındaki bir yola erişim. Reddetmek ayrıca
+	 * DOĞRU olan: agent'ın işi klonlanan depo; container'ın ev dizininde
+	 * yapılandırma dosyalarımız ve kimlik bilgileri duruyor.
+	 */
 	rules := []PermissionRule{
 		{Permission: "question", Pattern: "*", Action: "deny"},
 		{Permission: "plan_enter", Pattern: "*", Action: "deny"},
+		{Permission: "external_directory", Pattern: "*", Action: "deny"},
 	}
 
 	if !a.AllowEdit {

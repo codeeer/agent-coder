@@ -28,6 +28,14 @@ type Limits struct {
 	MemoryGB      func() int
 	CloneDepth    func() int
 
+	// EngineLogPersist, motor loglarının saklanıp saklanmayacağı.
+	// Kapalıysa toplama da yapılmaz — container'dan boşuna okumayız.
+	EngineLogPersist func() bool
+	// EngineLogMaxKB, kaynak başına saklanacak azami ham boyut.
+	EngineLogMaxKB func() int
+	// EngineLogRetention, logların saklanma süresi.
+	EngineLogRetention func() time.Duration
+
 	// Packages, kurumsal paket deposu yapılandırması. Diğerleri gibi FONKSİYON:
 	// ayar değişince yeniden başlatma gerekmesin diye her koşuda okunur.
 	// Token da buradan gelir — ayarda değil, şifreli kimlik bilgisi deposunda.
@@ -195,6 +203,9 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 		Model:       run.ModelID,
 		Task:        run.Task,
 		Timeout:     m.limits.Timeout(),
+		// Loglar container SİLİNMEDEN önce toplanır; saklama kapalıysa
+		// callback hiç verilmez, yani okuma maliyeti de doğmaz.
+		EngineLogs: m.engineLogSink(writeCtx, run.ID),
 		Limits: runner.Limits{
 			CPUCores: m.limits.CPUCores(),
 			MemoryGB: m.limits.MemoryGB(),
@@ -424,4 +435,75 @@ func (m *Manager) packages() runner.PackageRegistry {
 		return runner.PackageRegistry{}
 	}
 	return m.limits.Packages()
+}
+
+/*
+ * engineLogSink, motor loglarını kaydeden geri çağrımı üretir.
+ *
+ * Ayar kapalıysa nil döner ve runner toplama işini hiç yapmaz — kapatmanın
+ * anlamı "kaydetme" değil, "hiç uğraşma" olmalı.
+ *
+ * writeCtx İPTAL EDİLMEZ bir context: loglar en çok iptal edilmiş ve zaman
+ * aşımına uğramış koşularda gerekli; koşunun context'i kullanılsaydı tam o
+ * durumlarda yazma da düşerdi.
+ */
+func (m *Manager) engineLogSink(writeCtx context.Context, runID uuid.UUID) runner.EngineLogFunc {
+	if m.limits.EngineLogPersist == nil || !m.limits.EngineLogPersist() {
+		return nil
+	}
+
+	maxKB := 2048
+	if m.limits.EngineLogMaxKB != nil {
+		maxKB = m.limits.EngineLogMaxKB()
+	}
+
+	return func(logs []runner.EngineLog) {
+		if err := m.store.SaveEngineLogs(writeCtx, runID, logs, maxKB<<10); err != nil {
+			// Log saklayamamak çalıştırmanın sonucunu değiştirmez.
+			slog.WarnContext(writeCtx, "motor logları kaydedilemedi",
+				"run_id", runID, "error", err)
+		}
+	}
+}
+
+/*
+ * PurgeEngineLogs, süresi dolmuş motor loglarını periyodik olarak siler.
+ *
+ * Katalog senkronuyla aynı kalıp (`catalog.Syncer.Run`): ayrı bir zamanlayıcı
+ * altyapısı kurulmuyor, açılışta bir kez ve sonra ticker ile çalışıyor.
+ *
+ * Aralık sabit (6 saat), süre ayardan: temizliğin ne sıklıkla koştuğu
+ * kullanıcıyı ilgilendiren bir karar değil, logların ne kadar yaşadığı ise
+ * öyle.
+ */
+func (m *Manager) PurgeEngineLogs(ctx context.Context) {
+	const aralik = 6 * time.Hour
+
+	temizle := func() {
+		if m.limits.EngineLogRetention == nil {
+			return
+		}
+		n, err := m.store.PurgeEngineLogs(ctx, m.limits.EngineLogRetention())
+		if err != nil {
+			slog.WarnContext(ctx, "eski motor logları silinemedi", "error", err)
+			return
+		}
+		if n > 0 {
+			slog.InfoContext(ctx, "eski motor logları silindi", "adet", n)
+		}
+	}
+
+	temizle()
+
+	ticker := time.NewTicker(aralik)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			temizle()
+		}
+	}
 }

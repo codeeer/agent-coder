@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 )
 
@@ -334,14 +335,26 @@ func (c *Container) Logs(ctx context.Context, tail string) (string, error) {
 	}
 	defer rc.Close()
 
-	// Docker log akışı 8 baytlık başlıklarla çerçevelenir; hata ayıklama için
-	// ham okumak yeterli, çerçeveler gözle ayıklanabilir.
-	const maxLog = 256 << 10
-	data, err := io.ReadAll(io.LimitReader(rc, maxLog))
-	if err != nil {
-		return "", fmt.Errorf("container logları okunamadı: %w", err)
+	/*
+	 * Docker akışı TTY'siz container'da 8 baytlık başlıklarla çerçeveler:
+	 * her parçanın önünde akış numarası ve uzunluk durur. Bu bayrlar metin
+	 * değil — log kaydedilip arayüzde gösterildiği için ("Motor logları")
+	 * çözülmeleri gerekiyor; aksi halde satırların başında `\x02\x00…`
+	 * çöpü görünür ve satır sınırları kayar.
+	 *
+	 * maxLog kaçak koruması: asıl boyut sınırı saklama katmanında ve oradaki
+	 * kırpma SONU korur.
+	 */
+	const maxLog = 8 << 20
+	var out bytes.Buffer
+	if _, err := stdcopy.StdCopy(&out, &out, io.LimitReader(rc, maxLog)); err != nil {
+		// Sınırda kesilen bir çerçeve hata verir; o ana kadar çözülen kısım
+		// yine de değerlidir — teşhis logu "ya hep ya hiç" değildir.
+		if out.Len() == 0 {
+			return "", fmt.Errorf("container logları okunamadı: %w", err)
+		}
 	}
-	return string(data), nil
+	return out.String(), nil
 }
 
 // Wait, container'ın ölmesini bekler ve çıkış kodunu döner.
@@ -355,4 +368,48 @@ func (c *Container) Wait(ctx context.Context) (int64, error) {
 	case <-ctx.Done():
 		return 0, ctx.Err()
 	}
+}
+
+/*
+ * ReadDir, container içindeki bir dizinin dosyalarını okur.
+ *
+ * `docker cp` ile aynı uç (`CopyFromContainer`): exec kurmaya gerek yok ve
+ * container'ın kabuğuna bağımlı değil — motor çökmüş olsa bile dosyalar
+ * okunabilir. Teşhis logları tam da o durumda gerekiyor.
+ *
+ * Dizin yoksa BOŞ harita döner, hata değil: motor hiç log yazmamış olabilir
+ * ve bu bir arıza değil.
+ */
+func (c *Container) ReadDir(ctx context.Context, dir string, maxBytes int64) (map[string][]byte, error) {
+	rc, _, err := c.docker.CopyFromContainer(ctx, c.ID, dir)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			return map[string][]byte{}, nil
+		}
+		return nil, fmt.Errorf("container dizini okunamadı: %w", err)
+	}
+	defer rc.Close()
+
+	out := map[string][]byte{}
+	tr := tar.NewReader(io.LimitReader(rc, maxBytes))
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			// Sınıra takılıp yarım kalan akış hata değil: elimizdeki kadarı
+			// da işe yarar. Teşhis verisi "ya hep ya hiç" değildir.
+			break
+		}
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			break
+		}
+		out[hdr.Name] = data
+	}
+	return out, nil
 }

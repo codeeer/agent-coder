@@ -167,6 +167,13 @@ func run() error {
 		MemoryGB:   func() int { return settingsSvc.Int(settings.KeyRunnerMemoryLimitG) },
 		CloneDepth: func() int { return settingsSvc.Int(settings.KeyCloneDepth) },
 
+		// Motor logları: saklama, boyut sınırı ve yaşam süresi.
+		EngineLogPersist: func() bool { return settingsSvc.Bool(settings.KeyEngineLogPersist) },
+		EngineLogMaxKB:   func() int { return settingsSvc.Int(settings.KeyEngineLogMaxKB) },
+		EngineLogRetention: func() time.Duration {
+			return time.Duration(settingsSvc.Int(settings.KeyEngineLogRetention)) * 24 * time.Hour
+		},
+
 		// Paket deposu: adres ve kullanıcı adı ayarlardan, token şifreli
 		// kimlik bilgisi deposundan. Token okunamazsa çalıştırma DURMAZ —
 		// anonim okumaya açık depolarda kayıt zaten yoktur ve olmayan bir
@@ -299,6 +306,14 @@ func run() error {
 		// Katalog senkronu açılışı engellemez: anahtar henüz girilmemiş veya
 		// internet yoksa sistem yine de ayağa kalkar.
 		syncer.Run(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// Eski motor loglarının temizliği. Ayrı bir zamanlayıcı altyapısı
+		// yok; katalog senkronuyla aynı kalıp.
+		runManager.PurgeEngineLogs(ctx)
 	}()
 
 	wg.Add(1)

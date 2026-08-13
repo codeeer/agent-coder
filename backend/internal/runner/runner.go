@@ -61,6 +61,13 @@ type Request struct {
 	// anında hazırlanmıştır (bkz. ImageFor, node-versions.txt).
 	NodeVersion string
 
+	// EngineLogs, motorun ham loglarını alır — koşu NASIL biterse bitsin
+	// çağrılır. nil olabilir (saklama kapalıysa toplama da yapılmaz).
+	//
+	// Callback olarak taşınıyor çünkü `Run` başarısızlıkta nil `Result`
+	// döndürüyor; oysa loglara asıl ihtiyaç duyulan an odur.
+	EngineLogs EngineLogFunc
+
 	// Timeout, çalıştırmanın azami süresi. Ayarlardan gelir.
 	Timeout time.Duration
 

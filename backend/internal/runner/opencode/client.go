@@ -6,6 +6,7 @@ package opencode
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -401,4 +402,46 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+/*
+ * sessionTranscript, bir oturumun tam mesaj ve parça geçmişini döner.
+ *
+ * NEDEN DOSYADAN DEĞİL API'DEN: motorun oturum deposu bu sürümde SQLite
+ * (`opencode.db`) — ölçüldü. Bir veritabanı dosyasını ham kopyalamak metin
+ * üretmez, maskeleme uygulanamaz ve okunamaz. API ise aynı veriyi JSON
+ * olarak veriyor: her mesajın rolü, metni, akıl yürütmesi ve araç çağrıları.
+ *
+ * Çıktı GİRİNTİLİ yazılıyor: bu içerik satır numaralı bir görüntüleyicide
+ * okunacak, tek satırlık 10 KB'lık bir JSON orada işe yaramaz.
+ */
+func (c *client) sessionTranscript(ctx context.Context, sessionID string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		c.base+"/session/"+sessionID+"/message", nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	const maxBody = 32 << 20
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	if err != nil {
+		return "", fmt.Errorf("oturum geçmişi okunamadı: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("durum %d: %s", resp.StatusCode, truncate(string(data), 300))
+	}
+
+	var guzel bytes.Buffer
+	if err := json.Indent(&guzel, data, "", "  "); err != nil {
+		// Biçimlendirilemeyen yanıt yine de saklanır: bozuk JSON'un kendisi
+		// de teşhis verisidir.
+		return string(data), nil
+	}
+	return guzel.String(), nil
 }

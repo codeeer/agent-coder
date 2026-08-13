@@ -38,6 +38,7 @@ import {
   CirclePlay,
   CodeXml,
   Cpu,
+  Download,
   Package,
   ExternalLink,
   Eye,
@@ -117,6 +118,8 @@ export const IconExternal = icon(ExternalLink);
 export const IconPlay = icon(CirclePlay);
 // Kurumsal paket deposu (Nexus, Artifactory…).
 export const IconPackage = icon(Package);
+// Ham log indirme.
+export const IconDownload = icon(Download);
 
 // ─── Durum ──────────────────────────────────────────────────────────────────
 

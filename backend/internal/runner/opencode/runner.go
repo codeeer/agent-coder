@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -103,7 +104,29 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	// Temizlik iptal edilmiş context ile çalışmaz; kendi context'ini kullanır.
 	defer ct.Remove(context.WithoutCancel(ctx))
 
+	/*
+	 * Motor logları container SİLİNMEDEN ÖNCE toplanır.
+	 *
+	 * `defer` sırası kritik: LIFO çalıştığı için bu satır yukarıdaki
+	 * `ct.Remove`tan SONRA yazılmak zorunda — böylece önce toplanır, sonra
+	 * silinir. Ters sırada container yok olmuş olurdu.
+	 *
+	 * Koşu nasıl biterse bitsin çalışır; asıl ihtiyaç başarısız ve zaman
+	 * aşımına uğramış koşularda.
+	 */
 	cli := newClient(ct.Host)
+
+	// Oturum kimliği aşağıda doluyor; toplama `defer` olduğu için çalıştığı
+	// anda güncel değeri okur. Oturum hiç açılamadan düşen bir koşuda boş
+	// kalır ve geçmiş kaynağı atlanır.
+	var oturumKimligi string
+
+	if req.EngineLogs != nil {
+		defer func() {
+			req.EngineLogs(collectEngineLogs(
+				context.WithoutCancel(ctx), ct, cli, oturumKimligi, req))
+		}()
+	}
 
 	if err := cli.waitReady(runCtx, readyTimeout); err != nil {
 		// Hazır olmama sebebi genelde klonlamanın başarısız olmasıdır;
@@ -141,6 +164,7 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	if err != nil {
 		return nil, classify(err, runCtx, ctx)
 	}
+	oturumKimligi = sessionID
 
 	msg, err := cli.sendMessage(runCtx, sessionID,
 		req.Agent.Slug, req.Provider.Slug, req.Model, req.Task)
@@ -392,4 +416,111 @@ func classifyCtx(runCtx, parent context.Context) error {
 		return runner.ErrTimeout
 	}
 	return nil
+}
+
+// engineLogDir, motorun kendi log dosyalarını yazdığı dizin.
+//
+// Dizin ilk oturumdan SONRA oluşuyor (ölçüldü): hiç oturum açılmadan biten
+// bir koşuda burası boştur ve bu bir arıza değildir.
+const engineLogDir = "/home/agent/.local/share/opencode/log"
+
+/*
+ * transcriptTimeout, oturum geçmişini çekmek için tanınan süre.
+ *
+ * Kısa tutuluyor: bu adım çalıştırma BİTTİKTEN sonra koşuyor ve container'ın
+ * silinmesini geciktiriyor. Cevap vermeyen bir motor için beklemek, teşhis
+ * verisi uğruna kaynak sızdırmak olurdu.
+ */
+const transcriptTimeout = 15 * time.Second
+
+// engineLogReadCap, tar akışından okunacak azami ham bayt.
+//
+// Saklama sınırı ayrı ve ayarlardan geliyor; bu yalnızca bellekte sınırsız
+// büyümeyi engelleyen üst bir bariyer.
+const engineLogReadCap = 16 << 20
+
+/*
+ * collectEngineLogs, container silinmeden önce ham teşhis verisini toplar.
+ *
+ * Üç kaynak var ve hiçbiri diğerinin yerini tutmaz: container'ın
+ * stdout/stderr'i entrypoint ile klonlamayı anlatır, motorun log dosyaları
+ * sağlayıcı çözümleme ve izin kararlarını, oturum geçmişi ise agent'ın
+ * konuşmasının ve araç çağrılarının tamamını.
+ *
+ * Oturum geçmişi ayrıca İLERLEME AKIŞININ YEDEĞİ: ilerleme kayıtları SSE
+ * üzerinden besleniyor ve o bağlantı kopabiliyor. Koptuğunda olan biten
+ * kaybolmasın diye tam geçmiş burada saklanıyor.
+ *
+ * HİÇBİR HATA YUKARI TAŞINMAZ: log toplamak çalıştırmanın sonucunu
+ * değiştiremez. Toplanamayan bir kaynak sessizce atlanır.
+ */
+func collectEngineLogs(ctx context.Context, ct *sandbox.Container, cli *client, sessionID string, req runner.Request) []runner.EngineLog {
+	sirlar := runner.SecretsOf(req)
+	out := []runner.EngineLog{}
+
+	/*
+	 * Oturum geçmişi İLK toplanır: motor hâlâ ayakta ve API cevap veriyor.
+	 * Dosya kopyalama container'ı durdurmasa da, en kırılgan adımı sona
+	 * bırakmak için sebep yok.
+	 *
+	 * Kendi zaman aşımı var: koşu zaten bitmiş, teşhis verisi uğruna
+	 * çalıştırma kapanışı süresiz beklemez.
+	 */
+	if cli != nil && sessionID != "" {
+		gecmisCtx, iptal := context.WithTimeout(ctx, transcriptTimeout)
+		gecmis, err := cli.sessionTranscript(gecmisCtx, sessionID)
+		iptal()
+		if err == nil && gecmis != "" {
+			out = append(out, runner.EngineLog{
+				Source:  runner.EngineLogSession,
+				Content: runner.Redact(gecmis, sirlar),
+			})
+		}
+	}
+
+	if ham, err := ct.Logs(ctx, "all"); err == nil && ham != "" {
+		out = append(out, runner.EngineLog{
+			Source:  runner.EngineLogStdout,
+			Content: runner.Redact(ham, sirlar),
+		})
+	}
+
+	if icerik := dizinMetni(ctx, ct, engineLogDir); icerik != "" {
+		out = append(out, runner.EngineLog{
+			Source:  runner.EngineLogFile,
+			Content: runner.Redact(icerik, sirlar),
+		})
+	}
+	return out
+}
+
+/*
+ * dizinMetni, bir container dizinini tek metne çevirir.
+ *
+ * Dosyalar YOL SIRASINA göre birleşiyor ve her birinin başına yolu yazılıyor:
+ * oturum deposunda sıra anlam taşıyor (mesajlar ve parçaları), ve hangi
+ * satırın nereden geldiği kaybolursa metin teşhis değerini yitirir.
+ *
+ * Okunamayan dizin boş metin döner — hata değil: hiç oturum açılmadan biten
+ * bir koşuda o dizin hiç oluşmamış olabilir.
+ */
+func dizinMetni(ctx context.Context, ct *sandbox.Container, dizin string) string {
+	dosyalar, err := ct.ReadDir(ctx, dizin, engineLogReadCap)
+	if err != nil || len(dosyalar) == 0 {
+		return ""
+	}
+
+	adlar := make([]string, 0, len(dosyalar))
+	for ad := range dosyalar {
+		adlar = append(adlar, ad)
+	}
+	sort.Strings(adlar)
+
+	var b strings.Builder
+	for _, ad := range adlar {
+		b.WriteString("== " + ad + " ==\n")
+		b.Write(dosyalar[ad])
+		b.WriteString("\n")
+	}
+	return b.String()
 }

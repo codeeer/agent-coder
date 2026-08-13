@@ -32,6 +32,7 @@ import type {
   ProjectRequest,
   ReportQuery,
   ReportSummary,
+  EngineLog,
   Run,
   RunList,
   StartWorkflowResponse,
@@ -395,6 +396,13 @@ export const api = {
         body: { branch: branch ?? "" },
         timeoutMs: 120_000,
       }),
+
+    /**
+     * Motorun saklanmış ham logları. Container silinmiş olsa da döner —
+     * özelliğin varlık sebebi bu.
+     */
+    engineLogs: (id: string) =>
+      apiFetch<{ items: EngineLog[] }>(`/api/runs/${id}/engine-logs`),
 
     /** Canlı olay akışının adresi — EventSource ile açılır. */
     eventsUrl: (id: string) => `${apiBase()}/api/runs/${id}/events`,

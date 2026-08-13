@@ -9,6 +9,7 @@ import { describeError } from "@/lib/errors";
 import { useRunEvents } from "@/lib/use-run-events";
 import type { Run } from "@/lib/types";
 import { Markdown } from "@/components/markdown/Markdown";
+import { EngineLogs } from "@/components/runs/EngineLogs";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import {
   formatCompact,
@@ -16,7 +17,13 @@ import {
   formatDuration,
   formatMoney,
 } from "@/components/charts/format";
-import { IconAgent, IconAlert, IconExternal, IconTrash } from "@/components/ui/icons";
+import {
+  IconAgent,
+  IconAlert,
+  IconExternal,
+  IconTerminal,
+  IconTrash,
+} from "@/components/ui/icons";
 import {
   Badge,
   Button,
@@ -39,6 +46,7 @@ export default function RunDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [sekme, setSekme] = useState<SekmeID>("cikti");
 
   const {
     data: run,
@@ -152,7 +160,10 @@ export default function RunDetailPage() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <RunActions run={run} onConfirmDelete={() => setConfirmingDelete(true)} />
+            <RunActions
+              run={run}
+              onConfirmDelete={() => setConfirmingDelete(true)}
+            />
             <Link
               href="/runs"
               className="rounded text-xs text-ink-3 transition-colors hover:text-accent"
@@ -249,35 +260,97 @@ export default function RunDetailPage() {
               </>
             }
             busy={remove.isPending}
-            error={remove.isError ? describeError(remove.error).message : undefined}
+            error={
+              remove.isError ? describeError(remove.error).message : undefined
+            }
             onConfirm={() => remove.mutate()}
             onCancel={() => setConfirmingDelete(false)}
           />
         )}
       </Card>
 
-      {/* Kayan bölge: künye sabit kalırken içerik kayıyor. */}
+      {/* Motor logları AYRI SEKMEDE: teşhis katmanı, günlük kullanımın
+          parçası değil. Aynı sütuna eklenseydi her koşuda gözün önünden
+          geçerdi; oysa oraya yalnızca bir şey ters gittiğinde bakılır. */}
+      <RunTabs active={sekme} onSelect={setSekme} />
+
+      {/* Kayan bölge: künye ve sekmeler sabit kalırken içerik kayıyor. */}
       <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
-        <Panel
-          title="İlerleme"
-          action={
-            active ? (
-              <span className="flex items-center gap-1.5 text-2xs text-ink-3">
-                <StatusDot tone={connected ? "accent" : "neutral"} pulse />
-                {connected ? "canlı" : "bağlanıyor…"}
-              </span>
-            ) : undefined
-          }
-          padded={false}
-        >
-          <EventLog runId={id} live={events} active={active} />
-        </Panel>
+        {sekme === "motor" ? (
+          <EngineLogs runId={id} live={active} />
+        ) : (
+          <>
+            <Panel
+              title="İlerleme"
+              action={
+                active ? (
+                  <span className="flex items-center gap-1.5 text-2xs text-ink-3">
+                    <StatusDot tone={connected ? "accent" : "neutral"} pulse />
+                    {connected ? "canlı" : "bağlanıyor…"}
+                  </span>
+                ) : undefined
+              }
+              padded={false}
+            >
+              <EventLog runId={id} live={events} active={active} />
+            </Panel>
 
-        {run.output && <AgentOutput output={run.output} />}
+            {run.output && <AgentOutput output={run.output} />}
 
-        {run.diff && <Changes run={run} />}
+            {run.diff && <Changes run={run} />}
+          </>
+        )}
       </div>
     </div>
+  );
+}
+
+const SEKMELER = [
+  { id: "cikti", label: "Çalıştırma", Icon: IconAgent },
+  { id: "motor", label: "Motor logları", Icon: IconTerminal },
+] as const;
+
+type SekmeID = (typeof SEKMELER)[number]["id"];
+
+/**
+ * Koşu detayının iki görünümü.
+ *
+ * Ayarlar sayfasındaki gezinme kalıbının yatay hâli: etkin sekme hem renkle
+ * hem ALT ŞERİTLE işaretlenir — renk körlüğünde tek başına renk yetmez.
+ */
+function RunTabs({
+  active,
+  onSelect,
+}: {
+  active: SekmeID;
+  onSelect: (id: SekmeID) => void;
+}) {
+  return (
+    <nav
+      aria-label="Koşu görünümü"
+      className="-mx-1 flex shrink-0 gap-1 overflow-x-auto border-b border-line px-1"
+    >
+      {SEKMELER.map(({ id, label, Icon }) => {
+        const on = id === active;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onSelect(id)}
+            aria-current={on ? "page" : undefined}
+            className={`relative flex shrink-0 items-center gap-2 px-2.5 pt-1 pb-2 text-sm whitespace-nowrap transition-colors duration-150 ${
+              on ? "font-medium text-ink" : "text-ink-3 hover:text-ink"
+            }`}
+          >
+            <Icon className="size-4 shrink-0" />
+            {label}
+            {on && (
+              <span className="absolute inset-x-1.5 -bottom-px h-0.5 rounded-full bg-accent" />
+            )}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -309,7 +382,10 @@ function durationOf(run: Run): string {
  * durabilir. Silme İPTALİN YERİNE GEÇMEZ — süren bir kaydı silmek, kaydı
  * olmayan bir container bırakırdı; o yüzden yalnızca bitmiş işte görünür.
  */
-function RunActions({ run, onConfirmDelete }: {
+function RunActions({
+  run,
+  onConfirmDelete,
+}: {
   run: Run;
   onConfirmDelete: () => void;
 }) {
