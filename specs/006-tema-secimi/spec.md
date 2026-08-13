@@ -40,7 +40,9 @@ Kullanıcı temayı kendisi seçebilsin; seçmezse sistemi takip etmeye devam et
 - [x] "Sistem" seçiliyken işletim sistemi teması değişirse arayüz **anında** takip eder.
 - [x] Seçim yenilemede korunur.
 - [x] İlk boyamada doğru tema uygulanır; beyaz/siyah çakma olmaz.
-- [x] Tema anahtarı her sayfadan erişilebilir.
+- [x] Tema anahtarı her sayfadan erişilebilir. *(2026-08-13'te ölçülünce
+      koşu detayında olmadığı görüldü — o ekran `PageHeader` kullanmıyor.
+      Anahtar oraya ayrıca eklendi; kriter yeniden doğru.)*
 - [x] Grafiklerin **durum renkleri** temaya göre değişmez (başarılı yeşili iki temada
       da aynı renktir — iki ekran görüntüsü karşılaştırılabilir kalsın).
 
@@ -48,8 +50,15 @@ Kullanıcı temayı kendisi seçebilsin; seçmezse sistemi takip etmeye devam et
 
 - **Ek temalar** (yüksek kontrast, sepya vb.). İki tema yeterli.
 - **Sunucuda saklama.** Gerekçe aşağıda.
-- **Tema başına ayrı tasarım.** Jetonlar zaten iki temayı da karşılıyor; renk
-  değerleri değişmiyor, yalnızca seçilebilir hale geliyor.
+- **Yeni jeton veya yeni renk değeri.** Bu spec temayı *seçilebilir* yapar;
+  jetonların değerlerini belirlemez.
+
+  > **Bu madde bir kez yanlış anlaşıldı.** Önceki hâli "renk değerleri
+  > değişmiyor" diyordu ve bu, "açık tema koyunun aynısıdır, ayrıca
+  > değerlendirilmez" gibi okundu. Yanlıştı: ölçüm beş jetonun açık temada
+  > eşiğin altında olduğunu gösterdi ([tasks.md → Ölçüm 2](tasks.md)).
+  > Bugünkü kural şudur — **her tema ayrı ayrı değerlendirilir**:
+  > [.claude/rules/ui.md → Açık ve koyu tema](../../.claude/rules/ui.md).
 
 ## Karar: seçim veritabanında DEĞİL, tarayıcıda
 
@@ -87,5 +96,22 @@ durumuna ayrıldı.
 
 **Mekanizma değişmedi** — üç durum, `data-theme`, `localStorage` anahtarı ve
 ilk boyamadan önce çalışan betik aynı. Değişen yalnızca anahtarın ekrandaki
-yeri. "Tema anahtarı her sayfadan erişilebilir" kriteri hâlâ karşılanıyor:
-`PageHeader` her ekranda çiziliyor, dolayısıyla anahtar da her ekranda.
+yeri.
+
+O gün "`PageHeader` her ekranda çiziliyor, dolayısıyla anahtar da her
+ekranda" denmişti. **Bu ölçülmemişti ve yanlıştı:** koşu detayı `PageHeader`
+kullanmıyor. Bir sonraki maddeye bakın.
+
+### 2026-08-13 — anahtarın "her sayfada" olduğu iddiası ölçüldü ve düzeltildi
+
+Anahtarı sayfa başlığına bağlamak, kriteri **başlık bileşenini kullanan**
+sayfalarla sınırlamış. Koşu detayı yeniden tasarlanırken `PageHeader` yerine
+kendi künye kartını aldı ve tema anahtarı o ekrandan sessizce kayboldu; on
+iki sayfanın on birinde vardı, birinde yoktu.
+
+Ölçüm basitti: `[aria-label="Tema"]` koşu listesinde var, koşu detayında yok.
+
+Anahtar o ekrana ayrıca eklendi. Kalıcı ders: **"her sayfada" bir sayfa
+bileşenine bağlanamaz.** Kriter bugün doğru ama kırılgan; `PageHeader`
+kullanmayan bir sonraki ekran aynı şeyi tekrar yaşar. Kabuk seviyesine
+taşımak açık bir seçenek olarak duruyor.
