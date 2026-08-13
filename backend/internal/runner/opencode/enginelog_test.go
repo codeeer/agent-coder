@@ -3,6 +3,7 @@ package opencode
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -185,4 +186,47 @@ func TestSessionTranscript(t *testing.T) {
 		require.Error(t, err)
 		require.Empty(t, got)
 	})
+}
+
+/*
+ * Dev araç çıktılarının kırpılması.
+ *
+ * ÖLÇÜLMÜŞ bir olaydan geliyor: `npm install && build` koşusunda oturum
+ * geçmişi 4,29 MB çıktı ve %96'sı iki alandı. Saklama katmanı bunu bayt
+ * bayt kırpınca geriye GEÇERSİZ JSON kaldı; arayüz konuşma görünümüne
+ * düşemedi ve ham metin gösterdi — tam da en çok gerektiği koşuda.
+ *
+ * Buradaki iddia: kırpma yapıyı bozmaz. Her mesaj, her araç çağrısı yerinde
+ * kalır; yalnızca uzun metinlerin ortası çıkar.
+ */
+func TestSessionTranscript_DevCiktiKirpilir(t *testing.T) {
+	dev := strings.Repeat("x", 2<<20) // 2 MB'lık araç çıktısı
+	govde := `[{"info":{"role":"assistant"},"parts":[
+		{"type":"tool","tool":"bash","state":{"output":"` + dev + `"}},
+		{"type":"text","text":"kısa cevap"}]}]`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(govde))
+	}))
+	defer srv.Close()
+
+	c := &client{base: srv.URL, http: srv.Client()}
+	got, err := c.sessionTranscript(context.Background(), "ses_1")
+	require.NoError(t, err)
+
+	// 1. Sonuç GEÇERLİ JSON — konuşma görünümünün tek şartı.
+	var kok []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(got), &kok),
+		"kırpılmış geçmiş ayrıştırılabilir olmalı")
+
+	// 2. Yapı duruyor: mesaj ve iki parça yerinde.
+	require.Len(t, kok, 1)
+	parts, _ := kok[0]["parts"].([]any)
+	require.Len(t, parts, 2, "araç çağrısı da metin de korunmalı")
+	require.Contains(t, got, "kısa cevap", "kısa metinler dokunulmadan geçmeli")
+	require.Contains(t, got, `"tool": "bash"`, "araç adı korunmalı")
+
+	// 3. Dev alan gerçekten küçüldü ve kırpıldığı SÖYLENİYOR.
+	require.Less(t, len(got), 64<<10, "geçmiş saklama sınırının çok altında olmalı")
+	require.Contains(t, got, "bayt kırpıldı", "kırpma sessizce yapılmaz")
 }

@@ -6,7 +6,6 @@ package opencode
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -437,11 +436,64 @@ func (c *client) sessionTranscript(ctx context.Context, sessionID string) (strin
 		return "", fmt.Errorf("durum %d: %s", resp.StatusCode, truncate(string(data), 300))
 	}
 
-	var guzel bytes.Buffer
-	if err := json.Indent(&guzel, data, "", "  "); err != nil {
-		// Biçimlendirilemeyen yanıt yine de saklanır: bozuk JSON'un kendisi
-		// de teşhis verisidir.
+	/*
+	 * Dev araç çıktıları alan alan kırpılır — ÖLÇÜLMÜŞ bir soruna karşı.
+	 *
+	 * Bir `npm install && build` koşusunda geçmiş 4,29 MB çıktı ve %96'sı
+	 * iki alandı (1,6 MB'lık kurulum çıktısı ve 320 KB'lık üretilmiş dosya).
+	 * Saklama katmanı bunu bayt bayt kırpınca geriye GEÇERSİZ JSON kaldı ve
+	 * arayüz konuşma görünümüne düşemedi — tam da en çok gerektiği koşuda.
+	 *
+	 * Burada kırpınca yapı korunuyor: her mesaj, her araç çağrısı yerinde
+	 * kalıyor, yalnızca uzun metinlerin ORTASI çıkıyor. Baş ve son birlikte
+	 * tutuluyor; komut başta, hata sonda olur.
+	 */
+	var kok any
+	if err := json.Unmarshal(data, &kok); err != nil {
+		// Ayrıştırılamayan yanıt yine de saklanır: bozuk JSON'un kendisi de
+		// teşhis verisidir.
 		return string(data), nil
 	}
-	return guzel.String(), nil
+
+	guzel, err := json.MarshalIndent(trimStrings(kok), "", "  ")
+	if err != nil {
+		return string(data), nil
+	}
+	return string(guzel), nil
+}
+
+/*
+ * transcriptStringCap, geçmişteki tek bir metin alanının azami uzunluğu.
+ *
+ * Saklama sınırından (varsayılan 2 MB) çok küçük: amacı sınıra dayanmamak,
+ * hiç yaklaşmamak. Bir araç çıktısının dört kilobaytı neyin çalıştığını ve
+ * nasıl bittiğini söylemeye yetiyor; kalanı kurulum gürültüsü.
+ */
+const transcriptStringCap = 4 << 10
+
+// trimStrings, ağaçtaki uzun metinleri baş ve sonu koruyarak kısaltır.
+func trimStrings(v any) any {
+	switch t := v.(type) {
+	case string:
+		if len(t) <= transcriptStringCap {
+			return t
+		}
+		yarim := transcriptStringCap / 2
+		// Kırpma SÖYLENİR: eksik olduğunu bilmeyen okuyucu, olmayan bir
+		// satırı arar durur.
+		return t[:yarim] +
+			fmt.Sprintf("\n\n… [%d bayt kırpıldı] …\n\n", len(t)-transcriptStringCap) +
+			t[len(t)-yarim:]
+	case []any:
+		for i := range t {
+			t[i] = trimStrings(t[i])
+		}
+		return t
+	case map[string]any:
+		for k := range t {
+			t[k] = trimStrings(t[k])
+		}
+		return t
+	}
+	return v
 }
