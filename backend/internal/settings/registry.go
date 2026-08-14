@@ -34,6 +34,19 @@ const (
 	 * Değer ÇOK SATIRLIDIR; arayüz denetimi bu tipten türetir.
 	 */
 	KindCertificate Kind = "certificate"
+
+	/*
+	 * KindHostList, satır başına bir domain taşıyan izin listesi.
+	 *
+	 * KindCertificate ile aynı adlandırma kuralı: tip biçime değil ŞEYE göre
+	 * adlandırıldı. "multiline" denseydi tip, değerin ne olduğunu değil nasıl
+	 * yazıldığını söylerdi ve ikinci bir çok satırlı ayarda anlamsızlaşırdı.
+	 *
+	 * Değer ÇOK SATIRLIDIR; arayüz denetimi bu tipten türetir.
+	 * Dilbilgisi ve doğrulama `internal/hostlist` paketindedir — aynı kuralı
+	 * çıkış kapısı da kullanıyor.
+	 */
+	KindHostList Kind = "host_list"
 )
 
 // Definition, bir ayarın kod tarafındaki tanımı.
@@ -69,6 +82,12 @@ const (
 	KeyPackagesTimeout = "packages.timeout_seconds"
 
 	KeyCorporateCA = "network.corporate_ca"
+	// KeyEgressProxy, sandbox çıkış denetiminin ANA ANAHTARI (spec 020).
+	// Boşsa denetim tamamen kapalıdır; whitelist bile yok sayılır.
+	KeyEgressProxy = "network.proxy_url"
+	// KeyAllowedHosts, sandbox'ın çıkabileceği domain'ler. Yalnızca
+	// KeyEgressProxy doluyken anlam taşır.
+	KeyAllowedHosts = "network.allowed_hosts"
 
 	KeyRunTimeoutMinutes  = "runner.timeout_minutes"
 	KeyMaxConcurrentRuns  = "runner.max_concurrent"
@@ -306,6 +325,38 @@ var Registry = []Definition{
 			"zincir taşıyan dosyalarda ara sertifikalar da alınır. " +
 			"Tanımlanırsa güvenilen kök listesine EKLENİR, genel sertifikalar " +
 			"geçerli kalmaya devam eder. Boş bırakılırsa hiçbir şey değişmez.",
+		Default: "",
+	},
+
+	/*
+	 * Çıkış denetimi — spec 020.
+	 *
+	 * Proxy ANA ANAHTARDIR: boşken agent ortamı bugünkü gibi her adrese
+	 * çıkabilir ve whitelist yok sayılır. Doluyken çıkış proxy'ye MECBUR olur
+	 * (yalnızca yönlendirilmez — ölçüldü, yönlendirme atlanabiliyordu) ve
+	 * whitelist devreye girer.
+	 *
+	 * Kimlik gömülü adres reddedilir: `putSetting` değeri loga yazıyor.
+	 */
+	{
+		Key: KeyEgressProxy, Group: GroupNetwork, Kind: KindText, Optional: true,
+		Label: "Çıkış proxy'si",
+		Help: "Agent ortamının internete çıkarken kullanacağı proxy " +
+			"(örnek: http://proxy.sirket.local:8080). Tanımlanırsa agent " +
+			"ortamı YALNIZCA bu proxy üzerinden dışarı çıkabilir; başka yol " +
+			"bırakılmaz. Boş bırakılırsa çıkış denetimi tamamen kapalıdır ve " +
+			"aşağıdaki izinli domain listesi de uygulanmaz. " +
+			"Adres kullanıcı adı/parola içeremez.",
+		Default: "",
+	},
+	{
+		Key: KeyAllowedHosts, Group: GroupNetwork, Kind: KindHostList, Optional: true,
+		Label: "İzinli domain'ler",
+		Help: "Agent ortamının çıkabileceği domain'ler, satır başına bir tane. " +
+			"`ornek.com` yalnızca o adresi, `*.ornek.com` alt alan adlarını açar. " +
+			"İzinli bir domain'e tüm portlar açıktır. Boş bırakılırsa domain " +
+			"kısıtı uygulanmaz, ama çıkış yine proxy'den geçmek zorundadır. " +
+			"YALNIZCA çıkış proxy'si tanımlıyken etkilidir.",
 		Default: "",
 	},
 }

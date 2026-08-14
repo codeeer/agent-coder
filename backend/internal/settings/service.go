@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/agent-coder/backend/internal/certfmt"
+	"github.com/agent-coder/backend/internal/hostlist"
 )
 
 var (
@@ -250,6 +251,25 @@ func Validate(def Definition, value string) error {
 		}
 		return validateText(def, value)
 
+	case KindHostList:
+		// Boş liste, "kısıt yok" demektir — spec 020. Hata değil.
+		if value == "" {
+			if def.Optional {
+				return nil
+			}
+			return fmt.Errorf("%w: boş olamaz", ErrInvalidValue)
+		}
+		/*
+		 * Ayrıştırma hostlist paketine devredilir — çıkış kapısının kullandığı
+		 * kuralın AYNISI. İki kopya olsaydı ayarda kabul edilen bir satır
+		 * kapıda tutmayabilirdi: kullanıcı listede sandığı ama olmayan bir
+		 * izinle kalırdı ve bunu ancak çalıştırma düştüğünde fark ederdi.
+		 */
+		if _, err := hostlist.Parse(value); err != nil {
+			return fmt.Errorf("%w: %s", ErrInvalidValue, err.Error())
+		}
+		return nil
+
 	default:
 		return fmt.Errorf("%w: tanımsız tip %q", ErrInvalidValue, def.Kind)
 	}
@@ -279,7 +299,7 @@ func rangeError(def Definition) error {
  */
 func validateText(def Definition, value string) error {
 	switch def.Key {
-	case KeyNPMRegistry:
+	case KeyNPMRegistry, KeyEgressProxy:
 		u, err := url.Parse(value)
 		if err != nil {
 			return fmt.Errorf("%w: adres ayrıştırılamadı", ErrInvalidValue)

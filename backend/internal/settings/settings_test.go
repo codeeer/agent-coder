@@ -216,3 +216,42 @@ func TestValidate_KayitDefteriAdresi(t *testing.T) {
 	require.Error(t, err, "kimlik gömülü adres reddedilmeli")
 	require.NotContains(t, err.Error(), "gizlitoken", "hata mesajı sırrı tekrarlamamalı")
 }
+
+/*
+ * Proxy adresi doğrulaması — kayıt defteri adresiyle aynı gerekçe.
+ *
+ * `putSetting` değeri loga yazıyor; `http://kullanici:parola@proxy:8080`
+ * biçiminde bir adres parolayı düz metin olarak loga ve veritabanına
+ * düşürürdü. Spec 020 bu yüzden kimlik doğrulaması isteyen proxy'leri
+ * kapsam dışı bıraktı.
+ */
+func TestValidate_ProxyAdresi(t *testing.T) {
+	def, ok := Lookup(KeyEgressProxy)
+	require.True(t, ok)
+
+	require.NoError(t, Validate(def, "http://proxy.sirket.local:8080"))
+	require.NoError(t, Validate(def, ""), "boş bırakmak denetimi kapatır")
+
+	require.Error(t, Validate(def, "proxy.sirket.local:8080"), "şema zorunlu")
+	require.Error(t, Validate(def, "ftp://proxy.sirket.local"), "yalnızca http(s)")
+	require.Error(t, Validate(def, "http://"), "sunucu adı zorunlu")
+
+	err := Validate(def, "http://kullanici:gizliparola@proxy.sirket.local:8080")
+	require.Error(t, err, "kimlik gömülü adres reddedilmeli")
+	require.NotContains(t, err.Error(), "gizliparola", "hata mesajı sırrı tekrarlamamalı")
+}
+
+// Whitelist doğrulaması hostlist paketine devrediliyor: ayarda kabul edilen bir
+// satırın kapıda tutmaması, kullanıcının listede sandığı ama olmayan bir izin
+// demektir.
+func TestValidate_IzinliHostlar(t *testing.T) {
+	def, ok := Lookup(KeyAllowedHosts)
+	require.True(t, ok)
+
+	require.NoError(t, Validate(def, "ornek.com\n*.npmjs.org\n# yorum\n"))
+	require.NoError(t, Validate(def, ""), "boş liste kısıt uygulanmadığı anlamına gelir")
+
+	err := Validate(def, "ornek.com\nhttps://bozuk.com")
+	require.Error(t, err, "URL yazılan satır reddedilmeli")
+	require.Contains(t, err.Error(), "2", "hata kaçıncı satır olduğunu söylemeli")
+}

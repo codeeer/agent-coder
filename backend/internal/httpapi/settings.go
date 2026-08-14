@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/agent-coder/backend/internal/certinfo"
+	"github.com/agent-coder/backend/internal/hostlist"
 	"github.com/agent-coder/backend/internal/settings"
 )
 
@@ -113,7 +115,28 @@ func (h *Handler) respondSettingsError(w http.ResponseWriter, r *http.Request, k
  */
 func logDegeri(key, value string) string {
 	def, ok := settings.Lookup(key)
-	if !ok || def.Kind != settings.KindCertificate {
+	if !ok {
+		return value
+	}
+
+	/*
+	 * İzinli domain listesi de özetlenir — sertifikayla aynı ÖLÇÜ gerekçesi.
+	 * Kurumsal bir listede onlarca satır olabiliyor; ham hâliyle loglanırsa
+	 * o satırdan sonrasını okumak zorlaşır. Değer sır değil, ama logu
+	 * kullanılamaz hale getirmesi de kabul edilemez.
+	 */
+	if def.Kind == settings.KindHostList {
+		if strings.TrimSpace(value) == "" {
+			return "(temizlendi)"
+		}
+		desenler, err := hostlist.Parse(value)
+		if err != nil {
+			return "(izinli domain listesi, okunamadı)"
+		}
+		return fmt.Sprintf("izinli domain listesi: %d domain", len(desenler))
+	}
+
+	if def.Kind != settings.KindCertificate {
 		return value
 	}
 	if strings.TrimSpace(value) == "" {

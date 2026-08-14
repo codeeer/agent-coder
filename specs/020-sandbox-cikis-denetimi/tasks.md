@@ -44,16 +44,16 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 3 — Ayarlar
 
-- [ ] T20 `KindHostList` tipi + `network.allowed_hosts` tanımı → `GET /api/settings`
+- [x] T20 `KindHostList` tipi + `network.allowed_hosts` tanımı → `GET /api/settings`
       çıktısında yeni ayar görünür
-- [ ] T21 `network.proxy_url` tanımı → `GET /api/settings` çıktısında görünür,
+- [x] T21 `network.proxy_url` tanımı → `GET /api/settings` çıktısında görünür,
       varsayılanı boş
-- [ ] T22 `Validate` `KindHostList` case'i `hostlist.Parse`'ı çağırır → geçersiz
+- [x] T22 `Validate` `KindHostList` case'i `hostlist.Parse`'ı çağırır → geçersiz
       satır 400 ile reddedilir, hata hangi satır olduğunu söyler
-- [ ] T23 Proxy URL doğrulaması: şema ve host zorunlu, kimlik gömülemez →
+- [x] T23 Proxy URL doğrulaması: şema ve host zorunlu, kimlik gömülemez →
       `http://kullanici:parola@p:8080` reddedilir **ve hata mesajı parolayı
       tekrarlamaz** (spec 017'deki `TestValidate_KayitDefteriAdresi` kalıbı)
-- [ ] T24 Kayıt defteri tutarlılık testleri yeşil kalır → `TestRegistry_*` geçer
+- [x] T24 Kayıt defteri tutarlılık testleri yeşil kalır → `TestRegistry_*` geçer
       (yeni tip `Validate` switch'ine eklenmezse bu test kırmızıya döner)
 
 ## Blok 4 — Ağ ve container yolu
@@ -128,4 +128,8 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Notlar
 
-Plandan sapmalar ve gerekçeleri buraya yazılır.
+**Plana ek — ayar log'unun özetlenmesi.** Plan yalnızca riskler tablosunda
+değinmişti; uygulanırken ayrı bir görev haline geldi (`logDegeri` +
+`internal/httpapi/settings_test.go`). Gerekçe sertifikadakiyle aynı ve ölçülmüş:
+kurumsal bir izin listesi onlarca satır olabiliyor, ham hâliyle loglanınca o
+satırdan sonrasını okumak zorlaşıyor. Değer sır değil, sorun ölçü.
