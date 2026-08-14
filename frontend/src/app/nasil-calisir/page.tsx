@@ -70,7 +70,7 @@ export default function HowItWorksPage() {
       >
         <Architecture />
         <div className="grid gap-3 sm:grid-cols-3">
-          <Mini title="Tuval">
+          <Mini title="Canvas">
             Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi
             talimat.
           </Mini>

@@ -243,7 +243,7 @@ export function Architecture() {
         w={150}
         h={54}
         title="Tarayıcı"
-        subtitle="tuval + izleme"
+        subtitle="canvas + izleme"
       />
       <Box x={20} y={120} w={150} h={54} title="Frontend" subtitle="Next.js" />
       <Arrow x1={95} y1={86} x2={95} y2={116} />
