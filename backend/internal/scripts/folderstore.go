@@ -207,3 +207,36 @@ func (s *Store) FoldersForAgent(ctx context.Context, agentID uuid.UUID) ([]Folde
 	}
 	return out, rows.Err()
 }
+
+/*
+DirectScriptIDsForAgent, agent'a DOĞRUDAN atanmış betiklerin kimlikleri.
+
+`ForAgent`'tan farkı: klasörden gelenleri İÇERMEZ.
+
+NEDEN AYRI: `ForAgent` çalıştırma katmanı için birleşim döndürüyor — agent
+neyi çalıştırabiliyorsa hepsi. Arayüz katmanının ihtiyacı ise farklı: hangi
+kutucukların işaretli olduğunu gösteriyor ve o liste geri kaydediliyor.
+Birleşim oradan geçseydi klasör üyeliği ilk kaydetmede KALICI TEKİL ATAMAYA
+dönüşür, script klasörden çıkarıldığında agent'ta kalmaya devam ederdi.
+*/
+func (s *Store) DirectScriptIDsForAgent(ctx context.Context, agentID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT s.id FROM scripts s
+		JOIN agent_scripts a ON a.script_id = s.id
+		WHERE a.agent_id = $1
+		ORDER BY s.name`, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("agent'ın doğrudan betikleri okunamadı: %w", err)
+	}
+	defer rows.Close()
+
+	out := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("betik kimliği taranamadı: %w", err)
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}

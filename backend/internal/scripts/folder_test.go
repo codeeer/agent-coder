@@ -330,3 +330,46 @@ func TestPath_KlasorluVeKlasorsuz(t *testing.T) {
 	require.Equal(t, "/home/agent/scripts/node-24",
 		scripts.Folder{Name: "node-24"}.Path())
 }
+
+/*
+ * DOĞRUDAN ATAMALAR, KLASÖRDEN GELENLERDEN AYRI OKUNABİLMELİ.
+ *
+ * GERÇEK BİR HATANIN KAYDI: `ForAgent` birleşim döndürmeye başlayınca agent
+ * yanıtındaki `scriptIds` de klasörden gelenleri taşımaya başladı. Arayüz o
+ * listeyle tekil kutucukları işaretliyor; kullanıcı agent'ı kaydettiği anda
+ * klasör üyeliği KALICI TEKİL ATAMAYA dönüşürdü. O noktadan sonra script'i
+ * klasörden çıkarmak onu agent'tan düşürmezdi — klasörün anlamı sessizce
+ * kaybolurdu.
+ *
+ * Çözüm: arayüz katmanı doğrudan atamaları ayrı okur; çalıştırma katmanı
+ * birleşimi kullanmaya devam eder.
+ */
+func TestDirectScriptIDs_KlasordenGelenleriIcermez(t *testing.T) {
+	pool := testutil.TestDB(t)
+	testutil.Truncate(t, pool, "agent_script_folders", "agent_scripts",
+		"scripts", "script_folders", "runs", "agents")
+	s := scripts.NewStore(pool)
+	ctx := context.Background()
+
+	f := klasor(t, s, "node-24")
+	_, err := s.Create(ctx, scripts.CreateInput{
+		Name: "01-klasorden", Content: "echo", FolderID: &f.ID})
+	require.NoError(t, err)
+
+	tekil, err := s.Create(ctx, scripts.CreateInput{Name: "tekil", Content: "echo"})
+	require.NoError(t, err)
+
+	agentID := seedAgent(t, pool, "kampanya-agent")
+	require.NoError(t, s.SetAgentScripts(ctx, agentID, []uuid.UUID{tekil.ID}))
+	require.NoError(t, s.SetAgentFolders(ctx, agentID, []uuid.UUID{f.ID}))
+
+	dogrudan, err := s.DirectScriptIDsForAgent(ctx, agentID)
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{tekil.ID}, dogrudan,
+		"klasörden gelen script tekil atama sayılmamalı")
+
+	// Çalıştırma katmanı hâlâ birleşimi görüyor.
+	hepsi, err := s.ForAgent(ctx, agentID)
+	require.NoError(t, err)
+	require.Len(t, hepsi, 2)
+}

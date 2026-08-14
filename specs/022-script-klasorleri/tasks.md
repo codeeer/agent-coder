@@ -86,13 +86,13 @@ Docker ile kanıtlanabilir.
 
 ## Blok 5 — Uçlar
 
-- [ ] T40 `GET/POST/PUT/DELETE /api/script-folders` → CRUD çalışır
-- [ ] T41 Script uçları `folderId` alır → oluştururken ve güncellerken klasör
+- [x] T40 `GET/POST/PUT/DELETE /api/script-folders` → CRUD çalışır
+- [x] T41 Script uçları `folderId` alır → oluştururken ve güncellerken klasör
       atanır, kaldırılır
-- [ ] T42 Agent uçları `scriptFolderIds` alır; `scriptIds` korunur
-- [ ] T43 Klasör silme, kullanım sayılarını söyler → yanıt kaç script ve kaç
+- [x] T42 Agent uçları `scriptFolderIds` alır; `scriptIds` korunur
+- [x] T43 Klasör silme, kullanım sayılarını söyler → yanıt kaç script ve kaç
       agent etkileneceğini taşır
-- [ ] T44 Hata durumları spec tablosuna uyar → boş ad, geçersiz karakter,
+- [x] T44 Hata durumları spec tablosuna uyar → boş ad, geçersiz karakter,
       çift ad, çift script adı: dördü için ayrı test
 
 ## Blok 6 — Arayüz
@@ -159,3 +159,19 @@ bağımlılık kalktı. Ölçümle sonrası: dizin artık `10001:10001`, root'un
 **`make lint-shell` KIRIK ama bu değişiklikten değil.** SC1091, `entrypoint.sh`
 satır 15'te `java-truststore.sh`'ı izleyememekten geliyor ve spec 018'den beri
 var. Bu spec'te düzeltilmedi — ayrı iş.
+
+**YAKALANAN HATA — kendi eklediğim, ve sessiz olanından.** Blok 2'de `ForAgent`
+birleşim döndürmeye başladı. Ama agent yanıtındaki `scriptIds` de aynı
+fonksiyondan besleniyordu ve o alan arayüzde TEKİL kutucukları işaretleyip
+aynen geri kaydediliyor. Sonuç: klasörden gelen betikler tekil atama gibi
+görünür, kullanıcı agent'ı kaydettiği anda klasör üyeliği KALICI TEKİL ATAMAYA
+dönüşür, script'i klasörden çıkarmak onu agent'tan düşürmezdi — klasörün
+anlamı sessizce kaybolurdu.
+
+Hata çalışma anında hiçbir belirti vermezdi: her şey "çalışıyor" görünür, sadece
+klasör bir süre sonra işlevini yitirirdi.
+
+Çözüm: `DirectScriptIDsForAgent` eklendi. Arayüz katmanı doğrudan atamaları
+okur, çalıştırma katmanı birleşimi kullanmaya devam eder. Testi ayrıca yazıldı
+(`TestDirectScriptIDs_KlasordenGelenleriIcermez`) — aynı fonksiyonu iki amaç
+için kullanan bir tasarım o testte düşer.

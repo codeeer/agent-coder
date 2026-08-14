@@ -38,6 +38,8 @@ type updateAgentRequest struct {
 	MCPServerIDs *[]uuid.UUID `json:"mcpServerIds"`
 	// ScriptIDs, agent'ın çalıştırabileceği hazır betikler. Aynı kural.
 	ScriptIDs *[]uuid.UUID `json:"scriptIds"`
+	// ScriptFolderIDs, agent'a atanmış kampanya klasörleri (spec 022).
+	ScriptFolderIDs *[]uuid.UUID `json:"scriptFolderIds"`
 }
 
 /*
@@ -50,6 +52,8 @@ type agentResponse struct {
 	agentreg.Agent
 	MCPServerIDs []uuid.UUID `json:"mcpServerIds"`
 	ScriptIDs    []uuid.UUID `json:"scriptIds"`
+	// ScriptFolderIDs, agent'a atanmış kampanya klasörleri (spec 022).
+	ScriptFolderIDs []uuid.UUID `json:"scriptFolderIds"`
 }
 
 // withRelations, agent kaydına erişebildiği MCP sunucularını ve betikleri ekler.
@@ -57,7 +61,8 @@ type agentResponse struct {
 // Okuma hatası agent'ı gizlemez: liste boş görünür ve log'a düşer. Bir yan
 // tablo sorunu yüzünden agent ekranının hiç açılmaması orantısız olurdu.
 func (h *Handler) withRelations(ctx contextT, a agentreg.Agent) agentResponse {
-	out := agentResponse{Agent: a, MCPServerIDs: []uuid.UUID{}, ScriptIDs: []uuid.UUID{}}
+	out := agentResponse{Agent: a, MCPServerIDs: []uuid.UUID{},
+		ScriptIDs: []uuid.UUID{}, ScriptFolderIDs: []uuid.UUID{}}
 
 	if h.deps.MCPServers != nil {
 		servers, err := h.deps.MCPServers.ForAgent(ctx, a.ID)
@@ -70,12 +75,27 @@ func (h *Handler) withRelations(ctx contextT, a agentreg.Agent) agentResponse {
 	}
 
 	if h.deps.Scripts != nil {
-		list, err := h.deps.Scripts.ForAgent(ctx, a.ID)
+		/*
+		 * DOĞRUDAN atamalar okunuyor, `ForAgent` DEĞİL.
+		 *
+		 * `ForAgent` klasörden gelenleri de içeren birleşimi döner ve o liste
+		 * çalıştırma katmanı için doğru. Ama bu alan arayüzde tekil kutucukları
+		 * işaretliyor ve aynen geri kaydediliyor: birleşim buradan geçseydi
+		 * klasör üyeliği ilk kaydetmede kalıcı tekil atamaya dönüşür,
+		 * script'i klasörden çıkarmak onu agent'tan düşürmezdi.
+		 */
+		ids, err := h.deps.Scripts.DirectScriptIDsForAgent(ctx, a.ID)
 		if err != nil {
 			slog.WarnContext(ctx, "agent'ın betikleri okunamadı", "agent_id", a.ID, "error", err)
 		}
-		for _, s := range list {
-			out.ScriptIDs = append(out.ScriptIDs, s.ID)
+		out.ScriptIDs = append(out.ScriptIDs, ids...)
+
+		klasorler, err := h.deps.Scripts.FoldersForAgent(ctx, a.ID)
+		if err != nil {
+			slog.WarnContext(ctx, "agent'ın klasörleri okunamadı", "agent_id", a.ID, "error", err)
+		}
+		for _, f := range klasorler {
+			out.ScriptFolderIDs = append(out.ScriptFolderIDs, f.ID)
 		}
 	}
 
@@ -165,6 +185,13 @@ func (h *Handler) updateAgent(w http.ResponseWriter, r *http.Request) {
 
 	if req.ScriptIDs != nil && h.deps.Scripts != nil {
 		if err := h.deps.Scripts.SetAgentScripts(r.Context(), a.ID, *req.ScriptIDs); err != nil {
+			h.respondScriptError(w, r, err)
+			return
+		}
+	}
+
+	if req.ScriptFolderIDs != nil && h.deps.Scripts != nil {
+		if err := h.deps.Scripts.SetAgentFolders(r.Context(), a.ID, *req.ScriptFolderIDs); err != nil {
 			h.respondScriptError(w, r, err)
 			return
 		}

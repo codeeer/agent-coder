@@ -200,6 +200,16 @@ func (h *Handler) Routes() http.Handler {
 			r.Delete("/{id}", h.deleteMCPServer)
 		})
 
+		// Kampanya klasörleri (spec 022). Betiklerden AYRI uç: yaşam
+		// döngüleri ayrı — klasör silinince betikler kalır.
+		r.Route("/script-folders", func(r chi.Router) {
+			r.Get("/", h.listScriptFolders)
+			r.Post("/", h.createScriptFolder)
+			r.Get("/{id}/usage", h.scriptFolderUsage)
+			r.Put("/{id}", h.updateScriptFolder)
+			r.Delete("/{id}", h.deleteScriptFolder)
+		})
+
 		r.Route("/scripts", func(r chi.Router) {
 			r.Get("/", h.listScripts)
 			r.Post("/", h.createScript)
