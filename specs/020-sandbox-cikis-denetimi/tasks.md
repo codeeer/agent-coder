@@ -86,15 +86,15 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 6 — Arayüz
 
-- [ ] T50 `GET /api/network/egress` → proxy kaynağı ve "her zaman izinli" listeler
+- [x] T50 `GET /api/network/egress` → proxy kaynağı ve "her zaman izinli" listeler
       dönüyor; `curl` ile doğrulanır
-- [ ] T51 `host_list` kind'ı frontend'de çok satırlı alan olarak çizilir →
+- [x] T51 `host_list` kind'ı frontend'de çok satırlı alan olarak çizilir →
       ayarlar → Kurumsal ağ'da textarea görünür [P]
-- [ ] T52 "Her zaman izinli" bölümü gerçek yapılandırmadan geliyor → ekranda
+- [x] T52 "Her zaman izinli" bölümü gerçek yapılandırmadan geliyor → ekranda
       görünen adresler tanımlı provider/repository/registry ile aynı [P]
-- [ ] T53 Proxy boşken whitelist'in etkisiz olduğu arayüzde söylenir → proxy
+- [x] T53 Proxy boşken whitelist'in etkisiz olduğu arayüzde söylenir → proxy
       alanı boşaltılınca uyarı beliriyor
-- [ ] T54 Açık ve koyu tema ayrı ayrı doğrulanır → DevTools ile ekran görüntüsü,
+- [x] T54 Açık ve koyu tema ayrı ayrı doğrulanır → DevTools ile ekran görüntüsü,
       hizalama ve taşma kontrolü
 
 ## Blok 7 — Ölçüm ve belgeler

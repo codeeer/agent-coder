@@ -44,6 +44,7 @@ import type {
   StartRunRequest,
   SettingsResponse,
   CACertStatus,
+  EgressStatus,
   CANormalizeResult,
   UpdateAgentRequest,
   PutCredentialRequest,
@@ -308,6 +309,9 @@ export const api = {
   network: {
     /** Sertifikanın durumu ve içinden okunan bilgi. */
     ca: () => apiFetch<CACertStatus>("/api/network/ca"),
+
+    /** Çıkış denetiminin durumu ve her zaman izinli adresler. */
+    egress: () => apiFetch<EgressStatus>("/api/network/egress"),
 
     /**
      * Seçilen dosyayı PEM'e çevirir — KAYDETMEZ.

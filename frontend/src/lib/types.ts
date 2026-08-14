@@ -302,6 +302,28 @@ export interface RefreshResponse {
  * "certificate" ADI BİÇİM DEĞİL: değer normalleştirilmiş PEM olarak saklanır
  * ama kullanıcı DER veya PKCS#7 de verebiliyor (bkz. network.normalizeCA).
  */
+/**
+ * GET /api/network/egress — sandbox çıkış denetiminin çözülmüş durumu (spec 020).
+ *
+ * `alwaysAllowed` UYDURULMAZ: gerçek yapılandırmadan türetilir. Kullanıcının
+ * yazmadığı ama açık olan kapılar burada görünür.
+ */
+export interface EgressStatus {
+  proxy: {
+    /** Üç durum: ayardan, ortam değişkeninden veya tanımsız. */
+    source: "settings" | "env" | "none";
+    /** host:port. Kaynak "none" ise boş. */
+    host: string;
+  };
+  alwaysAllowed: {
+    /** Çalıştırma motorunun kendi ihtiyaçları. */
+    engine: string[] | null;
+    providers: string[] | null;
+    repositories: string[] | null;
+    registries: string[] | null;
+  };
+}
+
 export type SettingKind = "int" | "bool" | "text" | "certificate" | "host_list";
 
 /**

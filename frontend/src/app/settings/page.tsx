@@ -13,6 +13,7 @@ import { McpAccessSection } from "@/components/settings/McpAccessSection";
 import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
 import { CACertStatus } from "@/components/settings/CACertStatus";
+import { EgressStatus } from "@/components/settings/EgressStatus";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
 import { ScriptSection } from "@/components/settings/ScriptSection";
 import {
@@ -278,7 +279,24 @@ function TabContent({ tab }: { tab: TabID }) {
             <div className="border-b border-line px-4 py-3.5">
               <CACertStatus />
             </div>
-            <RuntimeSettings groups={["network"]} showHeadings={false} />
+            <RuntimeSettings keys={["network.corporate_ca"]} showHeadings={false} />
+          </Panel>
+
+          {/* AYRI PANO. Sertifika "SSL denetimi yapan ağda çalışabilmek" için,
+              çıkış denetimi ise "sandbox nereye çıkabilsin" için. Tek panoda
+              toplandıklarında pano başlığı ikisini birden anlatamıyordu. */}
+          <Panel
+            title="Sandbox çıkış denetimi"
+            description="Agent ortamının internete nasıl ve nereye çıkabileceği. Proxy tanımlanmazsa hiçbir kısıt uygulanmaz."
+            padded={false}
+          >
+            <div className="border-b border-line px-4 py-3.5">
+              <EgressStatus />
+            </div>
+            <RuntimeSettings
+              keys={["network.proxy_url", "network.allowed_hosts"]}
+              showHeadings={false}
+            />
           </Panel>
           <p className="text-xs leading-relaxed text-ink-3">
             TLS doğrulamasını kapatan bir ayar yoktur ve eklenmeyecektir. Kurumsal

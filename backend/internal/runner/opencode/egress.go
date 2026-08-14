@@ -171,3 +171,15 @@ func (r *Runner) egressOturumuAc(req runner.Request, emit runner.EventFunc) (*ne
 		OnDeny:   denyBildirici(req.RunID.String(), emit),
 	})
 }
+
+/*
+ * EngineHosts, motorun kendi çalışması için gereken adresler.
+ *
+ * DIŞA AÇIK çünkü arayüz bunları "her zaman izinli" olarak göstermek zorunda
+ * (spec 020 H4): kullanıcının bilmediği açık bir kapı bırakılmaz. Ama liste
+ * motora özgü olduğu için burada duruyor — httpapi'nin opencode'u tanıması
+ * gerekmiyor, değeri fonksiyon olarak alıyor.
+ */
+func (r *Runner) EngineHosts() []string {
+	return append([]string{}, engineHosts...)
+}

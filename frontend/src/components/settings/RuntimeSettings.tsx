@@ -52,10 +52,20 @@ export function RuntimeSettings({
    * sorgu verilmediğinde kod yolu bugünküyle birebir aynı olmalı.
    */
   query = "",
+  /**
+   * Verilirse yalnızca bu anahtarlar çizilir.
+   *
+   * Grup filtresi yetmiyor: "Kurumsal ağ" grubunda hem sertifika hem çıkış
+   * denetimi var ve ikisi ayrı panolara ait — biri SSL denetimi yapan ağlar
+   * için, diğeri sandbox'ın nereye çıkabileceği için. Tek panoda toplamak,
+   * pano başlığını ikisini birden anlatamaz hâle getiriyordu.
+   */
+  keys,
 }: {
   groups?: string[];
   showHeadings?: boolean;
   query?: string;
+  keys?: string[];
 } = {}) {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["settings"],
@@ -69,6 +79,7 @@ export function RuntimeSettings({
   const groups = new Map<string, SettingValue[]>();
   for (const item of filterSettings(data.items, query)) {
     if (only && !only.includes(item.group)) continue;
+    if (keys && !keys.includes(item.key)) continue;
     const list = groups.get(item.group) ?? [];
     list.push(item);
     groups.set(item.group, list);

@@ -81,6 +81,18 @@ type Deps struct {
 	// nil olabilir — o durumda sertifika tanımsız sayılır.
 	CACert *cacert.Resolver
 
+	/*
+	 * Çıkış denetimi (spec 020).
+	 *
+	 * EngineHosts FONKSİYON olarak taşınıyor çünkü değer motora özgü ve
+	 * `internal/runner` sınırının içinde duruyor; httpapi'nin opencode'u
+	 * tanıması gerekmiyor (AGENTS.md).
+	 */
+	EngineHosts func() []string
+	// EgressProxyEnv, ortam değişkeninden gelen proxy — YEDEK yol.
+	// Ayar doluysa o kazanır; bu değer yalnızca kaynağı bildirmek için.
+	EgressProxyEnv string
+
 	// Jira (spec 002'den sonra credentials paketinin ilgilendiği tek şey)
 	Credentials   *credentials.Store
 	JiraValidator *credentials.Validator
@@ -220,6 +232,8 @@ func (h *Handler) Routes() http.Handler {
 		// Kurumsal ağ: sertifikanın durumu ve dosya çevirme (spec 017).
 		// Sertifikayı KAYDEDEN uç yok — kaydetme ayarlar ucundan yapılır.
 		r.Get("/network/ca", h.caCert)
+		// Çıkış denetiminin çözülmüş durumu — kaydetme yok (spec 020).
+		r.Get("/network/egress", h.egressStatus)
 		r.Post("/network/ca/normalize", h.caNormalize)
 
 		r.Get("/credentials", h.listCredentials)
