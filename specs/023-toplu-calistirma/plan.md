@@ -230,6 +230,7 @@ Eylemler: **İptal** (bekleyenler düşer, çalışanlar sürer — onayda yazı
 | Zamanlayıcı iptal edilmiş toplu işin öğesini başlatır | `NextPending` yalnızca `queued`/`running` toplu işlerden okur |
 | Uyandırma sinyali kaçarsa kuyruk donar | Dakikalık emniyet turu; ayrıca `Wake` tamponlu kanala bloklamadan yazdığı için sinyal kaybolmaz |
 | Açılışta uzlaştırma çalışmazsa öğeler sonsuza kadar `running` | `Reconcile` açılışta koşar ve kaç öğeyi düşürdüğünü loglar |
+| **Kullanıcı runner container'ını elle siler** | Sinyal KAYBOLMAZ: slot'u bırakan şey container değil, goroutine'in `defer finish()`'i. Bağlantı kopar, goroutine çözülür, slot bırakılır. Tek etkisi gecikme — en kötü hâlde çalıştırma süre sınırı kadar. Emniyet turu burada devreye GİRMEZ ve girmemeli: slot gerçekten dolu, boş saymak sınırı aşardı. |
 | Proje silinmiş | `ON DELETE CASCADE` öğeyi düşürür; toplu iş sayıları buna göre |
 | Aynı projeyi iki kez seçme | `UNIQUE (batch_id, project_id)` |
 
