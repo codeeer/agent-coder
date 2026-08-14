@@ -773,6 +773,9 @@ export function ConfirmStrip({
   question,
   consequence,
   confirmLabel = "Evet, sil",
+  // Bekleme metni de değişebilmeli: şerit yalnızca silme için değil (spec 023
+  // toplu iş iptali de kullanıyor) ve "Siliniyor…" orada yanlış bir söz verir.
+  busyLabel = "Siliniyor…",
   busy = false,
   error,
   onConfirm,
@@ -782,6 +785,7 @@ export function ConfirmStrip({
   question: string;
   consequence?: React.ReactNode;
   confirmLabel?: string;
+  busyLabel?: string;
   busy?: boolean;
   error?: string;
   onConfirm: () => void;
@@ -799,7 +803,7 @@ export function ConfirmStrip({
       </p>
       <div className="mt-2.5 flex gap-2">
         <Button size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
-          {busy ? "Siliniyor…" : confirmLabel}
+          {busy ? busyLabel : confirmLabel}
         </Button>
         <Button size="sm" onClick={onCancel} disabled={busy}>
           Vazgeç

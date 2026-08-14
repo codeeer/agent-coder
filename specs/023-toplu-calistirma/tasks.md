@@ -66,14 +66,20 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 5 — Arayüz
 
-- [ ] T40 Akış detayında "Çok projede çalıştır": seçim listesi, sayaç
-- [ ] T41 Seçim mantığı saf modülde, `npm test` ile
-- [ ] T42 Toplu iş ekranı: sayılar + öğe listesi, süren işte tazelenir
-- [ ] T43 Öğe kendi akış çalışmasına bağlanır
-- [ ] T44 İptal onayı SONUCU yazar: bekleyenler düşer, çalışanlar sürer
-- [ ] T45 **"Kaldığı yerden devam et"** yalnızca kesilmiş öğe varken çıkar ve
-      üzerinde sayı yazar
-- [ ] T46 `ui.md`: iki tema, boş ve dolu hâller
+- [x] T40 Akış detayında "Çok projede çalıştır": arama, tümünü seç, sayaç.
+      Tek birincil eylem ve üzerinde kaç projede çalışacağı yazıyor
+- [x] T41 Seçim mantığı saf modülde (`batch-selection.ts`), `npm test` 85/85
+- [x] T42 Toplu iş ekranı: sayı şeridi + öğe listesi, süren işte 3 sn'de
+      tazelenir; liste ekranı 4 sn'de
+- [x] T43 Öğe kendi akış çalışmasına bağlanır — başlatılmamış öğe bağlantı
+      DEĞİL düz metin (boş sayfaya götürmemeli)
+- [x] T44 İptal onayı SONUCU yazar → tarayıcıda ölçüldü: "4 bekleyen iş düşer;
+      2 çalışan iş kendi hâlinde sürer ve sonucu kaydedilir."
+- [x] T45 **"Kaldığı yerden devam et"** yalnızca kesilmiş öğe varken çıkar ve
+      üzerinde sayı yazar ("Kaldığı yerden devam et (2 iş)")
+- [x] T46 `ui.md`: iki tema ÖLÇÜLDÜ (açık: 5,16–5,86 · koyu: 5,23–10,25;
+      denetim sınırı 3,46 ≥ 3), boş ve dolu hâller, geniş (1440) ve dar (1169)
+      masaüstü — yatay taşma yok, konsol temiz
 
 ## Blok 6 — Kapanış
 
@@ -131,6 +137,22 @@ kadar "çalışıyor" gösterirdi. Tek istisna iptal: iptal edilmiş bir iş, so
 çalışan öğesi bitince `done`'a dönmez — kullanıcı onu iptal etti. `Resume` ise
 durumu bilerek diriltir; `done` ya da `cancelled` kalsaydı `NextPending` sıraya
 alınan öğeleri hiç görmez ve kuyruk sessizce donardı.
+
+**Arayüzde üç şey ölçümle değişti.** (1) Bitmiş bir toplu işte "0 bekliyor ·
+0 çalışıyor" yazıyordu; sıfır kovalar artık yalnızca iş SÜRERKEN duruyor —
+orada kuyruğun boşalışını izlemek haber, bittikten sonra gürültü. (2) "Backend
+yeniden başladığında kesildi" kırmızı yazılıyordu; kesilme bir hata değil
+açıklama, kırmızı onu derleme hatasıyla aynı ağırlığa koyup gerçekten başarısız
+olan satırı görünmez yapıyordu. (3) `ConfirmStrip` bekleme metnini
+"Siliniyor…" olarak sabitlemişti — şerit artık silme dışında da kullanılıyor,
+`busyLabel` eklendi.
+
+**Doğrulama gerçek koşum başlatmadan yapıldı.** Ekranları görmek için sıraya iş
+koymak, otuz container ve gerçek model maliyeti demekti. Bunun yerine geçici
+demo kaydı veritabanına yazıldı — hiçbiri zamanlayıcının alacağı durumda
+değildi (bekleyen öğeli olan, kayıtlı sürümü OLMAYAN bir akışa bağlandı: en
+kötü hâlde container açmadan "yapılandırma eksiği" ile düşerdi). Kayıtlar
+doğrulamadan sonra silindi.
 
 **Container elle silinirse sinyal kaybolmuyor** — bu da kullanıcı sorusuyla
 ortaya çıktı ve ölçüldü: slot\'u bırakan şey container değil, goroutine\'in

@@ -977,3 +977,96 @@ export interface ImportLine {
   reason?: string;
   summary?: { created: number; skipped: number; failed: number };
 }
+
+/* ── Toplu çalıştırma (spec 023) ─────────────────────────────────────────── */
+
+/**
+ * Toplu işin durumu.
+ *
+ * `done` "hepsi başarılı" DEMEK DEĞİLDİR: kuyrukta bekleyen ve çalışan
+ * kalmadığı anlamına gelir. Başarı/başarısızlık sayılarda okunur.
+ */
+export type RunBatchStatus = "queued" | "running" | "done" | "cancelled";
+
+/**
+ * Öğenin durumu.
+ *
+ * `interrupted` ile `failed` AYNI ŞEY DEĞİL: kesilen iş hiç sonuç üretmedi,
+ * başarısız olan çalıştı ve bir sonuç üretti. "Kaldığı yerden devam et"
+ * yalnızca birincisini sıraya alır.
+ */
+export type RunBatchItemStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "interrupted"
+  | "cancelled";
+
+export interface RunBatchCounts {
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  interrupted: number;
+  cancelled: number;
+}
+
+export interface RunBatch {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  task: string;
+  status: RunBatchStatus;
+  counts: RunBatchCounts;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RunBatchItem {
+  id: string;
+  batchId: string;
+  projectId: string;
+  projectName: string;
+  position: number;
+  status: RunBatchItemStatus;
+  /** Çalışma başlatıldıktan SONRA dolar; öğe kendi akış çalışmasına bu alanla bağlanır. */
+  workflowRunId: string | null;
+  error: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface RunBatchDetail extends RunBatch {
+  /** Yalnızca detayda dolu; liste ekranı sayılarla yetinir. */
+  items: RunBatchItem[] | null;
+}
+
+/**
+ * İptal ve devamın sonucu.
+ *
+ * Etkilenen sayı VE eylemden sonraki durum birlikte döner: ekran kendi
+ * tahminiyle değil sistemin söylediğiyle tazelenir.
+ */
+export interface RunBatchActionResult {
+  affected: number;
+  status: RunBatchStatus;
+  counts: RunBatchCounts;
+}
+
+export const RUN_BATCH_STATUS_TEXT: Record<RunBatchStatus, string> = {
+  queued: "sırada",
+  running: "çalışıyor",
+  done: "bitti",
+  cancelled: "iptal edildi",
+};
+
+export const RUN_BATCH_ITEM_STATUS_TEXT: Record<RunBatchItemStatus, string> = {
+  pending: "bekliyor",
+  running: "çalışıyor",
+  succeeded: "tamamlandı",
+  failed: "başarısız",
+  interrupted: "kesildi",
+  cancelled: "iptal edildi",
+};

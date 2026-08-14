@@ -39,6 +39,9 @@ import type {
   EngineLog,
   Run,
   RunList,
+  RunBatch,
+  RunBatchActionResult,
+  RunBatchDetail,
   StartWorkflowResponse,
   Workflow,
   WorkflowDetail,
@@ -586,6 +589,30 @@ export const api = {
     /** Son Jira taramasının sonucu — tarama arka planda çalıştığı için tek görünür iz. */
     jiraScan: (id: string) =>
       apiFetch<JiraScanState>(`/api/workflows/${id}/jira-scan`),
+  },
+
+  /**
+   * Toplu çalıştırma (spec 023) — bir akışı çok projede sıraya koyma.
+   *
+   * Çalışma uçlarından AYRI: toplu iş bir çalıştırma değil, bir kuyruk.
+   * Başlatma yalnızca sıraya koyar ve döner; iş saatler sürebilir.
+   */
+  runBatches: {
+    list: (params: PageQuery = {}) =>
+      apiFetch<Paged<RunBatch>>(`/api/run-batches${pageQuery(params)}`),
+
+    get: (id: string) => apiFetch<RunBatchDetail>(`/api/run-batches/${id}`),
+
+    create: (body: { workflowId: string; task: string; projectIds: string[] }) =>
+      apiFetch<RunBatchDetail>("/api/run-batches", { method: "POST", body }),
+
+    /** Bekleyenleri düşürür; çalışanlar kendi hâlinde sürer. */
+    cancel: (id: string) =>
+      apiFetch<RunBatchActionResult>(`/api/run-batches/${id}/cancel`, { method: "POST" }),
+
+    /** Yalnızca KESİLMİŞ öğeleri yeniden sıraya alır. */
+    resume: (id: string) =>
+      apiFetch<RunBatchActionResult>(`/api/run-batches/${id}/resume`, { method: "POST" }),
   },
 
   workflowRuns: {

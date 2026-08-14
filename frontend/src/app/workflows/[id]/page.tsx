@@ -24,6 +24,7 @@ import {
   WorkflowRunBadge,
   isWorkflowActive,
 } from "@/components/workflows/WorkflowStatusBadge";
+import { BatchRunPanel } from "@/components/workflows/BatchRunPanel";
 import {
   IconAgent,
   IconComment,
@@ -498,6 +499,27 @@ export default function WorkflowEditorPage() {
             </Notice>
           )}
         </Card>
+      </Section>
+
+      {/*
+        ÇOK PROJEDE ÇALIŞTIR — tek çalıştırmanın YANINDA durur, yerine geçmez.
+        Bir projede denemek ile otuz projede kampanya yürütmek aynı karar
+        değil; ikisi ayrı bölüm.
+      */}
+      <Section
+        title="Çok projede çalıştır"
+        description="Aynı akışı seçtiğiniz projelerin hepsinde sıraya koyar. İşler eşzamanlılık sınırına uyarak sırayla çalışır."
+      >
+        <BatchRunPanel
+          workflowId={id}
+          projects={projects.data?.items ?? []}
+          disabled={!wf.activeVersionId}
+          disabledReason={
+            !wf.activeVersionId
+              ? "Akışın kayıtlı bir tanımı yok. Adımları çizip kaydedin."
+              : undefined
+          }
+        />
       </Section>
 
       <HookCard workflowId={id} token={wf.hookToken} />

@@ -49,6 +49,7 @@ import {
   GitPullRequest,
   Globe,
   LayoutDashboard,
+  Layers,
   Menu,
   MessageSquare,
   Monitor,
@@ -101,6 +102,8 @@ function icon(Glyph: LucideIcon) {
 
 export const IconDashboard = icon(LayoutDashboard);
 export const IconWorkflow = icon(Workflow);
+/** Toplu çalıştırma — bir akışın çok projedeki koşumları (spec 023). */
+export const IconLayers = icon(Layers);
 export const IconFolder = icon(Folder);
 export const IconAgent = icon(Bot);
 export const IconChip = icon(Cpu);

@@ -64,43 +64,43 @@ var (
 // Sayılar ayrı sorgularla değil tek sorguda hesaplanır: otuz öğelik bir listede
 // öğe başına bir sorgu, liste ekranını otuz bir sorguya çıkarırdı.
 type Counts struct {
-	Total       int
-	Pending     int
-	Running     int
-	Succeeded   int
-	Failed      int
-	Interrupted int
-	Cancelled   int
+	Total       int `json:"total"`
+	Pending     int `json:"pending"`
+	Running     int `json:"running"`
+	Succeeded   int `json:"succeeded"`
+	Failed      int `json:"failed"`
+	Interrupted int `json:"interrupted"`
+	Cancelled   int `json:"cancelled"`
 }
 
 // Batch, bir toplu çalıştırma kaydı.
 type Batch struct {
-	ID           uuid.UUID
-	WorkflowID   uuid.UUID
-	WorkflowName string // JOIN'den; ekran akışın adını gösteriyor
-	Task         string
-	Status       string
-	Counts       Counts
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uuid.UUID `json:"id"`
+	WorkflowID   uuid.UUID `json:"workflowId"`
+	WorkflowName string    `json:"workflowName"` // JOIN'den; ekran akışın adını gösteriyor
+	Task         string    `json:"task"`
+	Status       string    `json:"status"`
+	Counts       Counts    `json:"counts"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // Item, toplu işin bir öğesi — tek bir projede tek bir akış çalışması.
 type Item struct {
-	ID          uuid.UUID
-	BatchID     uuid.UUID
-	ProjectID   uuid.UUID
-	ProjectName string // JOIN'den; ekran proje adını gösteriyor
-	Position    int
-	Status      string
+	ID          uuid.UUID `json:"id"`
+	BatchID     uuid.UUID `json:"batchId"`
+	ProjectID   uuid.UUID `json:"projectId"`
+	ProjectName string    `json:"projectName"` // JOIN'den; ekran proje adını gösteriyor
+	Position    int       `json:"position"`
+	Status      string    `json:"status"`
 
 	// WorkflowRunID, çalışma başlatıldıktan SONRA dolar. Öğe kendi akış
 	// çalışmasına bu alanla bağlanır.
-	WorkflowRunID *uuid.UUID
+	WorkflowRunID *uuid.UUID `json:"workflowRunId"`
 
-	Error      string
-	StartedAt  *time.Time
-	FinishedAt *time.Time
+	Error      string     `json:"error"`
+	StartedAt  *time.Time `json:"startedAt"`
+	FinishedAt *time.Time `json:"finishedAt"`
 }
 
 // Pending, sıradaki öğe ve onu BAŞLATMAK için gereken toplu iş bilgisi.

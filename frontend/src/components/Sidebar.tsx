@@ -15,6 +15,7 @@ import {
   IconFolder,
   IconSettings,
   IconWorkflow,
+  IconLayers,
 } from "@/components/ui/icons";
 
 /**
@@ -41,6 +42,7 @@ const NAV = [
     label: "Çalışma",
     items: [
       { href: "/workflows", label: "Akışlar", Icon: IconWorkflow },
+      { href: "/run-batches", label: "Toplu çalıştırma", Icon: IconLayers },
       { href: "/runs", label: "Çalıştırmalar", Icon: IconPlay },
       { href: "/reports", label: "Raporlar", Icon: IconReport },
     ],
