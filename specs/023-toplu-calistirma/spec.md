@@ -2,7 +2,7 @@
 
 - **Spec no:** 023
 - **Tarih:** 2026-08-15
-- **Durum:** Taslak
+- **Durum:** Uygulandı (2026-08-15)
 
 ---
 
@@ -68,10 +68,10 @@ otuz kez elle tetiklemek uygulanabilir değil.**
 
 Kabul kriterleri:
 
-- [ ] Kullanıcı bir akış için birden çok proje seçip tek hamlede başlatabilir
-- [ ] Seçim yapılırken kaç proje seçildiği görünür
-- [ ] Başlatıldığında kaç işin sıraya alındığı yazılır
-- [ ] Hiç proje seçilmeden başlatılamaz
+- [x] Kullanıcı bir akış için birden çok proje seçip tek hamlede başlatabilir
+- [x] Seçim yapılırken kaç proje seçildiği görünür
+- [x] Başlatıldığında kaç işin sıraya alındığı yazılır
+- [x] Hiç proje seçilmeden başlatılamaz
 
 ### H2 — Sınıra uyulması
 
@@ -81,10 +81,10 @@ reddedilen bir iş hiç çalışmamış olur.**
 
 Kabul kriterleri:
 
-- [ ] Aynı anda çalışan iş sayısı eşzamanlılık sınırını **aşmaz**
-- [ ] Sınırı aşan işler **reddedilmez**, kuyrukta bekler
-- [ ] Bir iş bitince sıradaki kendiliğinden başlar
-- [ ] Kuyruk, ayardaki sınır değiştirilirse yeni sınıra uyar
+- [x] Aynı anda çalışan iş sayısı eşzamanlılık sınırını **aşmaz**
+- [x] Sınırı aşan işler **reddedilmez**, kuyrukta bekler
+- [x] Bir iş bitince sıradaki kendiliğinden başlar
+- [x] Kuyruk, ayardaki sınır değiştirilirse yeni sınıra uyar
 
 ### H3 — İlerlemeyi görme
 
@@ -94,11 +94,11 @@ iyi olmaz.**
 
 Kabul kriterleri:
 
-- [ ] Toplu iş; bekleyen, çalışan, biten ve başarısız sayılarıyla görünür
-- [ ] Her satır hangi projeye ait olduğunu ve durumunu gösterir
-- [ ] Çalışan ve biten işler kendi çalıştırma kaydına bağlanır
-- [ ] İş sürerken ekran kendiliğinden tazelenir
-- [ ] Toplu iş bitince sonuç özeti kalır; ekran boşalmaz
+- [x] Toplu iş; bekleyen, çalışan, biten ve başarısız sayılarıyla görünür
+- [x] Her satır hangi projeye ait olduğunu ve durumunu gösterir
+- [x] Çalışan ve biten işler kendi çalıştırma kaydına bağlanır
+- [x] İş sürerken ekran kendiliğinden tazelenir
+- [x] Toplu iş bitince sonuç özeti kalır; ekran boşalmaz
 
 ### H4 — Hataya rağmen devam
 
@@ -108,9 +108,9 @@ denememek için sebep değil.**
 
 Kabul kriterleri:
 
-- [ ] Bir iş başarısız olduğunda kuyruk **durmaz**
-- [ ] Başarısız işler sonuç özetinde adıyla ve sebebiyle listelenir
-- [ ] Başarılı olanlar korunur
+- [x] Bir iş başarısız olduğunda kuyruk **durmaz**
+- [x] Başarısız işler sonuç özetinde adıyla ve sebebiyle listelenir
+- [x] Başarılı olanlar korunur
 
 ### H5 — Yeniden başlatmaya dayanma
 
@@ -120,11 +120,11 @@ ve o sürede bir yeniden başlatma olağandır.**
 
 Kabul kriterleri:
 
-- [ ] Bekleyen işler yeniden başlatmadan sonra da bekliyor görünür ve sırayla
+- [x] Bekleyen işler yeniden başlatmadan sonra da bekliyor görünür ve sırayla
       başlar
-- [ ] Yeniden başlatma sırasında çalışan bir iş kesilirse durumu **belirsiz
+- [x] Yeniden başlatma sırasında çalışan bir iş kesilirse durumu **belirsiz
       bırakılmaz**; ne olduğu yazılır
-- [ ] Kullanıcı hangi işlerin koştuğunu, hangilerinin beklediğini yeniden
+- [x] Kullanıcı hangi işlerin koştuğunu, hangilerinin beklediğini yeniden
       başlatmadan sonra da görebilir
 
 ### H5a — Kaldığı yerden devam
@@ -135,14 +135,14 @@ projeyi de yeniden koşturmak demek olurdu.**
 
 Kabul kriterleri:
 
-- [ ] Kesilmiş öğesi olan toplu işte **"Kaldığı yerden devam et"** eylemi
+- [x] Kesilmiş öğesi olan toplu işte **"Kaldığı yerden devam et"** eylemi
       görünür ve kaç işin sıraya alınacağını üzerinde yazar
-- [ ] Düğme, kaç işin sıraya alınacağını **önceden** söyler
-- [ ] Yalnızca **kesilmiş** öğeler sıraya alınır; tamamlananlar tekrar
+- [x] Düğme, kaç işin sıraya alınacağını **önceden** söyler
+- [x] Yalnızca **kesilmiş** öğeler sıraya alınır; tamamlananlar tekrar
       koşturulmaz
-- [ ] Gerçekten başarısız olmuş öğeler (derleme hatası gibi) kendiliğinden
+- [x] Gerçekten başarısız olmuş öğeler (derleme hatası gibi) kendiliğinden
       sıraya alınmaz — onlar çalıştı ve bir sonuç üretti
-- [ ] Kesilmiş öğe yoksa düğme çıkmaz
+- [x] Kesilmiş öğe yoksa düğme çıkmaz
 
 ### H6 — Vazgeçme
 
@@ -151,10 +151,10 @@ Kabul kriterleri:
 
 Kabul kriterleri:
 
-- [ ] Toplu iş iptal edilebilir
-- [ ] İptal, **bekleyen** işleri düşürür
-- [ ] Çalışan işler kendi hâlinde devam eder ve sonuçları kaydedilir
-- [ ] İptalin ne yapacağı, onaydan **önce** yazılır
+- [x] Toplu iş iptal edilebilir
+- [x] İptal, **bekleyen** işleri düşürür
+- [x] Çalışan işler kendi hâlinde devam eder ve sonuçları kaydedilir
+- [x] İptalin ne yapacağı, onaydan **önce** yazılır
 
 ---
 

@@ -83,9 +83,36 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 6 — Kapanış
 
-- [ ] T50 README: toplu çalıştırma ve kuyruk davranışı
-- [ ] T51 Kapı temiz
-- [ ] T52 Kabul kriterleri elle doğrulanır; spec "Uygulandı"
+- [x] T50 README: "Aynı akışı otuz projede çalıştırın" bölümü + öne çıkanlar
+      satırı. `AGENTS.md` → Kritik Teknik Notlar'a sınırın ADIM seviyesinde
+      uygulandığı ve slot sinyalinin zaten var olduğu yazıldı
+- [x] T51 Kapı temiz: `make test-integration`, `make lint`, `npm run typecheck`,
+      `npm run lint`, `npm test` (85/85)
+- [x] T52 Kabul kriterleri gerçek sistemde doğrulandı (aşağıda)
+
+---
+
+## Kabul doğrulaması (2026-08-15)
+
+Çalışan sistemde, **hiç container açmadan ve maliyet üretmeden**: kuyruk
+kayıtlı sürümü OLMAYAN bir akışa bağlandı, böylece her öğe başlatma anında
+"yapılandırma eksiği" ile düşüyor. Ölçülen davranışlar:
+
+| Kriter | Ölçüm |
+| --- | --- |
+| Kuyruk kendiliğinden ilerler | Sıraya konan 4 öğe, hiç uyandırma gönderilmeden emniyet turunda (~15 sn sonra) işlendi |
+| Bir öğe düşünce kuyruk DURMAZ (H4) | Dördü de sırayla denendi, hepsi sebebiyle `failed` oldu |
+| Toplu iş bitince `done` (T17) | Bekleyen ve çalışan kalmayınca durum `done` |
+| Bitmiş işi iptal hata değil (T23) | `affected: 0`, durum `done` kaldı, HTTP 200 |
+| Kesilmiş öğe yokken devam | `affected: 0` — düğme zaten çıkmıyor |
+| Devam YALNIZCA kesilenleri alır (H5a) | 2 kesilmiş + 2 başarısız öğede `affected: 2`; başarısızlar dokunulmadı, toplu iş `queued`'a döndü |
+| Hiç proje seçilmeden başlatılamaz (H1) | HTTP 400 `no_projects` |
+| Akış silinmiş | HTTP 404 `workflow_not_found` |
+| Tanımsız akış sıraya konmaz | HTTP 409 `no_version` — "önce adımları kaydedin" |
+| Sınır değişince yeni sınıra uyar (H2) | Zamanlayıcı testi: sınır 1 iken tek öğe, 3'e çıkınca sonraki turda üç öğe — yeniden başlatma yok |
+| Yeniden başlatmaya dayanır (H5) | Backend GERÇEKTEN yeniden başlatıldı: çalışan öğe `interrupted` + sebebi yazıldı (log: `adet=1`), iki bekleyen öğe hayatta kaldı ve açılıştan sonra sırayla başlatıldı |
+
+Doğrulama kayıtları sonrasında silindi; veritabanında toplu iş kalmadı.
 
 ---
 

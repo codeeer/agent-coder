@@ -37,6 +37,7 @@ modeliyle, her çalıştırma kayıtlı ve maliyeti ölçülü.
 | 📡 **Canlı izleme** | Adım adım log akışı (SSE), diff görüntüleme, iptal |
 | 💰 **Maliyet takibi** | Adım başına token ve USD; yönetici raporu |
 | 📜 **Hazır betikler** | Prosedür işlerinde LLM doğaçlaması yerine sabit `.sh` çalıştırma |
+| 📚 **Toplu çalıştırma** | Aynı akışı otuz projede tek hamlede sıraya koyma; eşzamanlılık sınırına uyan kalıcı kuyruk |
 | 🔗 **Entegrasyonlar** | Jira (tetikleyici + yorum), GitHub / Bitbucket / genel Git (push + PR), MCP (iki yönlü) |
 | 🌗 **Açık / koyu tema** | İkisi de ölçülerek WCAG AA'ya getirildi |
 
@@ -535,6 +536,48 @@ PR düğümü o branch'i kullanır.
 
 Adımlar tuvalde canlı renklenir. Bitince her adımın çıktısını, diff'ini, kaç token
 harcadığını ve kaç dolar tuttuğunu görürsünüz.
+
+---
+
+# Aynı akışı otuz projede çalıştırın
+
+Standart bir kampanyayı (örneğin "Node 18'den 24'e yükselt") tek tek tetiklemek
+otuz projede otuz tur demek. Akış ekranındaki **Çok projede çalıştır** bölümü
+bunu bir hamleye indirir: görev metnini yazın, projeleri seçin (arama ve
+"tümünü seç" var), düğmeye basın. Düğmenin üzerinde kaç projede çalışacağı
+yazar.
+
+**Bu bir liste değil, bir kuyruk.** İşler aynı anda başlamaz — **Ayarlar →
+Çalışma → Eşzamanlı çalıştırma sınırı** kadarı koşar, kalanı sırada bekler ve
+bir iş bitince sıradaki kendiliğinden başlar. Sınır keyfi değil: her iş kendi
+container'ında iki çekirdek ve dört GB istiyor.
+
+> **Neden kuyruk gerekti:** sınır dolduğunda çalıştırma yöneticisi sıraya
+> koymuyor, reddediyor. Sınır 3 iken otuz iş birden başlatılsaydı üçü çalışır,
+> yirmi yedisi "eşzamanlılık sınırı doldu" diye düşerdi.
+
+İlerleme **Toplu çalıştırma** ekranında: bekleyen · çalışan · tamamlanan ·
+başarısız sayıları üstte, projeler altta. Her satır kendi akış çalışmasına
+bağlanır; başarısız olanın sebebi satırın içinde yazar. İş sürerken ekran
+kendiliğinden tazelenir, bittiğinde sonuç özeti kalır.
+
+**Bir proje düşerse kuyruk durmaz.** Yirmi yedinci projedeki derleme hatası,
+yirmi sekizinciyi denememek için sebep değil.
+
+**İptal** bekleyen işleri düşürür; o an çalışanlar kendi hâlinde sürer ve
+sonuçları kaydedilir — onay ekranında bu sayılarla yazılıdır.
+
+**Yeniden başlatmaya dayanır.** Kuyruk veritabanında; otuz projelik bir kampanya
+saatler sürer ve o sürede bir yeniden başlatma olağandır. Bekleyenler beklemeye
+devam eder. Yeniden başlatma sırasında çalışan işler **kesildi** olarak
+işaretlenir ve kendiliğinden tekrarlanmaz — yarım kalmış bir işin yan etkisi
+(branch'e gönderilmiş bir değişiklik) habersizce tekrarlanmamalı. Onları
+**Kaldığı yerden devam et** düğmesi sıraya alır; düğme kaç işin başlayacağını
+üzerinde yazar ve yalnızca kesilmiş iş varken çıkar.
+
+> Gerçekten başarısız olanlar (derleme hatası gibi) bu düğmeyle sıraya
+> **alınmaz** — onlar çalıştı ve bir sonuç üretti. Yeniden denemek isterseniz
+> yeni bir toplu iş başlatın.
 
 ---
 

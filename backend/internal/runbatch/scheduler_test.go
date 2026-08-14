@@ -334,6 +334,40 @@ func TestZamanlayici_BitenTopluIsDoneOlur(t *testing.T) {
 }
 
 /*
+Kuyruk AYARDAKİ SINIRA UYAR — sınır değişince yeniden başlatma gerekmez.
+
+Sınır kuyrukta kopyalanmıyor, her turda soruluyor. Kopyalansaydı ayar
+değiştiğinde geride kalır ve kullanıcı sınırı düşürdüğü hâlde makine eski
+sayıda iş koşturmaya devam ederdi.
+*/
+func TestZamanlayici_SinirDegisince_YeniSiniraUyar(t *testing.T) {
+	f := setup(t, "a", "b", "c", "d")
+	ctx := context.Background()
+	f.create(t, f.projects...)
+
+	b := &sahteBaslatici{sonuc: map[uuid.UUID]runbatch.Outcome{}, yeni: f.yeniCalisma}
+	sinir := 1
+	s := runbatch.NewScheduler(f.store, b, b, runbatch.Slots{
+		Max: func() int { return sinir },
+		Active: func() int {
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			return b.acik + b.disAktif
+		},
+	})
+
+	s.Tick(ctx)
+	require.Len(t, b.baslatilan, 1, "sınır 1 iken tek öğe çalışır")
+
+	// Kullanıcı ayardan sınırı yükseltti — yeniden başlatma YOK.
+	sinir = 3
+	s.Tick(ctx)
+
+	require.Len(t, b.baslatilan, 3, "yeni sınır sonraki turda geçerli olmalı")
+	require.Equal(t, 3, b.tepeDeger())
+}
+
+/*
 T14 — `Wake` BLOKLAMAZ ve sinyal KAYBOLMAZ.
 
 Kanal `runs.Manager.release()` içinden besleniyor: orada beklemek, biten bir

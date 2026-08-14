@@ -419,6 +419,23 @@ proje kökünde. Bu bayrak olmadan compose `.env`'i `deploy/` altında arar, bul
 port ayarları **sessizce** varsayılana düşer. Makefile bunu zaten geçiriyor; compose'u elle
 çağırırsanız siz de geçirin.
 
+**Eşzamanlılık sınırı ADIM seviyesinde uygulanır, akış seviyesinde değil.**
+`workflow.Launcher.Launch` sınıra HİÇ BAKMAZ: çalışma kaydını oluşturur ve
+motoru goroutine olarak başlatır. Sınır `runs.Manager.begin` → `tryAcquire`
+içinde; dolduğunda `runbuild.StepRunner` hatayı yukarı verir ve motor akış
+çalışmasının TAMAMINI `failed` yapar. İki sonucu var: (1) bir akış başlatmak
+"sınır dolu" hatası döndürmez, hata dakikalar sonra veritabanına düşer;
+(2) paralel dallı bir akış aynı anda birden fazla slot tutar — "bir çalışma =
+bir slot" yanlıştır. Toplu çalıştırma kuyruğu (spec 023) bu yüzden hem kendi
+çalışan öğe sayısını hem de yöneticideki boş slotu kontrol eder ve sınır
+hatasıyla düşen öğeyi başarısız saymaz, kuyruğa geri koyar.
+
+**Slot boşalma sinyali zaten üretiliyor.** `runs.Manager.release()` →
+`cond.Broadcast()`; ayrıca `Limits.OnSlotFree` kancası var (nil olabilir) ve
+bağ `main.go`'da kuruluyor — `runs` paketi kuyruğu tanımaz. Boş slot için
+yoklama YAZMAYIN: var olan bir bilgiyi yok sayıp aynı soruyu saniyede bir
+sormak olur. Kanca bloklamamalıdır.
+
 **Sandbox güvenliği:** Backend'e `/var/run/docker.sock` mount edilir (sibling-container deseni).
 Runner container'ları izole network'te çalışır, dışarıya port açmaz, CPU/RAM limitlidir ve
 iş bitince container + volume silinir. Git token'ı sadece env ile geçer, loglardan maskelenir.
