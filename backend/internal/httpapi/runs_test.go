@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -56,6 +57,37 @@ func TestRespondRunError_YapilandirmaEksigi500Donmez(t *testing.T) {
 			fmt.Errorf("beklenmedik"))
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
+}
+
+/*
+ * Gönderim engelinin SEBEBİ her vakada yazılır.
+ *
+ * GERÇEK BİR ŞİKÂYETİN KAYDI: zaten gönderilmiş bir koşuda kullanıcı
+ * değişiklikleri görüyor ama "Branch'e gönder" düğmesini bulamıyordu — düğme
+ * gizleniyordu ve tek iz, başlıktaki küçük branch rozetiydi. Rozet durumu
+ * söylüyor, düğmenin YOKLUĞUNU açıklamıyor.
+ *
+ * Kural (silme düğmesindekinin aynısı): eylem gizlenmez, pasifleşir ve sebebi
+ * yazılır. Sebep BRANCH ADINI taşır; "zaten gönderildi" tek başına "nereye?"
+ * sorusunu açıkta bırakır.
+ *
+ * ErrNoChanges bunun DIŞINDA: gönderilecek bir değişiklik yokken düğmenin
+ * konusu da yok. Orada gizlemek "yok" demek değil, doğruyu söylemektir.
+ */
+func TestPushEngeli_ZatenGonderilmisBranchiSoyler(t *testing.T) {
+	h := &Handler{}
+	dal := "agent-coder/coder-2cd9aa07"
+
+	sebep := h.pushEngeli(context.Background(),
+		runs.Run{Diff: "diff --git a/x b/x", PushedBranch: &dal})
+
+	require.Contains(t, sebep, dal, "hangi branch'e gönderildiği yazılmalı")
+}
+
+func TestPushEngeli_DegisiklikYoksaSebepYazilmaz(t *testing.T) {
+	h := &Handler{}
+
+	require.Empty(t, h.pushEngeli(context.Background(), runs.Run{}))
 }
 
 // TestRespondRunError_SilmeEngelleri — silinemeyen bir kayıt "arıza" değil,

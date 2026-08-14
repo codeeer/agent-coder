@@ -143,8 +143,11 @@ export default function RunDetailPage() {
                     {run.workflowName} · {run.stepName}
                   </Badge>
                 )}
+                {/* Yalnız bir ok ("→ dal") neyin olduğunu söylemiyordu:
+                    hedef branch mi, gönderilmiş branch mi belirsizdi. Fiil
+                    yazılı — rozet durumu okur, tahmine bırakmaz. */}
                 {run.pushedBranch && (
-                  <Badge tone="info">→ {run.pushedBranch}</Badge>
+                  <Badge tone="info">Gönderildi → {run.pushedBranch}</Badge>
                 )}
               </div>
 
@@ -537,8 +540,12 @@ function RunActions({
         Sebep BACKEND'den geliyor (`runs.CanPush`). Öncesinde arayüz kuralı
         kendi yazıyordu ve git erişimini hiç sormuyordu: tanımsız bir projede
         düğme çıkıyor, tıklanınca hata veriyordu.
+
+        `pushedBranch` de ARTIK GİZLEMİYOR: zaten gönderilmiş bir koşuda
+        kullanıcı değişiklikleri görüp düğmeyi bulamıyor, neden olmadığını da
+        anlayamıyordu. Tek koşul kaldı — değişiklik varsa düğme var.
       */}
-      {run.diff && !run.pushedBranch && (
+      {run.diff && (
         <Button
           variant="primary"
           onClick={() => setPushing(true)}

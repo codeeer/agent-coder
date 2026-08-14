@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -142,10 +143,21 @@ const gitErisimiYokMesaji = "Bu projede git erişimi tanımlı değil — " +
 func (h *Handler) pushEngeli(ctx contextT, run runs.Run) string {
 	if err := runs.CanPush(run, true); err != nil {
 		switch {
+		/*
+		 * Gönderilecek değişiklik yoksa düğmenin KONUSU yok — orada gizlemek
+		 * doğruyu söylemektir, eylemi saklamak değil.
+		 */
 		case errors.Is(err, runs.ErrNoChanges):
-			return "" // Düğme zaten çıkmıyor; ayrıca sebep yazmaya gerek yok.
-		case errors.Is(err, runs.ErrAlreadyPushed):
 			return ""
+		/*
+		 * Zaten gönderilmişse sebep YAZILIR. Öncesinde burası da boş dönüyor,
+		 * arayüz düğmeyi tamamen gizliyordu: kullanıcı değişiklikleri görüp
+		 * düğmeyi bulamıyor, tek iz başlıktaki küçük branch rozeti kalıyordu.
+		 * Rozet durumu söyler, düğmenin yokluğunu açıklamaz.
+		 */
+		case errors.Is(err, runs.ErrAlreadyPushed):
+			return fmt.Sprintf("Bu çalıştırma zaten %s branch'ine gönderildi",
+				*run.PushedBranch)
 		}
 	}
 
