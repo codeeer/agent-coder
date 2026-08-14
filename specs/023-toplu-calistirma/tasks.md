@@ -11,14 +11,15 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 1 — Şema ve depo
 
-- [ ] T01 `000017_toplu_calistirma.sql`: `run_batches`, `run_batch_items`,
-      bekleyen indeksi → migration uygulanır
-- [ ] T02 `Create` öğeleri sırayla yazar → `position` 0..n-1
-- [ ] T03 Aynı proje iki kez REDDEDİLİR → `UNIQUE (batch_id, project_id)`
-- [ ] T04 `NextPending` en küçük `position`\'ı verir → sıra eklenme sırasıdır
-- [ ] T05 `NextPending` iptal edilmiş toplu işin öğesini VERMEZ
-- [ ] T06 `Get` toplu işi öğeleriyle ve proje adlarıyla döner (JOIN)
-- [ ] T07 Sayılar doğru: bekleyen · çalışan · tamamlanan · başarısız · kesilen
+- [x] T01 `000017_toplu_calistirma.sql`: `run_batches`, `run_batch_items`,
+      bekleyen indeksi → migration uygulanır (test veritabanında sürüm 17;
+      geri alma `TestMigration017_GeriAlinabilir` ile kilitli)
+- [x] T02 `Create` öğeleri sırayla yazar → `position` 0..n-1
+- [x] T03 Aynı proje iki kez REDDEDİLİR → `UNIQUE (batch_id, project_id)`
+- [x] T04 `NextPending` en küçük `position`\'ı verir → sıra eklenme sırasıdır
+- [x] T05 `NextPending` iptal edilmiş toplu işin öğesini VERMEZ
+- [x] T06 `Get` toplu işi öğeleriyle ve proje adlarıyla döner (JOIN)
+- [x] T07 Sayılar doğru: bekleyen · çalışan · tamamlanan · başarısız · kesilen
 
 ## Blok 2 — Zamanlayıcı (riskli)
 
@@ -80,6 +81,25 @@ görüldü: `runs.Manager.release()` → `cond.Broadcast()`. Var olan bilgiyi yo
 sayıp aynı soruyu saniyede bir sormak yerine olay güdümlü tasarıma geçildi.
 Dakikalık tur mekanizma değil, kaçan bir uyandırmaya karşı sigorta olarak
 kaldı.
+
+**Durum alanları TEXT değil ENUM (Blok 1'de plandan sapıldı).** Plan iki durum
+sütununu da `TEXT` yazıyordu; proje konvansiyonu (`AGENTS.md` → Go, db-migrations
+skill'i) durum alanlarının Postgres `ENUM` tipi olmasını söylüyor. Zamanlayıcı
+öğe durumunu koddan yazacağı için yazım hatasının veritabanında sessizce
+durmasındansa orada reddedilmesi tercih edildi. Bedeli görüldü: `CASE` sonucu
+metin olduğu için toplu iş durumunu tazeleyen sorgu açık dönüşüm (`::run_batch_status`)
+istedi.
+
+`workflow_run_status` yeniden KULLANILMADI: değer listesi bugün aynı görünüyor
+ama ona eklenecek bir değer kuyruk için de geçerli sayılırdı.
+
+**Toplu işin durumu türetilmiş bir değerdir.** Öğe güncellemeleriyle aynı
+transaction'da öğelerden yeniden hesaplanır (`refreshStatus`). Ayrıca elle
+yönetilseydi arada düşen bir süreç, bekleyeni kalmamış bir toplu işi sonsuza
+kadar "çalışıyor" gösterirdi. Tek istisna iptal: iptal edilmiş bir iş, son
+çalışan öğesi bitince `done`'a dönmez — kullanıcı onu iptal etti. `Resume` ise
+durumu bilerek diriltir; `done` ya da `cancelled` kalsaydı `NextPending` sıraya
+alınan öğeleri hiç görmez ve kuyruk sessizce donardı.
 
 **Container elle silinirse sinyal kaybolmuyor** — bu da kullanıcı sorusuyla
 ortaya çıktı ve ölçüldü: slot\'u bırakan şey container değil, goroutine\'in

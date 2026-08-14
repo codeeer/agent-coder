@@ -236,3 +236,34 @@ func TestMigration004_GeriAlinabilir(t *testing.T) {
 
 	require.NoError(t, database.MigrateUp(ctx))
 }
+
+// MigrateUpTo(17): bu test 017'nin geri almasını sınıyor, "son migration"
+// hangisiyse onunkini değil.
+//
+// TİPLER DE TEMİZLENMELİ: enum geride kalırsa ileri gitmek "type already
+// exists" ile patlar — ve bu ancak geri alıp yeniden ilerleten biri fark eder.
+func TestMigration017_GeriAlinabilir(t *testing.T) {
+	database := testutil.TempDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, database.MigrateUpTo(ctx, 17))
+
+	var n int
+	require.NoError(t, database.Pool.QueryRow(ctx, `
+		SELECT count(*) FROM information_schema.tables
+		WHERE table_name IN ('run_batches','run_batch_items')`).Scan(&n))
+	require.Equal(t, 2, n)
+
+	require.NoError(t, database.MigrateDown(ctx))
+
+	require.NoError(t, database.Pool.QueryRow(ctx, `
+		SELECT count(*) FROM information_schema.tables
+		WHERE table_name LIKE 'run_batch%'`).Scan(&n))
+	require.Zero(t, n)
+
+	require.NoError(t, database.Pool.QueryRow(ctx, `
+		SELECT count(*) FROM pg_type WHERE typname LIKE 'run_batch%'`).Scan(&n))
+	require.Zero(t, n, "enum tipleri geride kalırsa ileri gitmek patlar")
+
+	require.NoError(t, database.MigrateUp(ctx))
+}
