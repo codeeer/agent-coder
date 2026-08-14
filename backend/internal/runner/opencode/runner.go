@@ -430,6 +430,16 @@ func buildEnv(req runner.Request, proxy string) map[string]string {
 	if req.Repo.Branch != "" {
 		env["REPO_BRANCH"] = req.Repo.Branch
 	}
+	/*
+	 * PROJE DİZİNİ — hem klonlama betiği hem kullanıcının yazdığı script'ler
+	 * bunu okur (spec 022 H6).
+	 *
+	 * TEK TANIM `runner.ProjectDir`. `entrypoint.sh` kendi değerini dayatmıyor,
+	 * bunu okuyor; iki yerde sabit yazılsaydı biri değiştiğinde diğeri geride
+	 * kalır ve script'ler var olmayan bir dizine bakardı.
+	 */
+	env["PROJECT_DIR"] = runner.ProjectDir
+
 	if req.Repo.CloneDepth > 0 {
 		env["GIT_CLONE_DEPTH"] = fmt.Sprint(req.Repo.CloneDepth)
 	}
@@ -534,7 +544,9 @@ func toRunnerFiles(files []FileChange) []runner.FileChange {
 func toSandboxFiles(files []runner.ConfigFile) []sandbox.File {
 	out := make([]sandbox.File, 0, len(files))
 	for _, f := range files {
-		out = append(out, sandbox.File{Path: f.Path, Content: f.Content, Mode: f.Mode})
+		out = append(out, sandbox.File{
+			Path: f.Path, Content: f.Content, Mode: f.Mode, IsDir: f.IsDir,
+		})
 	}
 	return out
 }

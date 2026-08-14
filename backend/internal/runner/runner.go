@@ -221,6 +221,12 @@ type AgentSpec struct {
 	// Yalnızca AllowBash açıkken işleme alınır (spec 012 K3): kapalıyken dosya
 	// container'a hiç girmez.
 	Scripts []ScriptSpec
+
+	// ScriptFolders, betiklerin ait olduğu kampanya klasörleri.
+	//
+	// Betik listesinden TÜRETİLEMEZ: klasörün kendi açıklaması yalnızca burada
+	// ve model kampanyanın ne olduğunu ondan öğreniyor.
+	ScriptFolders []FolderSpec
 }
 
 // ScriptSpec, container'a konacak tek bir betik.
@@ -235,7 +241,34 @@ type ScriptSpec struct {
 	// modele anlatan tek şey budur.
 	Description string
 	Content     string
+	// Folder, betiğin ait olduğu kampanya klasörü. Boşsa betik kökte durur —
+	// klasör öncesi davranışın aynısı.
+	Folder string
 }
+
+/*
+FolderSpec, bir kampanya klasörünün talimatta anlatılması için gereken bilgi.
+
+AÇIKLAMA AYRI TAŞINIYOR çünkü script'lerin kendi açıklamaları kampanyanın NE
+OLDUĞUNU anlatmıyor: "engines alanını günceller" tek bir adımı tarif eder,
+"Node 18'den 24'e standart yükseltme" ise işin tamamını.
+*/
+type FolderSpec struct {
+	Name        string
+	Description string
+}
+
+/*
+ProjectDir, klonlanan projenin container içindeki kökü.
+
+TEK TANIM. Değer `entrypoint.sh`'a `PROJECT_DIR` olarak geçiyor ve betik onu
+okuyor; iki yerde sabit yazılsaydı biri değiştiğinde diğeri geride kalır ve
+kullanıcının yazdığı script'ler var olmayan bir dizine bakardı.
+
+Betikler bu değişkeni kullanır ve ÇALIŞMA DİZİNİNE GÜVENMEZ: bash aracını
+hangi dizinde çalıştırdığı motorun kararı, bizim değil.
+*/
+const ProjectDir = "/work"
 
 // MCPServerSpec, tek bir MCP sunucusuna bağlanmak için gerekenler.
 //

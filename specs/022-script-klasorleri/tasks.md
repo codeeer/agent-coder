@@ -48,26 +48,39 @@ Docker ile kanıtlanabilir.
 
 ## Blok 3 — Container yerleşimi
 
-- [ ] T20 `ConfigFile.IsDir` → dizin girdisi taşıyabilir
-- [ ] T21 `copyFiles` dizin başlığı yazar (`tar.TypeDir`, 0o755, uid/gid 10001)
+- [x] T20 `ConfigFile.IsDir` → dizin girdisi taşıyabilir
+- [x] T21 `copyFiles` dizin başlığı yazar (`tar.TypeDir`, 0o755, uid/gid 10001)
       → tar akışı incelenerek doğrulanır
-- [ ] T22 Klasörlü script alt dizine yazılır → `BuildConfigFiles` çıktısında
+- [x] T22 Klasörlü script alt dizine yazılır → `BuildConfigFiles` çıktısında
       hem dizin hem dosya var, sıra doğru (dizin ÖNCE)
-- [ ] T23 **Gerçek container'da agent kullanıcısı dizini LİSTELEYEBİLİR** →
+- [x] T23 **Gerçek container'da agent kullanıcısı dizini LİSTELEYEBİLİR** →
       `ls` çalışır. Dosyanın varlığına bakmak yetmez: daha önce yaşanan hata
       tam olarak buydu (Dockerfile'daki `AccessDeniedException` kaydı)
-- [ ] T24 Klasörsüz script bugünkü yolunda kalır → mevcut kurulumların
+- [x] T24 Klasörsüz script bugünkü yolunda kalır → mevcut kurulumların
       bozulmadığı testle kilitlenir
+
+## Blok 3b — Proje dizini (H6)
+
+- [x] T25 `runner.ProjectDir` sabiti ve container'a `PROJECT_DIR` değişkeni →
+      çalıştırmada ortamda görünür
+- [x] T26 `entrypoint.sh` `WORKDIR`'ü `PROJECT_DIR`'den okur, varsayılanı korur
+      → değişken verilmezse eski davranış aynen sürer
+- [x] T27 **Gerçek container'da `$PROJECT_DIR` klonlanan projeyi gösterir** →
+      script oradan bir dosyayı okuyabilir
+- [x] T28 Script çalışma dizininden BAĞIMSIZ çalışır → başka bir dizinden
+      çağrılan script yine doğru dosyayı bulur
 
 ## Blok 4 — Talimat metni
 
-- [ ] T30 `scriptSection` klasör başlığı yazar: klasör adı, açıklaması, dizin
+- [x] T30 `scriptSection` klasör başlığı yazar: klasör adı, açıklaması, dizin
       yolu → çıktı metni testle karşılaştırılır
-- [ ] T31 Klasördeki script'ler ad sırasıyla listelenir → `02` `01`'den sonra
-- [ ] T32 Klasörsüz script'ler ayrı ve bugünkü biçimde listelenir
-- [ ] T33 Hiç script yoksa blok HİÇ yazılmaz → boş başlık modelin dikkatini
+- [x] T31 Klasördeki script'ler ad sırasıyla listelenir → `02` `01`'den sonra
+- [x] T32 Klasörsüz script'ler ayrı ve bugünkü biçimde listelenir
+- [x] T33 Hiç script yoksa blok HİÇ yazılmaz → boş başlık modelin dikkatini
       boşa harcar
-- [ ] T34 **Bash yetkisi kapalıyken klasörlü script de yazılmaz ve
+- [x] T35 Talimatta `$PROJECT_DIR` ve "kalıcı değişiklikler orada olmalı"
+      kuralı yazar → metin testle karşılaştırılır
+- [x] T34 **Bash yetkisi kapalıyken klasörlü script de yazılmaz ve
       anlatılmaz** → `scriptsFor` tek kapı; "yeni yetenek açmıyor" iddiasının
       kanıtı
 
@@ -88,6 +101,8 @@ Docker ile kanıtlanabilir.
       ayrı → boş kurulumda da anlamlı görünür
 - [ ] T51 Klasör oluşturma, yeniden adlandırma, silme → silmede kaç script'in
       klasörsüz kalacağı yazılı onay
+- [ ] T57 Script düzenleme ekranında `$PROJECT_DIR` notu görünür → kullanıcı
+      kaynağı okumadan öğrenir
 - [ ] T52 Script formunda klasör seçimi (klasörsüz dahil) → var olan script'in
       klasörü değiştirilebilir
 - [ ] T53 Agent formunda klasör + tekil script seçimi → ikisi bir arada
@@ -120,3 +135,27 @@ bir kalıp icat edilmedi.
 **`NULLS NOT DISTINCT` gerçekten uygulandı, göze güvenilmedi.** Testler geçtikten
 sonra indeks tanımı veritabanından okundu:
 `CREATE UNIQUE INDEX scripts_klasor_ad ON public.scripts USING btree (folder_id, name) NULLS NOT DISTINCT`
+
+**Dizin girdisi ÖLÇÜLDÜ, sonra yine de eklendi.** Planda "dizin başlığı
+yazılmazsa agent dizini listeleyemeyebilir" yazıyordu. Gerçek runner imajında
+sınandı: dizin başlığı OLMADAN da çalışıyor — Docker eksik ara dizini
+`root:root 0755` açıyor ve agent onu listeleyip içindeki betiği
+çalıştırabiliyor. Yani planın gerekçesi ölçümle çürüdü.
+
+Girdi yine de eklendi ve gerekçesi değiştirildi: o davranış Docker'ın
+belgelenmemiş bir ayrıntısı, izinleri daralırsa agent kilitlenir ve bu ürün o
+hatayı bir kez yaşadı. On satır karşılığında belgelenmemiş davranışa olan
+bağımlılık kalktı. Ölçümle sonrası: dizin artık `10001:10001`, root'un değil.
+
+**Gerçek container'da ölçülenler (T23, T27, T28):**
+
+| Ne | Sonuç |
+| --- | --- |
+| Dizin sahipliği (girdi eklendikten sonra) | `drwxr-xr-x 10001 10001` |
+| `/tmp`'den çağrılan betik `$PROJECT_DIR`'i buluyor mu | evet — `package.json` okundu |
+| `PROJECT_DIR` verilmişse entrypoint onu kullanıyor mu | evet (`/ozel`) |
+| Verilmezse varsayılan | `/work` — eski davranış korunuyor |
+
+**`make lint-shell` KIRIK ama bu değişiklikten değil.** SC1091, `entrypoint.sh`
+satır 15'te `java-truststore.sh`'ı izleyememekten geliyor ve spec 018'den beri
+var. Bu spec'te düzeltilmedi — ayrı iş.

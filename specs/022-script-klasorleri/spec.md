@@ -121,6 +121,23 @@ Kabul kriterleri:
 - [ ] Klasör de tekil script de yoksa bu bölüm hiç yazılmaz
 - [ ] Container içinde klasörün script'leri gerçekten o dizin altında durur
 
+### H6 — Script'in projeyi bulması
+
+**Script yazan kullanıcı** olarak, **projenin nerede olduğunu tahmin etmeden
+dosya değiştirmek** istiyorum, çünkü **ben projemin İÇİNDEKİ yolu biliyorum
+(`config/webpack.config.js`), kökün nereye açıldığını değil.**
+
+Kabul kriterleri:
+
+- [ ] Script'e projenin kök dizini bir ortam değişkeniyle verilir
+- [ ] Script çalışma dizinine güvenmeden çalışabilir: `"$PROJECT_DIR/..."`
+      yazan bir script, hangi dizinden çağrılırsa çağrılsın doğru yeri bulur
+- [ ] Değişkenin adı ve anlamı script düzenleme ekranında **yazılı** olarak
+      görünür — kullanıcı kaynağı okumak zorunda kalmaz
+- [ ] Agent'ın talimatında da yazar
+- [ ] Kalıcı olması gereken değişikliklerin proje dizini altında olması
+      gerektiği söylenir
+
 ### H5 — Klasörün silinmesi
 
 **Kullanıcı** olarak, **bir kampanya bittiğinde klasörü kaldırmak** istiyorum,
@@ -146,6 +163,23 @@ Kabul kriterleri:
   Kullanıcı sırayı `01-`, `02-` gibi öneklerle kurar; ürün ayrı bir sıra
   bilgisi tutmaz. Böylece sıra hem arayüzde hem `ls` çıktısında aynı görünür ve
   iki yerde ayrışamaz.
+
+- **Script çalışma dizinine güvenmez.** Projenin kökü açık bir ortam
+  değişkeniyle veriliyor. Çalışma dizinini kim belirliyor sorusunun cevabı
+  ürünün elinde değil — bash aracını çalıştıran motor. Bugün doğru olan bir
+  varsayım, motorun bir sürümünde sessizce bozulur ve göreli yol yazan bütün
+  script'ler "dosya bulunamadı" ile düşer.
+
+- **Proje dizininin adı TEK YERDE tanımlıdır.** Değeri ürün belirler ve
+  container'a değişken olarak geçer; klonlama betiği onu okur. İki yerde
+  yazılsaydı biri değiştiğinde diğeri geride kalır ve script'ler var olmayan
+  bir dizine bakardı.
+
+- **Proje dizini dışına yazan script'in emeği kaybolur — ve bu SÖYLENİR,
+  engellenmez.** Değişiklik kaydı yalnızca proje dizininden çıkarılıyor; başka
+  bir yere yazılan dosya branch'e gitmez ve container silinince yok olur.
+  Geçici dosya üretmek meşru bir ihtiyaç olduğu için yol kapatılmıyor; kural
+  script ekranında ve talimatta yazılı.
 
 - **Klasör yetki açmaz.** Bugünkü kural aynen geçerli: bash yetkisi kapalı bir
   agent'a hiçbir script — klasörlü ya da klasörsüz — kopyalanmaz ve talimatında
@@ -174,6 +208,7 @@ Kabul kriterleri:
 | Aynı adda klasör zaten var | Var olduğu söylenir; sessizce ikinci kayıt açılmaz |
 | Aynı klasörde aynı adda script | Çakışma söylenir; hangi klasörde olduğu yazılır |
 | Klasör silinirken içinde script var | Kaç script'in klasörsüz kalacağı söylenir, sonra onaylatılır |
+| Script proje dizini dışına yazdı | Engellenmez; değişiklik kaydına girmeyeceği önceden yazılıdır |
 | Bash yetkisi kapalı agent'a klasör atanmış | Atama korunur ama çalıştırmada hiçbir script kopyalanmaz; agent ekranında bu durum **görünür** olur |
 
 ---

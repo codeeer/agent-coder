@@ -60,6 +60,9 @@ type File struct {
 	Path    string
 	Content []byte
 	Mode    int64
+
+	// IsDir, girdinin dizin olduğunu söyler.
+	IsDir bool
 }
 
 // Container, çalışan bir sandbox.
@@ -220,11 +223,26 @@ func (m *Manager) copyFiles(ctx context.Context, id string, files []File) error 
 		if mode == 0 {
 			mode = 0o600
 		}
+		/*
+		 * DİZİN GİRDİSİ AÇIKÇA YAZILIR.
+		 *
+		 * Ölçüldü: yazılmasa da çalışıyor — Docker eksik ara dizini kendisi
+		 * `root:root 0755` açıyor ve agent onu listeleyebiliyor. Ama o davranış
+		 * belgelenmemiş bir ayrıntı; izinler bir gün daralırsa agent dizine
+		 * erişemez ve bu ürün o hatayı bir kez yaşadı.
+		 */
+		tip := byte(tar.TypeReg)
+		boyut := int64(len(f.Content))
+		if f.IsDir {
+			tip, boyut = tar.TypeDir, 0
+		}
+
 		hdr := &tar.Header{
-			Name:    name,
-			Mode:    mode,
-			Size:    int64(len(f.Content)),
-			ModTime: time.Unix(0, 0),
+			Name:     name,
+			Typeflag: tip,
+			Mode:     mode,
+			Size:     boyut,
+			ModTime:  time.Unix(0, 0),
 			// Runner container'ı agent kullanıcısıyla (uid 10001) çalışıyor;
 			// dosyalar onun okuyabileceği sahiplikte olmalı.
 			Uid: 10001,
@@ -233,8 +251,10 @@ func (m *Manager) copyFiles(ctx context.Context, id string, files []File) error 
 		if err := tw.WriteHeader(hdr); err != nil {
 			return fmt.Errorf("%w: tar başlığı yazılamadı: %w", ErrCreate, err)
 		}
-		if _, err := tw.Write(f.Content); err != nil {
-			return fmt.Errorf("%w: tar içeriği yazılamadı: %w", ErrCreate, err)
+		if !f.IsDir {
+			if _, err := tw.Write(f.Content); err != nil {
+				return fmt.Errorf("%w: tar içeriği yazılamadı: %w", ErrCreate, err)
+			}
 		}
 	}
 	if err := tw.Close(); err != nil {

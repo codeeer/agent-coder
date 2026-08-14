@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -23,6 +24,21 @@ type ConfigFile struct {
 	Content []byte
 	// Mode, dosya izinleri.
 	Mode int64
+
+	/*
+	 * IsDir, girdinin bir DİZİN olduğunu söyler.
+	 *
+	 * ÖLÇÜLDÜ: dizin girdisi olmadan da çalışıyor — Docker eksik ara dizini
+	 * kendisi `root:root 0755` olarak açıyor ve agent (uid 10001) onu
+	 * listeleyip içindeki betiği çalıştırabiliyor.
+	 *
+	 * Yine de açıkça yazılıyor: o davranış Docker'ın belgelenmemiş bir ayrıntısı
+	 * ve izinleri bir gün daralırsa agent dizine erişemez. Bu ürün o hatayı bir
+	 * kez yaşadı (runner/Dockerfile: "Dosyanın yazılmış olması dizinin
+	 * kullanılabilir olduğu anlamına gelmiyordu"). On satırlık bir girdi,
+	 * belgelenmemiş davranışa olan bağımlılığı kaldırıyor.
+	 */
+	IsDir bool
 }
 
 // configDir, çalıştırma motorunun yapılandırmayı okuduğu global dizin.
@@ -104,9 +120,20 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegi
 	 * Bu özellik `BuildPermissions`'a HİÇ dokunmaz; "yeni yetenek açmıyor"
 	 * iddiasının tek kanıtı budur.
 	 */
+	// Dizinler ÖNCE: tar akışı sırayla çıkarılıyor ve dosya kendi dizininden
+	// önce gelirse ara dizini Docker açar — bizim sahiplik/izin ayarımız
+	// uygulanmaz.
+	for _, f := range kullanilanKlasorler(a) {
+		files = append(files, ConfigFile{
+			Path:  folderPath(f.Name),
+			Mode:  0o755,
+			IsDir: true,
+		})
+	}
+
 	for _, s := range scriptsFor(a) {
 		files = append(files, ConfigFile{
-			Path:    scriptPath(s.Name),
+			Path:    scriptPath(s),
 			Content: []byte(s.Content),
 			Mode:    scriptMode,
 		})
@@ -127,8 +154,48 @@ func scriptsFor(a AgentSpec) []ScriptSpec {
 	return a.Scripts
 }
 
-// scriptPath, bir betiğin container içindeki mutlak yolu.
-func scriptPath(name string) string { return scriptsDir + "/" + name + ".sh" }
+/*
+scriptPath, bir betiğin container içindeki mutlak yolu.
+
+TEK ÜRETİCİ: hem dosyayı yazan kod hem talimatı üreten kod buradan geçiyor.
+İki ayrı üretici olsaydı biri klasörü unuttuğunda dosya köke yazılır, talimatta
+alt dizin yazardı ve model var olmayan bir yolu denerdi — hata ancak
+çalıştırma anında, üstelik "betik çalışmadı" kılığında görünürdü.
+*/
+func scriptPath(s ScriptSpec) string {
+	if s.Folder == "" {
+		return scriptsDir + "/" + s.Name + ".sh"
+	}
+	return scriptsDir + "/" + s.Folder + "/" + s.Name + ".sh"
+}
+
+// folderPath, bir kampanya klasörünün container içindeki dizini.
+func folderPath(name string) string { return scriptsDir + "/" + name }
+
+/*
+kullanilanKlasorler, gerçekten betiği olan klasörleri sırayla döner.
+
+BOŞ KLASÖR ATLANIR: kullanamayacağı bir dizini modele göstermek, onu var
+olmayan bir adımı aramaya iter. Klasör agent'a atanmış ama içi boşsa (ya da
+bash kapalı olduğu için betikler elenmişse) ortada anlatılacak bir şey yok.
+*/
+func kullanilanKlasorler(a AgentSpec) []FolderSpec {
+	dolu := map[string]bool{}
+	for _, s := range scriptsFor(a) {
+		if s.Folder != "" {
+			dolu[s.Folder] = true
+		}
+	}
+
+	out := make([]FolderSpec, 0, len(a.ScriptFolders))
+	for _, f := range a.ScriptFolders {
+		if dolu[f.Name] {
+			out = append(out, f)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
 
 // mcpTimeoutMS, MCP sunucusuna bağlanma ve araç çağırma süre sınırı.
 //
@@ -303,17 +370,56 @@ func scriptSection(a AgentSpec) string {
 	b.WriteString("Açıklamasına uyan bir iş yapman gerekirse komutu kendin kurma, ")
 	b.WriteString("ilgili betiği çalıştır — sonucun her seferinde aynı olması için.\n\n")
 
+	/*
+	 * PROJE DİZİNİ. Betikler `$PROJECT_DIR` üzerinden çalışıyor ve modelin de
+	 * projenin nerede olduğunu bilmesi gerekiyor — kaynağı okuyarak
+	 * öğrenemez.
+	 */
+	b.WriteString("Proje `" + ProjectDir + "` altında; betikler bu yolu ")
+	b.WriteString("`$PROJECT_DIR` değişkeninden okur. ")
+	b.WriteString("Kalıcı olması gereken her değişiklik bu dizinin altında olmalı — ")
+	b.WriteString("başka bir yere yazılan dosya değişiklik kaydına girmez.\n\n")
+
+	// Önce klasörsüz betikler: bugünkü biçim aynen korunuyor.
 	for _, s := range list {
-		b.WriteString("- `" + scriptPath(s.Name) + "`")
-		// Açıklama, betiğin NE ZAMAN çağrılacağını anlatan tek ipucu; boşsa
-		// satırı kırpmak yerine yalnızca yolu yazıyoruz.
-		if d := oneLine(s.Description); d != "" {
+		if s.Folder != "" {
+			continue
+		}
+		b.WriteString(betikSatiri(s))
+	}
+
+	for _, f := range kullanilanKlasorler(a) {
+		b.WriteString("\n### " + f.Name)
+		if d := oneLine(f.Description); d != "" {
 			b.WriteString(" — " + d)
 		}
-		b.WriteString("\n")
+		b.WriteString("\n\n")
+		b.WriteString("Dizin: `" + folderPath(f.Name) + "`\n")
+		/*
+		 * SIRA ANLATILIYOR, DAYATILMIYOR. Adımlar arasında karar veren sensin;
+		 * ürün sırayı işletmiyor, yalnızca var olduğunu söylüyor (spec 022).
+		 */
+		b.WriteString("Adımlar numara sırasıyla yazılmıştır.\n\n")
+
+		for _, s := range list {
+			if s.Folder == f.Name {
+				b.WriteString(betikSatiri(s))
+			}
+		}
 	}
 
 	return b.String()
+}
+
+// betikSatiri, tek bir betiğin liste satırı.
+func betikSatiri(s ScriptSpec) string {
+	out := "- `" + scriptPath(s) + "`"
+	// Açıklama, betiğin NE ZAMAN çağrılacağını anlatan tek ipucu; boşsa
+	// satırı kırpmak yerine yalnızca yolu yazıyoruz.
+	if d := oneLine(s.Description); d != "" {
+		out += " — " + d
+	}
+	return out + "\n"
 }
 
 // oneLine, markdown liste öğesini bozmayacak tek satırlık metin üretir.

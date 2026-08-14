@@ -175,6 +175,34 @@ Agent uçlarına `scriptFolderIds` eklenir; `scriptIds` korunur.
 
 ---
 
+## Proje dizini — script'in çapası
+
+Script yazarı projesinin İÇİNDEKİ yolu biliyor; kökün nereye açıldığını
+bilmiyor. Bugün kök `/work` ama bu değer Go tarafında **hiç geçmiyor**:
+yalnızca `entrypoint.sh` (`readonly WORKDIR=/work`) ve Dockerfile biliyor.
+
+Karar: **değeri ürün belirler, betik okur.**
+
+```go
+// runner paketi — TEK tanım
+const ProjectDir = "/work"
+```
+
+```bash
+# entrypoint.sh — ürünün verdiğini kullanır, kendi değerini dayatmaz
+readonly WORKDIR="${PROJECT_DIR:-/work}"
+```
+
+Container'a `PROJECT_DIR` olarak geçer. Böylece:
+
+- script `"$PROJECT_DIR/config/webpack.config.js"` yazar ve çalışma dizininden
+  BAĞIMSIZ olur — bash aracının hangi dizinde koştuğu bizim denetimimizde değil
+- değer tek yerde tanımlı; `entrypoint.sh`'daki varsayılan yalnızca eski
+  çağrılar için güvenlik ağı
+
+Değişken üç yerde görünür olur: agent talimatı, script düzenleme ekranı,
+README.
+
 ## Container yerleşimi
 
 ```
@@ -237,7 +265,9 @@ yazdığı prompt) anlatılacak — spec'in kapsam dışı bölümüne uygun.
 | `db/migrations/000016_script_klasorleri.sql` **(yeni)** | Tablolar + benzersizlik indeksi |
 | `internal/scripts/script.go` | `Folder`, `FolderID`, klasörlü `Path()` |
 | `internal/scripts/store.go` | Klasör CRUD, `SetAgentFolders`, `ForAgent` birleşimi, `FolderUsage` |
-| `internal/runner/runner.go` | `ScriptSpec.Folder`, `AgentSpec.ScriptFolders`, `ConfigFile.IsDir` |
+| `internal/runner/runner.go` | `ScriptSpec.Folder`, `AgentSpec.ScriptFolders`, `ConfigFile.IsDir`, `ProjectDir` sabiti |
+| `runner/entrypoint.sh` | `WORKDIR` değeri `PROJECT_DIR`'den okunur |
+| `internal/runner/opencode/runner.go` | `PROJECT_DIR` ortam değişkeni |
 | `internal/runner/config.go` | `scriptPath` klasörlü, `scriptSection` klasör başlıklı, dizin girdileri |
 | `internal/runner/sandbox/docker.go` | `copyFiles` dizin başlığı yazar |
 | `internal/runbuild/builder.go` | Klasör açıklamalarını `AgentSpec`'e taşır |

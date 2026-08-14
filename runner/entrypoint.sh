@@ -14,7 +14,11 @@ source /usr/local/bin/git-credentials.sh
 # shellcheck source=runner/java-truststore.sh
 source /usr/local/bin/java-truststore.sh
 
-readonly WORKDIR=/work
+# Değeri ÜRÜN belirler (`runner.ProjectDir`) ve `PROJECT_DIR` ile geçirir.
+# Varsayılan yalnızca güvenlik ağı: değişkeni göndermeyen eski bir çağrıda
+# davranış aynen sürsün diye. İki yerde sabit yazılsaydı biri değiştiğinde
+# diğeri geride kalırdı.
+readonly WORKDIR="${PROJECT_DIR:-/work}"
 readonly PORT="${OPENCODE_PORT:-4096}"
 
 # Kimlik bilgisi eşleşmezse git kullanıcı adı SORMAYA çalışıyor; terminal

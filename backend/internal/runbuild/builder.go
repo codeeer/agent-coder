@@ -61,9 +61,35 @@ func (b *Builder) agentScripts(ctx context.Context, agentID uuid.UUID) ([]runner
 
 	out := make([]runner.ScriptSpec, 0, len(list))
 	for _, s := range list {
+		// KLASÖR ADI TAŞINMAK ZORUNDA: taşınmazsa dosya köke yazılır, talimatta
+		// alt dizin yazar ve model var olmayan bir yolu dener.
 		out = append(out, runner.ScriptSpec{
 			Name: s.Name, Description: s.Description, Content: s.Content,
+			Folder: s.FolderName,
 		})
+	}
+	return out, nil
+}
+
+/*
+agentScriptFolders, agent'a atanmış kampanya klasörlerini çözer.
+
+Betik listesinden türetilemez: klasörün AÇIKLAMASI yalnızca burada ve model
+kampanyanın ne olduğunu ondan öğreniyor.
+*/
+func (b *Builder) agentScriptFolders(ctx context.Context, agentID uuid.UUID) ([]runner.FolderSpec, error) {
+	if b.scripts == nil {
+		return nil, nil
+	}
+
+	list, err := b.scripts.FoldersForAgent(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]runner.FolderSpec, 0, len(list))
+	for _, f := range list {
+		out = append(out, runner.FolderSpec{Name: f.Name, Description: f.Description})
 	}
 	return out, nil
 }
@@ -233,6 +259,11 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 		return runs.StartInput{}, err
 	}
 
+	scriptFolders, err := b.agentScriptFolders(ctx, agent.ID)
+	if err != nil {
+		return runs.StartInput{}, err
+	}
+
 	return runs.StartInput{
 		Create: runs.CreateInput{
 			ProjectID: project.ID, AgentID: agent.ID, ProviderID: &provider.ID,
@@ -248,6 +279,7 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 			AllowWebfetch: agent.AllowWebfetch,
 			MCPServers:    mcpServers,
 			Scripts:       agentScripts,
+			ScriptFolders: scriptFolders,
 		},
 		Provider: runner.ProviderSpec{
 			Slug: provider.Slug, Kind: string(provider.Type),
