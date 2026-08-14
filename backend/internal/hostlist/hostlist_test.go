@@ -96,3 +96,27 @@ func TestParse_HataSatirNumarasiniSoyler(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "3")
 }
+
+/*
+ * Tek parçalı ad (nokta içermeyen) GEÇERLİDİR.
+ *
+ * ÖLÇÜLEREK BULUNDU: ilk sürüm "en az bir nokta içermeli" diyordu ve gerçek
+ * bir çalıştırmada depo adresi `sizinti-depo` olan bir kurulumda klonlama
+ * reddedildi (backend logu: "sandbox çıkışı engellendi host=sizinti-depo").
+ * Kurumsal ağlarda `nexus`, `gitlab`, `artifactory` gibi tek parçalı iç adlar
+ * yaygın; Docker ağındaki servis adları da öyle. Nokta şartı hepsini
+ * kapatıyordu.
+ */
+func TestParse_TekParcaliAdGecerlidir(t *testing.T) {
+	desenler, err := Parse("nexus")
+	require.NoError(t, err)
+	require.True(t, Match(desenler, "nexus"))
+	require.False(t, Match(desenler, "nexus.sirket.local"))
+}
+
+func TestParse_TekParcaliWildcard(t *testing.T) {
+	desenler, err := Parse("*.nexus")
+	require.NoError(t, err)
+	require.True(t, Match(desenler, "alt.nexus"))
+	require.False(t, Match(desenler, "nexus"))
+}

@@ -58,30 +58,30 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 4 — Ağ ve container yolu
 
-- [ ] T30 `deploy/docker-compose.yml`: `restricted` network (`internal: true`),
+- [x] T30 `deploy/docker-compose.yml`: `restricted` network (`internal: true`),
       backend iki network'te → `docker network inspect` ile `Internal: true`
       görünür, backend her iki network'te listelenir
-- [ ] T31 Kısıtlı network'ün gerçekten kapalı olduğu doğrulanır → o network'e bağlı
+- [x] T31 Kısıtlı network'ün gerçekten kapalı olduğu doğrulanır → o network'e bağlı
       geçici bir container'dan `curl https://example.com` **başarısız** olur
-- [ ] T32 `sandbox`: container'ın network IP'sini okuma → birim/elle test ile
+- [x] T32 `sandbox`: container'ın network IP'sini okuma → birim/elle test ile
       başlatılan container'ın IP'si dönüyor
-- [ ] T33 Çalıştırma başına network seçimi: proxy doluysa kısıtlı, boşsa mevcut →
+- [x] T33 Çalıştırma başına network seçimi: proxy doluysa kısıtlı, boşsa mevcut →
       iki çalıştırma başlatılır, `docker inspect` ile ikisinin farklı network'te
       doğduğu görülür
-- [ ] T34 `applyProxy` hedefi kapı olur → birim testi: verilen kapı adresi tüm
+- [x] T34 `applyProxy` hedefi kapı olur → birim testi: verilen kapı adresi tüm
       değişkenlerde ve JVM `-D` özelliklerinde görünür
-- [ ] T35 Çalıştırma kaydı aç/kapa `defer` ile her yola bağlanır → başarı, hata ve
+- [x] T35 Çalıştırma kaydı aç/kapa `defer` ile her yola bağlanır → başarı, hata ve
       iptal yollarının üçünde de kayıt kapanır
-- [ ] T36 **İlk uçtan uca çalıştırma**: proxy tanımlı, whitelist'te repository ve
+- [x] T36 **İlk uçtan uca çalıştırma**: proxy tanımlı, whitelist'te repository ve
       `repo1.maven.org` var → çalıştırma başarıyla biter
 
 ## Blok 5 — Görünürlük
 
-- [ ] T40 Ret, `slog` ile loglanır → backend logunda host ve çalıştırma kimliği
+- [x] T40 Ret, `slog` ile loglanır → backend logunda host ve çalıştırma kimliği
       görünür
-- [ ] T41 Ret, çalıştırmanın olay akışına uyarı olarak yazılır → arayüzde
+- [x] T41 Ret, çalıştırmanın olay akışına uyarı olarak yazılır → arayüzde
       çalıştırma ekranında görünür, metin whitelist'e eklemeyi söyler
-- [ ] T42 Aynı host tekrar reddedildiğinde akış boğulmaz → 50 denemede olay akışına
+- [x] T42 Aynı host tekrar reddedildiğinde akış boğulmaz → 50 denemede olay akışına
       sınırlı sayıda satır düşer, kaç kez denendiği yazar
 
 ## Blok 6 — Arayüz
@@ -99,10 +99,10 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 7 — Ölçüm ve belgeler
 
-- [ ] T60 **Zorlamanın kanıtı:** denetim açıkken Maven'lı görev koşulur, köprüde
+- [x] T60 **Zorlamanın kanıtı:** denetim açıkken Maven'lı görev koşulur, köprüde
       tcpdump alınır → runner IP'sinden kapı dışına giden SYN sayısı **0**
       (önceki ölçümde 5'ti). Sayı `## Ölçümler`e yazılır
-- [ ] T61 **Ret yolu ölçümü:** whitelist'ten `archive.apache.org` çıkarılıp aynı
+- [x] T61 **Ret yolu ölçümü:** whitelist'ten `archive.apache.org` çıkarılıp aynı
       görev koşulur → çalıştırma ekranında ret uyarısı, backend 5xx yok
 - [ ] T62 **Kapalı davranış:** proxy boşken çalıştırma → runner eski network'te,
       hiçbir proxy değişkeni yazılmamış (`docker inspect` ile env kontrolü)
@@ -123,10 +123,31 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 | Ne | Değer |
 |----|-------|
 | Kapı dışına giden bağlantı (önce) | 5 — `repo.maven.apache.org` |
-| Kapı dışına giden bağlantı (sonra) | _ölçülecek — T60_ |
+| Kapı dışına giden bağlantı (sonra) | **0** — runner yalnızca kapıya bağlandı |
 | 8 MB tünelden akarken heap artışı | < 4 MB (T17, `-race` ile) |
+| Kapalı network'ten DNS ile çıkış | `Could not resolve host` |
+| Kapalı network'ten **doğrudan IP'ye** çıkış | `Could not connect` — 0 ms, rota yok |
+| Kapalı network'te komşu container'a erişim | 200 — kapı erişilebilir |
 
 ## Notlar
+
+**Sapma 1 — kimlik kaynak IP ile değil, port ile.** Plan "tek dinleyici +
+kaynak IP" diyordu. Ölçüldü: Docker container'ın IP'sini YALNIZCA BAŞLATMADA
+atıyor (öncesinde `invalid IP`). Kayıt ancak başlatmadan sonra yapılabilirdi,
+oysa container başlar başlamaz klonluyor — kaydın yetişmediği her seferde
+klonlama sessizce reddedilirdi. Artık her çalıştırma kendi portunda kendi
+oturumunu açıyor; port container yaratılmadan önce biliniyor, yarış yok.
+Sonuç ölçümde de görünüyor: iki koşu, iki ayrı kapı portu (44073, 34867).
+
+**Sapma 2 — `internal/hostlist` nokta şartı kaldırıldı.** İlk sürüm "en az bir
+nokta içermeli" diyordu. İlk gerçek koşu bu yüzden düştü: depo adresi tek
+parçalı bir Docker servis adıydı (`sizinti-depo`), otomatik izinliler
+listesine giremedi ve klonlama reddedildi. Kurumsal ağlarda `nexus`, `gitlab`
+gibi tek parçalı iç adlar yaygın. Nokta yerine açık bir yıldız kuralı kondu.
+
+**Sapma 3 — ayrıştırılamayan zorunlu adres artık loglanıyor.** Sessiz atlama,
+yukarıdaki hatayı gizledi: ekranda yalnızca "klonlama başarısız" yazıyordu ve
+sebebi backend logunda aramak gerekti.
 
 **Plana ek — ayar log'unun özetlenmesi.** Plan yalnızca riskler tablosunda
 değinmişti; uygulanırken ayrı bir görev haline geldi (`logDegeri` +

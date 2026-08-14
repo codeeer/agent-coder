@@ -59,9 +59,16 @@ func egressAllow(spec runner.EgressSpec) ([]hostlist.Pattern, error) {
 		}
 		ek, err := hostlist.Parse(h)
 		if err != nil {
-			// Yapılandırmadan türetilen adres ayrıştırılamıyorsa sessizce
-			// atlanır: kullanıcının yazmadığı bir satır yüzünden çalıştırma
-			// reddedilmemeli.
+			/*
+			 * Ayrıştırılamayan zorunlu adres atlanır ama SESSİZ KALMAZ.
+			 *
+			 * Sessizliğin bedeli ölçüldü: tek parçalı bir depo adresi
+			 * (`sizinti-depo`) ayrıştırılamadığı için listeye giremedi,
+			 * klonlama reddedildi ve ortada yalnızca "klonlama başarısız"
+			 * yazıyordu. Sebebini backend logunda aramak gerekti.
+			 */
+			slog.Warn("zorunlu izinli adres ayrıştırılamadı — bu adrese çıkış engellenecek",
+				"host", h, "error", err)
 			continue
 		}
 		desenler = append(desenler, ek...)

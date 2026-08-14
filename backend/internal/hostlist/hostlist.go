@@ -46,14 +46,32 @@ func gecerliMi(host string) error {
 	if strings.ContainsAny(host, " \t") {
 		return errors.New("boşluk içeremez")
 	}
+	/*
+	 * Yıldız yalnızca `*.ornek.com` önekinde geçerli — o da buraya gelmeden
+	 * ayıklanıyor. Geriye kalan her yıldız hatadır.
+	 *
+	 * Tek başına `*` özellikle reddediliyor: "her şeye izin" demek isteyen
+	 * kullanıcı listeyi BOŞ bırakmalı. İki ayrı yazımın aynı anlama gelmesi,
+	 * "acaba `*` gerçekten her şeyi mi açıyor" sorusunu doğururdu.
+	 */
+	if strings.Contains(host, "*") {
+		return errors.New("yıldız yalnızca `*.ornek.com` biçiminde kullanılır; " +
+			"her adrese izin için listeyi boş bırakın")
+	}
 	for _, r := range host {
 		if r > 127 {
 			return errors.New("ASCII dışı karakter — punycode karşılığını yazın (xn--...)")
 		}
 	}
-	if !strings.Contains(host, ".") {
-		return errors.New("en az bir nokta içermeli")
-	}
+	/*
+	 * NOKTA ŞARTI YOK — kaldırıldı, sebebi ölçüm.
+	 *
+	 * İlk sürüm "en az bir nokta içermeli" diyordu. Gerçek bir çalıştırmada
+	 * depo adresi tek parçalı bir Docker servis adı (`sizinti-depo`) olduğu
+	 * için otomatik izinliler listesine hiç giremedi ve klonlama reddedildi.
+	 * Kurumsal ağlarda `nexus`, `gitlab` gibi tek parçalı iç adlar yaygın;
+	 * şart, çalışması gereken kurulumları kapatıyordu.
+	 */
 	return nil
 }
 
