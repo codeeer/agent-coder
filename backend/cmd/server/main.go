@@ -159,9 +159,10 @@ func run() error {
 	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network, cfg.Runner.HTTPProxy)
 	if cfg.Runner.HTTPProxy != "" {
 		// Sessiz kalmamalı: vekil, çalıştırmanın TÜM dış trafiğini üçüncü bir
-		// sürece yönlendiriyor. Ölçüm bitip ayar kaldırılmadığında bunu
+		// sürece yönlendiriyor ve o süreç TLS'i açabiliyorsa sağlayıcı
+		// anahtarını da görür. Denetim bitip ayar kaldırılmadığında bunu
 		// loglardan görmek gerekir.
-		slog.WarnContext(ctx, "runner trafiği vekile yönlendiriliyor — ÖLÇÜM DÜZENEĞİ",
+		slog.WarnContext(ctx, "runner trafiği denetim vekiline yönlendiriliyor",
 			"proxy", cfg.Runner.HTTPProxy)
 	}
 

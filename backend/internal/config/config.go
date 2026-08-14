@@ -79,14 +79,22 @@ type RunnerConfig struct {
 	/*
 	 * HTTPProxy, runner container'ının çıkış trafiğini yönlendireceği vekil.
 	 *
-	 * YALNIZCA ANALİZ İÇİN — `veri-sizintisi-analizi` branch'inin ölçüm
-	 * düzeneği (bkz. scripts/sizinti-analizi/). Doluysa container'a HTTP_PROXY
-	 * ailesi ve Maven'ın -D vekil özellikleri geçilir; opencode'un dışarıya ne
-	 * gönderdiği ancak trafiği açılabilir bir vekilden geçirerek okunabiliyor.
+	 * DENETİM ARACI. Doluysa container'a HTTP_PROXY ailesi (büyük ve küçük
+	 * harfli), NODE_USE_ENV_PROXY ve Maven'ın -D vekil özellikleri geçilir.
+	 * Sandbox'ın dışarıya ne gönderdiği ancak trafik açılabilir bir vekilden
+	 * geçirilerek okunabiliyor; ölçümün nasıl yapıldığı ve ne bulduğu
+	 * `docs/veri-sizintisi-analizi.md` dosyasındadır.
 	 *
-	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez. Bu alan ana
-	 * branch'e ALINMAMALIDIR: üretimde vekil ayarı, ölçüm aracının değil
-	 * kurumsal ağ ayarlarının işidir.
+	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez.
+	 *
+	 * DİKKAT — bu ayar açıkken runner'ın TÜM dış trafiği üçüncü bir sürece
+	 * yönlendirilir ve o süreç TLS'i açabiliyorsa sağlayıcı anahtarı dahil
+	 * her şeyi görür. Bu yüzden açılışta uyarı loglanır (cmd/server/main.go);
+	 * sessizce açık kalmamalı.
+	 *
+	 * Vekil trafiği YÖNLENDİRİR, MECBUR ETMEZ: vekili yok sayan bir istemci
+	 * doğrudan çıkabilir. Ölçüldü — Maven'ın JVM tarafı bunu yaptı. Bu ayarı
+	 * "tüm çıkış denetleniyor" garantisi sanmayın.
 	 */
 	HTTPProxy string
 }

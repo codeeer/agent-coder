@@ -22,9 +22,9 @@ type Runner struct {
 	sandbox *sandbox.Manager
 	image   string
 	network string
-	// proxy, ÖLÇÜM DÜZENEĞİ — bkz. config.RunnerConfig.HTTPProxy.
-	// Sertifikanın aksine kurucuda: vekil çalışma anında değişmiyor, ölçüm
-	// boyunca sabit kalıyor.
+	// proxy, denetim vekili — bkz. config.RunnerConfig.HTTPProxy.
+	// Sertifikanın aksine kurucuda: vekil bir dağıtım ayarı, çalışma anında
+	// değişmiyor.
 	proxy string
 }
 
@@ -408,7 +408,8 @@ func buildEnv(req runner.Request, proxy string) map[string]string {
 }
 
 /*
- * applyProxy, ÖLÇÜM DÜZENEĞİ — bkz. config.RunnerConfig.HTTPProxy.
+ * applyProxy, denetim vekilini container'ın istemcilerine tanıtır.
+ * Bkz. config.RunnerConfig.HTTPProxy.
  *
  * Tek bir vekil adresini, container içindeki her istemcinin okuduğu ayrı ayrı
  * biçimlere çevirir. Tek bir biçim yeterli olsaydı burası üç satır olurdu; üç

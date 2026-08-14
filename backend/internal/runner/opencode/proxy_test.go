@@ -8,12 +8,15 @@ import (
 )
 
 /*
- * Vekil ölçüm düzeneğinin testleri (scripts/sizinti-analizi/).
+ * Denetim vekilinin testleri.
  *
- * Bu testler ürün davranışını değil, ÖLÇÜMÜN KENDİSİNİ koruyor. Sızıntı
- * analizinin tüm sonucu "trafik gerçekten vekilden geçti mi" varsayımına
- * dayanıyor; değişkenlerden biri sessizce düşerse ölçüm "hiçbir yere istek
- * yok" gibi görünür ve yanlış bir rapor üretirdi.
+ * Bunlar bir ÖLÇÜMÜN GEÇERLİLİĞİNİ koruyor. Vekilden çıkan sonucun tamamı
+ * "trafik gerçekten vekilden geçti mi" varsayımına dayanıyor; değişkenlerden
+ * biri sessizce düşerse trafik vekile hiç uğramaz, döküm boş görünür ve bu
+ * "hiçbir yere istek yok" diye okunur. Yani bozulduğunda hata vermeyen,
+ * yanlış cevap veren bir yol — testin asıl sebebi bu.
+ *
+ * Ölçümün kendisi: docs/veri-sizintisi-analizi.md
  */
 
 func TestApplyProxy_BosDegerHicbirSeyEklemez(t *testing.T) {
