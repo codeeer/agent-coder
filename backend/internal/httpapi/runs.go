@@ -104,7 +104,76 @@ func (h *Handler) getRun(w http.ResponseWriter, r *http.Request) {
 		h.respondRunError(w, r, err)
 		return
 	}
-	respondJSON(w, http.StatusOK, run)
+
+	respondJSON(w, http.StatusOK, runDetailResponse{
+		Run:               run,
+		PushBlockedReason: h.pushEngeli(r.Context(), run),
+	})
+}
+
+/*
+ * runDetailResponse, çalıştırma detayı + gönderimin durumu.
+ *
+ * PushBlockedReason NEDEN VAR: arayüz "Branch'e gönder" düğmesini gösterirken
+ * backend'in kuralına bakmalı. Kural iki yere yazıldığında ayrışmıştı —
+ * arayüz git erişimini hiç sormuyordu ve tanımsız bir projede kullanıcı
+ * düğmeyi görüp tıklıyor, hata alıyordu.
+ *
+ * Boşsa gönderim mümkün. Doluysa metin doğrudan kullanıcıya gösterilebilir.
+ */
+type runDetailResponse struct {
+	runs.Run
+	PushBlockedReason string `json:"pushBlockedReason,omitempty"`
+}
+
+// gitErisimiYokMesaji, kullanıcıya NE YAPACAĞINI söyler — yalnızca neyin
+// eksik olduğunu değil.
+const gitErisimiYokMesaji = "Bu projede git erişimi tanımlı değil — " +
+	"Ayarlar → Git repository'ler bölümünden ekleyip projeye bağlayın"
+
+/*
+ * pushEngeli, gönderimin önündeki engeli insan diline çevirir.
+ *
+ * GİT ERİŞİMİ YALNIZCA GEREKİYORSA sorulur: kimlik çözümü bir proje sorgusu
+ * ve bir şifre çözme demek, oysa süren bir çalıştırmanın detayı saniyede bir
+ * tazeleniyor. Diff yoksa veya zaten gönderilmişse düğme nasılsa çıkmayacak;
+ * o yollarda depoya hiç gidilmiyor.
+ */
+func (h *Handler) pushEngeli(ctx contextT, run runs.Run) string {
+	if err := runs.CanPush(run, true); err != nil {
+		switch {
+		case errors.Is(err, runs.ErrNoChanges):
+			return "" // Düğme zaten çıkmıyor; ayrıca sebep yazmaya gerek yok.
+		case errors.Is(err, runs.ErrAlreadyPushed):
+			return ""
+		}
+	}
+
+	if h.deps.Projects == nil || h.deps.RunBuilder == nil {
+		return ""
+	}
+	project, err := h.deps.Projects.Get(ctx, run.ProjectID)
+	if err != nil {
+		return ""
+	}
+	/*
+	 * `RepoAccess` git erişimi tanımsızken ErrNoGitAccess döner — bu bir arıza
+	 * değil, YAPILANDIRILMAMIŞ olma hâli ve kullanıcıya öyle söylenmeli.
+	 * Ölçüldü: bu ayrım yapılmadan mesaj "Depo erişimi okunamadı" çıkıyordu ve
+	 * kullanıcıya ne yapacağını söylemiyordu.
+	 */
+	_, creds, err := h.deps.RunBuilder.RepoAccess(ctx, project.ID)
+	if errors.Is(err, runs.ErrNoGitAccess) {
+		return gitErisimiYokMesaji
+	}
+	if err != nil {
+		return "Depo erişimi okunamadı"
+	}
+
+	if errors.Is(runs.CanPush(run, creds != nil && creds.Secret != ""), runs.ErrNoGitAccess) {
+		return gitErisimiYokMesaji
+	}
+	return ""
 }
 
 // startRun, çalıştırmayı başlatır ve HEMEN döner.

@@ -331,6 +331,18 @@ export interface EgressStatus {
  * dosyalar (derleme çıktısı JAR gibi) uygulanamadığı için dışarıda kaldı.
  * Kullanıcıya söylenmeli — eksik bir branch tam sanılmamalı.
  */
+/**
+ * Çalıştırma detayında gönderimin durumu.
+ *
+ * `pushBlockedReason` doluysa gönderim yapılamaz ve metin doğrudan kullanıcıya
+ * gösterilir. Kural BACKEND'de (`runs.CanPush`); arayüz onu tekrar yazmıyor —
+ * iki kopya ayrışmıştı ve git erişimi tanımsız projelerde düğme çalışmadığı
+ * hâlde görünüyordu.
+ */
+export interface RunPushState {
+  pushBlockedReason?: string;
+}
+
 export interface PushResult {
   branch: string;
   skippedBinaries?: string[];
@@ -458,7 +470,7 @@ export interface FileChange {
  * `agentPrompt` ve `modelId` ANLIK KOPYADIR: agent veya model sonradan
  * değiştirilse bile geçmiş kayıt neyle çalıştığını doğru gösterir.
  */
-export interface Run {
+export interface Run extends RunPushState {
   id: string;
   projectId: string;
   agentId: string;

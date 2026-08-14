@@ -110,3 +110,40 @@ func TestBinariAyikla_BosDiff(t *testing.T) {
 	require.Empty(t, atlanan)
 	require.Empty(t, temiz)
 }
+
+/*
+ * Gönderim engelleri TEK YERDE.
+ *
+ * Arayüz "Branch'e gönder" düğmesini gösterirken, backend gönderimi kabul
+ * ederken AYNI kurala bakmalı. Öncesinde ayrışmışlardı: arayüz yalnızca diff
+ * ve daha önce gönderilip gönderilmediğine bakıyor, git erişimini hiç
+ * sormuyordu. Sonuç, git erişimi tanımlanmamış bir projede kullanıcının
+ * düğmeyi görüp tıklaması ve hata almasıydı — var olmayan bir eylemin
+ * gösterilmesi.
+ */
+func TestCanPush_DegisiklikYoksaEngel(t *testing.T) {
+	require.ErrorIs(t, CanPush(Run{}, true), ErrNoChanges)
+}
+
+func TestCanPush_ZatenGonderilmisseEngel(t *testing.T) {
+	b := "agent-coder/x"
+	err := CanPush(Run{Diff: "diff", PushedBranch: &b}, true)
+
+	require.ErrorIs(t, err, ErrAlreadyPushed)
+	require.Contains(t, err.Error(), b, "hangi branch olduğu söylenmeli")
+}
+
+func TestCanPush_GitErisimiYoksaEngel(t *testing.T) {
+	require.ErrorIs(t, CanPush(Run{Diff: "diff"}, false), ErrNoGitAccess)
+}
+
+func TestCanPush_HepsiTamamsaEngelYok(t *testing.T) {
+	require.NoError(t, CanPush(Run{Diff: "diff"}, true))
+}
+
+// Boş dizgeye eşit `PushedBranch` engel DEĞİL: kayıt açılmış ama gönderim
+// tamamlanmamış olabilir.
+func TestCanPush_BosBranchEngelDegil(t *testing.T) {
+	bos := ""
+	require.NoError(t, CanPush(Run{Diff: "diff", PushedBranch: &bos}, true))
+}

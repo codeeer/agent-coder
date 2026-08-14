@@ -60,19 +60,35 @@ type PushResult struct {
 	SkippedBinaries []string
 }
 
+/*
+ * CanPush, gönderimin önündeki engeli döner; nil ise engel yok.
+ *
+ * TEK KAYNAK: hem `Push` bunu çağırıyor hem de arayüzün "Branch'e gönder"
+ * düğmesini gösterip göstermeyeceği buradan çıkıyor. Kural iki yere
+ * yazıldığında ayrışmıştı — arayüz git erişimini hiç sormuyordu ve git
+ * erişimi tanımlanmamış bir projede kullanıcı düğmeyi görüp tıklıyor, hata
+ * alıyordu. Var olmayan bir eylemi göstermek, gizlemekten kötü.
+ */
+func CanPush(r Run, hasCreds bool) error {
+	if !r.HasChanges() {
+		return ErrNoChanges
+	}
+	if r.PushedBranch != nil && *r.PushedBranch != "" {
+		return fmt.Errorf("%w: %s", ErrAlreadyPushed, *r.PushedBranch)
+	}
+	if !hasCreds {
+		return ErrNoGitAccess
+	}
+	return nil
+}
+
 // Push, diff'i yeni bir branch olarak depoya gönderir.
 //
 // Aynı çalıştırma ikinci kez gönderilemez: iki farklı branch'in aynı işten
 // çıkması karışıklık yaratır ve kullanıcı hangisinin geçerli olduğunu bilemez.
 func (p *Pusher) Push(ctx context.Context, req PushRequest) (PushResult, error) {
-	if !req.Run.HasChanges() {
-		return PushResult{}, ErrNoChanges
-	}
-	if req.Run.PushedBranch != nil && *req.Run.PushedBranch != "" {
-		return PushResult{}, fmt.Errorf("%w: %s", ErrAlreadyPushed, *req.Run.PushedBranch)
-	}
-	if req.Creds == nil || req.Creds.Secret == "" {
-		return PushResult{}, ErrNoGitAccess
+	if err := CanPush(req.Run, req.Creds != nil && req.Creds.Secret != ""); err != nil {
+		return PushResult{}, err
 	}
 
 	branch := strings.TrimSpace(req.Branch)

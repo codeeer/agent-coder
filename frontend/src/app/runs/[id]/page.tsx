@@ -528,8 +528,23 @@ function RunActions({
 
   return (
     <>
+      {/*
+        Düğme, engelli olduğunda GİZLENMİYOR — pasifleşiyor ve sebebi
+        yazılıyor. Gizlenen bir eylem kullanıcıya "böyle bir şey yok" der;
+        oysa eylem var, bu projede kullanılamıyor. Silme düğmesindeki kararın
+        aynısı.
+
+        Sebep BACKEND'den geliyor (`runs.CanPush`). Öncesinde arayüz kuralı
+        kendi yazıyordu ve git erişimini hiç sormuyordu: tanımsız bir projede
+        düğme çıkıyor, tıklanınca hata veriyordu.
+      */}
       {run.diff && !run.pushedBranch && (
-        <Button variant="primary" onClick={() => setPushing(true)}>
+        <Button
+          variant="primary"
+          onClick={() => setPushing(true)}
+          disabled={!!run.pushBlockedReason}
+          title={run.pushBlockedReason}
+        >
           Branch&apos;e gönder
         </Button>
       )}
