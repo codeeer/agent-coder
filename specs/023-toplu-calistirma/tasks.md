@@ -54,10 +54,15 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 4 — Uçlar
 
-- [ ] T30 `POST /api/run-batches` → 201, kaç öğe sıraya alındı
-- [ ] T31 `GET /api/run-batches` ve `/{id}` → sayılar ve öğeler
-- [ ] T32 `cancel` ve `resume` → kaç öğenin etkilendiği yanıtta
-- [ ] T33 Hata durumları spec tablosuna uyar → proje seçilmedi, akış yok
+- [x] T30 `POST /api/run-batches` → 201, kaç öğe sıraya alındı
+- [x] T31 `GET /api/run-batches` ve `/{id}` → sayılar ve öğeler
+- [x] T32 `cancel` ve `resume` → kaç öğenin etkilendiği **ve eylemden sonraki
+      durum** yanıtta; ekran kendi tahminiyle tazelenmesin
+- [x] T33 Hata durumları spec tablosuna uyar → proje seçilmedi, aynı proje iki
+      kez, akış yok, proje yok, geçersiz kimlik
+- [x] T34 **Tanımsız akış sıraya KONMAZ** → 409 `no_version`. Sıraya konsaydı
+      otuz öğe tek tek başlatılıp tek tek düşerdi; kullanıcı otuz satırlık bir
+      başarısızlık listesi görür, sebebi ancak satırların içinde okurdu
 
 ## Blok 5 — Arayüz
 

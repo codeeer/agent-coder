@@ -395,6 +395,8 @@ func run() error {
 		WorkflowExec:   workflowExec,
 		Launcher:       workflowLauncher,
 		JiraTrigger:    jiraTrigger,
+		RunBatches:     batchStore,
+		BatchQueue:     batchScheduler,
 	})
 	defer handler.Shutdown()
 

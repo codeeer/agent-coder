@@ -30,6 +30,7 @@ import (
 	"github.com/agent-coder/backend/internal/mcpserver"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
+	"github.com/agent-coder/backend/internal/runbatch"
 	"github.com/agent-coder/backend/internal/runbuild"
 	"github.com/agent-coder/backend/internal/runs"
 	"github.com/agent-coder/backend/internal/scripts"
@@ -119,6 +120,11 @@ type Deps struct {
 	WorkflowExec *workflow.Executor
 	Launcher     *workflow.Launcher
 	JiraTrigger  *jiratrigger.Trigger
+
+	// Toplu çalıştırma (spec 023). Uçlar kuyruğu yalnızca doldurur ve
+	// uyandırır; işletmek zamanlayıcının işi.
+	RunBatches *runbatch.Store
+	BatchQueue *runbatch.Scheduler
 }
 
 // Handler, API'nin bağımlılıklarını ve durumunu taşır.
@@ -282,6 +288,16 @@ func (h *Handler) Routes() http.Handler {
 		})
 
 		r.Get("/workflow-versions/{id}", h.getVersion)
+
+		// Toplu çalıştırma (spec 023): bir akışı çok projede sıraya koyma.
+		// Çalışma uçlarından AYRI — toplu iş bir çalıştırma değil, bir kuyruk.
+		r.Route("/run-batches", func(r chi.Router) {
+			r.Get("/", h.listRunBatches)
+			r.Post("/", h.createRunBatch)
+			r.Get("/{id}", h.getRunBatch)
+			r.Post("/{id}/cancel", h.cancelRunBatch)
+			r.Post("/{id}/resume", h.resumeRunBatch)
+		})
 
 		r.Route("/workflow-runs", func(r chi.Router) {
 			r.Get("/", h.listWorkflowRuns)
