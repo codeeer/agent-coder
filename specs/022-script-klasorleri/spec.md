@@ -2,7 +2,7 @@
 
 - **Spec no:** 022
 - **Tarih:** 2026-08-14
-- **Durum:** Onaylandı
+- **Durum:** Uygulandı
 
 ---
 
@@ -66,14 +66,14 @@ istemiyorum.**
 
 Kabul kriterleri:
 
-- [ ] Kullanıcı ad ve açıklama vererek klasör oluşturabilir
-- [ ] Yeni bir script oluştururken bir klasöre konabilir ya da klasörsüz
+- [x] Kullanıcı ad ve açıklama vererek klasör oluşturabilir
+- [x] Yeni bir script oluştururken bir klasöre konabilir ya da klasörsüz
       bırakılabilir
-- [ ] Var olan bir script'in klasörü sonradan değiştirilebilir; klasörden
+- [x] Var olan bir script'in klasörü sonradan değiştirilebilir; klasörden
       çıkarılabilir
-- [ ] Bir script **en fazla bir** klasörde bulunur
-- [ ] Klasör listesi, her klasörün kaç script taşıdığını gösterir
-- [ ] Klasörsüz script'ler kaybolmaz; kendi başlıkları altında görünür
+- [x] Bir script **en fazla bir** klasörde bulunur
+- [x] Klasör listesi, her klasörün kaç script taşıdığını gösterir
+- [x] Klasörsüz script'ler kaybolmaz; kendi başlıkları altında görünür
 
 ### H2 — Ortak script'lerin klasör dışında kalması
 
@@ -83,9 +83,9 @@ birbirinden ayrışan kopyalar üretir.**
 
 Kabul kriterleri:
 
-- [ ] Klasörsüz script'ler kütüphanede ayrı bir grup olarak durur
-- [ ] Bir agent'a **klasör** ve **klasörsüz script** aynı anda atanabilir
-- [ ] Klasörsüz bir script birden fazla agent'a atanabilir
+- [x] Klasörsüz script'ler kütüphanede ayrı bir grup olarak durur
+- [x] Bir agent'a **klasör** ve **klasörsüz script** aynı anda atanabilir
+- [x] Klasörsüz bir script birden fazla agent'a atanabilir
 
 ### H3 — Klasörü agent'a tek hamlede bağlama
 
@@ -95,13 +95,13 @@ erteler.**
 
 Kabul kriterleri:
 
-- [ ] Agent'a klasör atandığında klasörün **tüm** script'leri o agent'ta
+- [x] Agent'a klasör atandığında klasörün **tüm** script'leri o agent'ta
       geçerli olur
-- [ ] Klasöre sonradan eklenen bir script, o klasörü atamış agent'larda
+- [x] Klasöre sonradan eklenen bir script, o klasörü atamış agent'larda
       **sonraki çalıştırmada** kendiliğinden geçerli olur; atama tekrar
       yapılmaz
-- [ ] Klasörden çıkarılan bir script o agent'larda artık geçerli olmaz
-- [ ] Agent ekranında hangi klasörlerin ve hangi tekil script'lerin atandığı
+- [x] Klasörden çıkarılan bir script o agent'larda artık geçerli olmaz
+- [x] Agent ekranında hangi klasörlerin ve hangi tekil script'lerin atandığı
       görünür
 
 ### H4 — Agent'ın klasörü görmesi
@@ -112,14 +112,14 @@ kullanmaz.**
 
 Kabul kriterleri:
 
-- [ ] Agent'ın talimatına klasörün **dizin yolu** yazılır
-- [ ] Klasörün açıklaması yazılır — kampanyanın ne olduğunu model buradan
+- [x] Agent'ın talimatına klasörün **dizin yolu** yazılır
+- [x] Klasörün açıklaması yazılır — kampanyanın ne olduğunu model buradan
       anlar
-- [ ] Klasördeki script'ler **adlarının sırasıyla** listelenir; her birinin
+- [x] Klasördeki script'ler **adlarının sırasıyla** listelenir; her birinin
       yolu ve açıklaması yazılır
-- [ ] Klasörsüz script'ler bugünkü gibi ayrı listelenir
-- [ ] Klasör de tekil script de yoksa bu bölüm hiç yazılmaz
-- [ ] Container içinde klasörün script'leri gerçekten o dizin altında durur
+- [x] Klasörsüz script'ler bugünkü gibi ayrı listelenir
+- [x] Klasör de tekil script de yoksa bu bölüm hiç yazılmaz
+- [x] Container içinde klasörün script'leri gerçekten o dizin altında durur
 
 ### H6 — Script'in projeyi bulması
 
@@ -129,13 +129,13 @@ dosya değiştirmek** istiyorum, çünkü **ben projemin İÇİNDEKİ yolu biliy
 
 Kabul kriterleri:
 
-- [ ] Script'e projenin kök dizini bir ortam değişkeniyle verilir
-- [ ] Script çalışma dizinine güvenmeden çalışabilir: `"$PROJECT_DIR/..."`
+- [x] Script'e projenin kök dizini bir ortam değişkeniyle verilir
+- [x] Script çalışma dizinine güvenmeden çalışabilir: `"$PROJECT_DIR/..."`
       yazan bir script, hangi dizinden çağrılırsa çağrılsın doğru yeri bulur
-- [ ] Değişkenin adı ve anlamı script düzenleme ekranında **yazılı** olarak
+- [x] Değişkenin adı ve anlamı script düzenleme ekranında **yazılı** olarak
       görünür — kullanıcı kaynağı okumak zorunda kalmaz
-- [ ] Agent'ın talimatında da yazar
-- [ ] Kalıcı olması gereken değişikliklerin proje dizini altında olması
+- [x] Agent'ın talimatında da yazar
+- [x] Kalıcı olması gereken değişikliklerin proje dizini altında olması
       gerektiği söylenir
 
 ### H5 — Klasörün silinmesi
@@ -145,10 +145,10 @@ Kabul kriterleri:
 
 Kabul kriterleri:
 
-- [ ] Klasör silinmeden önce kaç script taşıdığı ve kaç agent'a atandığı
+- [x] Klasör silinmeden önce kaç script taşıdığı ve kaç agent'a atandığı
       söylenir
-- [ ] Klasör silindiğinde içindeki script'ler **silinmez**, klasörsüz kalır
-- [ ] Silme, o klasörü kullanan agent'ların diğer atamalarını etkilemez
+- [x] Klasör silindiğinde içindeki script'ler **silinmez**, klasörsüz kalır
+- [x] Silme, o klasörü kullanan agent'ların diğer atamalarını etkilemez
 
 ---
 

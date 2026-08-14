@@ -148,7 +148,6 @@ export default function AgentsPage() {
     queryKey: ["scripts", "all"],
     queryFn: () => api.scripts.list({ limit: 200 }),
   });
-
   const items = useMemo(() => {
     const rows = agents.data?.items ?? [];
     const needle = q.trim().toLocaleLowerCase("tr");
@@ -952,6 +951,9 @@ function AgentForm({
   );
   const [mcpIds, setMcpIds] = useState<string[]>(agent?.mcpServerIds ?? []);
   const [scriptIds, setScriptIds] = useState<string[]>(agent?.scriptIds ?? []);
+  const [scriptFolderIds, setScriptFolderIds] = useState<string[]>(
+    agent?.scriptFolderIds ?? [],
+  );
 
   const mcpServers = useQuery({
     queryKey: ["mcp-servers"],
@@ -962,6 +964,19 @@ function AgentForm({
     queryKey: ["scripts", "all"],
     queryFn: () => api.scripts.list({ limit: 200 }),
   });
+  const scriptFolders = useQuery({
+    queryKey: ["script-folders"],
+    queryFn: api.scriptFolders.list,
+  });
+
+  // Klasörden gelen betikler ayrıca işaretlenmez: onlar klasörün üyeliğiyle
+  // geliyor ve tekil kutucuk olarak gösterilseydi kullanıcı onları
+  // "çıkarabileceğini" sanırdı.
+  const klasordenGelen = new Set(
+    (scripts.data?.items ?? [])
+      .filter((s) => s.folderId && scriptFolderIds.includes(s.folderId))
+      .map((s) => s.id),
+  );
 
   const save = useMutation({
     mutationFn: () =>
@@ -978,6 +993,7 @@ function AgentForm({
             allowWebfetch,
             mcpServerIds: mcpIds,
             scriptIds,
+            scriptFolderIds,
           })
         : api.agents.create({
             name: name.trim(),
@@ -993,8 +1009,15 @@ function AgentForm({
       // Oluşturma ucu atamaları almıyor; yeni agent kaydedildikten sonra
       // ikinci bir çağrıyla yazılırlar. Aksi halde kullanıcı formda seçim
       // yapar, kaydeder ve seçimi kaybolurdu.
-      if (!editing && (mcpIds.length > 0 || scriptIds.length > 0)) {
-        await api.agents.update(saved.id, { mcpServerIds: mcpIds, scriptIds });
+      if (
+        !editing &&
+        (mcpIds.length > 0 || scriptIds.length > 0 || scriptFolderIds.length > 0)
+      ) {
+        await api.agents.update(saved.id, {
+          mcpServerIds: mcpIds,
+          scriptIds,
+          scriptFolderIds,
+        });
       }
       void queryClient.invalidateQueries({ queryKey: ["agents"] });
       onDone();
@@ -1160,6 +1183,43 @@ function AgentForm({
             )}
           </div>
 
+          {/* Kampanya klasörleri: çok adımlı standart bir iş tek seçimle
+              bağlanır ve klasöre sonradan eklenen adım kendiliğinden geçerli
+              olur — atama tazelenmez (spec 022). */}
+          {(scriptFolders.data?.items.length ?? 0) > 0 && (
+            <div>
+              <p className="text-2xs font-medium tracking-wide text-ink-2 uppercase">
+                Kampanya klasörleri
+              </p>
+              <Well className="mt-1.5 px-3">
+                <PickerList>
+                  {scriptFolders.data?.items.map((f) => (
+                    <PickerRow
+                      key={f.id}
+                      title={f.name}
+                      note={
+                        f.description
+                          ? `${f.description} · ${f.scriptCount} adım`
+                          : `${f.scriptCount} adım`
+                      }
+                      mono
+                      checked={scriptFolderIds.includes(f.id)}
+                      onChange={(on) =>
+                        setScriptFolderIds((prev) =>
+                          on ? [...prev, f.id] : prev.filter((id) => id !== f.id),
+                        )
+                      }
+                    />
+                  ))}
+                </PickerList>
+              </Well>
+              <p className="mt-1.5 text-2xs text-ink-3">
+                Klasörün <strong>tüm</strong> adımları geçerli olur. Sonradan
+                eklenen adım için burayı tekrar düzenlemeniz gerekmez.
+              </p>
+            </div>
+          )}
+
           {/* Betikler: model NE ZAMAN çağıracağına karar verir, NE YAPACAĞINA
               betik karar verir. Prosedür işlerinde doğaçlamayı kesen tek şey. */}
           <div>
@@ -1181,9 +1241,16 @@ function AgentForm({
                       <PickerRow
                         key={s.id}
                         title={s.name}
-                        note={s.description}
+                        note={
+                          klasordenGelen.has(s.id)
+                            ? `${s.folderName} klasöründen geliyor`
+                            : s.description
+                        }
                         mono
-                        checked={scriptIds.includes(s.id)}
+                        disabled={klasordenGelen.has(s.id)}
+                        checked={
+                          scriptIds.includes(s.id) || klasordenGelen.has(s.id)
+                        }
                         onChange={(on) =>
                           setScriptIds((prev) =>
                             on
@@ -1202,12 +1269,13 @@ function AgentForm({
                  * betiği seçer, kaydeder, çalıştırır ve agent'ın onu neden hiç
                  * çağırmadığını hiçbir hata mesajı olmadan arardı.
                  */}
-                {!allowBash && scriptIds.length > 0 ? (
+                {!allowBash &&
+                (scriptIds.length > 0 || scriptFolderIds.length > 0) ? (
                   <div className="mt-2">
                     <Notice tone="warning">
                       Bu agent&apos;ın <strong>komut çalıştırma</strong> yetkisi
-                      kapalı. Seçilen betikler kaydedilir ama çalıştırma
-                      ortamına kopyalanmaz.
+                      kapalı. Seçilen betikler ve klasörler kaydedilir ama
+                      çalıştırma ortamına kopyalanmaz.
                     </Notice>
                   </div>
                 ) : (
@@ -1274,6 +1342,7 @@ function PickerRow({
   note,
   mono = false,
   checked,
+  disabled = false,
   onChange,
 }: {
   title: string;
@@ -1281,14 +1350,27 @@ function PickerRow({
   /** Ad bir dosya adına dönüşüyorsa tek aralıklı yazılır. */
   mono?: boolean;
   checked: boolean;
+  /**
+   * Seçim başka bir yerden geliyorsa kilitlenir — ama satır GİZLENMEZ.
+   *
+   * Klasörden gelen bir betiği listeden çıkarmak, kullanıcının onu
+   * "kaldırabileceğini" sanmasına yol açardı; oysa kaldırmanın yolu klasörü
+   * çıkarmak. Gizlemek ise "bu betik agent'ta yok" izlenimi verirdi.
+   */
+  disabled?: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-start gap-2.5 py-2">
+    <label
+      className={`flex items-start gap-2.5 py-2 ${
+        disabled ? "opacity-60" : "cursor-pointer"
+      }`}
+    >
       {/* mt: kutu, iki satırlık metnin ortasına değil ilk satırın hizasına oturur. */}
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="mt-0.5 size-3.5 shrink-0 accent-accent"
       />

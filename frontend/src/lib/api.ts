@@ -23,6 +23,7 @@ import type {
   CreateMcpServerRequest,
   UpdateMcpServerRequest,
   Script,
+  ScriptFolder,
   CreateScriptRequest,
   UpdateScriptRequest,
   ModelList,
@@ -391,6 +392,25 @@ export const api = {
         method: "POST",
         body: { data },
       }),
+  },
+
+  scriptFolders: {
+    list: () => apiFetch<{ items: ScriptFolder[] }>("/api/script-folders"),
+
+    create: (body: { name: string; description: string }) =>
+      apiFetch<ScriptFolder>("/api/script-folders", { method: "POST", body }),
+
+    update: (id: string, body: { name: string; description: string }) =>
+      apiFetch<ScriptFolder>(`/api/script-folders/${id}`, { method: "PUT", body }),
+
+    remove: (id: string) =>
+      apiFetch<null>(`/api/script-folders/${id}`, { method: "DELETE" }),
+
+    /** Silmeden önce: kaç betik klasörsüz kalacak, kaç agent etkilenecek. */
+    usage: (id: string) =>
+      apiFetch<{ scriptCount: number; agentCount: number }>(
+        `/api/script-folders/${id}/usage`,
+      ),
   },
 
   settings: {

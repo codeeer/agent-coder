@@ -629,9 +629,10 @@ yarın `npm install paket@latest` olarak koşabilir.
 | İçerik | `.sh` dosyanızın metni |
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
+cd "$PROJECT_DIR"
 npm ci
 npm update --save
 npm test
@@ -639,6 +640,76 @@ npm test
 
 Sonra **Agent'lar** ekranından hangi agent'ın kullanacağını seçin. Betik o
 agent'ın ortamına konur ve talimatına yol + açıklamayla yazılır.
+
+### Proje nerede? `$PROJECT_DIR`
+
+Depo her çalıştırmada `/work` altına klonlanır ve bu yol betiğe
+**`$PROJECT_DIR`** olarak geçer.
+
+**Çalışma dizinine güvenmeyin, bu değişkeni kullanın.** Siz projenizin
+*içindeki* yolu biliyorsunuz (`config/webpack.config.js`); kökün nereye
+açıldığını bilmenize gerek yok. Betiği hangi dizinden çağrıldığından bağımsız
+kılan da budur:
+
+```bash
+sed -i 's/"node": "18"/"node": "24"/' "$PROJECT_DIR/package.json"
+rm -f "$PROJECT_DIR/config/webpack.legacy.js"
+```
+
+> Kalıcı olması gereken her değişiklik bu dizinin altında olmalı. Başka bir
+> yere yazılan dosya değişiklik kaydına girmez, branch'e gitmez ve çalıştırma
+> bitince kaybolur.
+
+### Çok adımlı işler: kampanya klasörleri
+
+Otuz projeyi Node 18'den 24'e taşıyorsanız ve framework ekibi bunu yedi adım
+olarak tarif ettiyse, o yedi adımı **bir klasörde** toplayın.
+
+**Ayarlar → Script'ler → Klasör aç:**
+
+| Alan | Örnek |
+|---|---|
+| Ad | `node-24-upgrade` → `/home/agent/scripts/node-24-upgrade` |
+| Kampanya ne? | `Node 18'den 24'e standart yükseltme adımları` |
+
+Adımları bu klasöre ekleyin ve **sırayı adlarla kurun** — ürün ayrı bir sıra
+bilgisi tutmaz, böylece arayüzde gördüğünüz sıra ile container'daki `ls`
+çıktısı asla ayrışmaz:
+
+```
+/home/agent/scripts/node-24-upgrade/
+  01-engine-alanini-guncelle.sh
+  02-bagimliliklari-yukselt.sh
+  03-ci-dosyasini-guncelle.sh
+  …
+```
+
+Agent'a **klasörü** seçersiniz; yedi kutucuk işaretlemezsiniz. Klasöre
+sonradan sekizinci adımı eklediğinizde o klasörü kullanan bütün agent'larda
+kendiliğinden geçerli olur — hiçbir agent'ı tekrar düzenlemezsiniz.
+
+Agent talimatında şunu görür:
+
+```markdown
+### node-24-upgrade — Node 18'den 24'e standart yükseltme adımları
+
+Dizin: `/home/agent/scripts/node-24-upgrade`
+Adımlar numara sırasıyla yazılmıştır.
+
+- `/home/agent/scripts/node-24-upgrade/01-engine-alanini-guncelle.sh` — …
+```
+
+> **Sıra anlatılır, dayatılmaz.** Adımlar arasında karar veren agent'tır —
+> ikinci adımdan sonra derleme kırılırsa onu düzeltip devam etmesi beklenir.
+> Sıranın mekanik olarak işletilmesini istiyorsanız doğru çözüm yedi betik
+> değil, yedisini çağıran **tek** bir betiktir. Nasıl işleteceğini agent'ın
+> kendi talimatında (sizin yazdığınız prompt) anlatın.
+
+**Ortak betikler klasöre girmez.** Birden fazla kampanyada işe yarayan bir
+betiği klasörsüz bırakın; her klasöre kopyalanan betikler zamanla birbirinden
+ayrışır. Agent'a klasör ve klasörsüz betik **birlikte** atanabilir.
+
+Klasörü silmek betikleri silmez — klasörsüz kalırlar.
 
 > Sınır şu: **model ne zaman çağıracağına karar verir, betik ne yapılacağına.**
 > "Ne işe yarar" alanı bu yüzden önemli — agent'ın betiği ne zaman çağıracağını

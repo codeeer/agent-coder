@@ -4,16 +4,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { SCRIPT_DIR, type Script } from "@/lib/types";
+import { PROJECT_DIR, scriptPath, type Script } from "@/lib/types";
 import { IconPlus } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/Pagination";
+import { ScriptFolders } from "./ScriptFolders";
 import {
+  Badge,
   Button,
   PanelCard,
   Input,
   Mono,
   Notice,
   Panel,
+  Select,
   Skeleton,
   Textarea,
   Well,
@@ -58,6 +61,12 @@ export function ScriptSection() {
       }
     >
       <div className="space-y-3">
+        <ScriptFolders />
+
+        <div className="border-t border-line pt-3">
+          <p className="text-sm font-medium">Betikler</p>
+        </div>
+
         {adding && <ScriptForm onDone={() => setAdding(false)} />}
 
         {scripts.isPending && <Skeleton rows={2} />}
@@ -124,14 +133,17 @@ function ScriptCard({ script }: { script: Script }) {
     <PanelCard>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <span className="font-medium">{script.name}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{script.name}</span>
+            {script.folderName && <Badge tone="neutral">{script.folderName}</Badge>}
+          </div>
           {script.description && (
             <p className="mt-1 text-sm text-ink-2">{script.description}</p>
           )}
           {/* Agent'ın göreceği yol: kullanıcı talimatında ona atıfta bulunmak
               isterse aynı metni kullanabilmeli. */}
           <p className="mt-1 font-mono text-xs break-all text-ink-3">
-            {SCRIPT_DIR}/{script.name}.sh
+            {scriptPath(script)}
           </p>
           <p className="mt-1 text-2xs text-ink-3">
             Güncellendi: {formatDate(script.updatedAt)}
@@ -180,7 +192,17 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
 
   const [name, setName] = useState(script?.name ?? "");
   const [description, setDescription] = useState(script?.description ?? "");
-  const [content, setContent] = useState(script?.content ?? "#!/bin/bash\nset -euo pipefail\n\n");
+  const [folderId, setFolderId] = useState(script?.folderId ?? "");
+  const [content, setContent] = useState(
+    script?.content ?? `#!/usr/bin/env bash\nset -euo pipefail\n\ncd "$PROJECT_DIR"\n`,
+  );
+
+  const folders = useQuery({
+    queryKey: ["script-folders"],
+    queryFn: api.scriptFolders.list,
+  });
+
+  const secilenKlasor = folders.data?.items.find((f) => f.id === folderId);
 
   const save = useMutation({
     mutationFn: () =>
@@ -189,14 +211,20 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
             name: name.trim(),
             description: description.trim(),
             content,
+            folderId: folderId || undefined,
+            // Klasörden çıkarmak ile "dokunma" JSON'da aynı görünüyor;
+            // ayrı bir bayrak olmadan ayırt edilemez.
+            clearFolder: folderId === "",
           })
         : api.scripts.create({
             name: name.trim(),
             description: description.trim(),
             content,
+            folderId: folderId || undefined,
           }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["scripts"] });
+      void qc.invalidateQueries({ queryKey: ["script-folders"] });
       onDone();
     },
   });
@@ -220,10 +248,38 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
               boşluk ve büyük harf kabul edilmediğini yoksa anlamaz. */}
           <span className="mt-1 block text-2xs text-ink-3">
             Dosya adı olur:{" "}
-            <span className="font-mono">
-              {SCRIPT_DIR}/{name.trim() || "upgrade-deps"}.sh
+            <span className="font-mono break-all">
+              {scriptPath({
+                name: name.trim() || "upgrade-deps",
+                folderName: secilenKlasor?.name,
+              })}
             </span>
             . Küçük harf, rakam ve - kullanılabilir.
+          </span>
+        </label>
+
+        {/* Klasör seçimi: kampanyaya ait betikler bir arada dursun.
+            Klasörsüz bırakmak MEŞRU — birden fazla kampanyada işe yarayan
+            ortak betikler oraya kopyalanmamalı. */}
+        <label className="block">
+          <span className="text-2xs tracking-wide text-ink-2 uppercase">
+            Klasör
+          </span>
+          <Select
+            className="mt-1"
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+          >
+            <option value="">Klasörsüz (ortak betik)</option>
+            {folders.data?.items.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+          <span className="mt-1 block text-2xs text-ink-3">
+            Bir kampanyanın adımları klasörde toplanır ve agent&apos;a tek
+            seçimle bağlanır.
           </span>
         </label>
 
@@ -263,8 +319,24 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
           <Mono>&quot;$GIT_TOKEN&quot;</Mono>
         </p>
         <p className="mt-2 text-2xs text-ink-2">
-          Betik agent&apos;ın kabuğunda, klonlanan deponun içinde çalışır. Hata
-          durumunda durması için <Mono>set -euo pipefail</Mono> önerilir.
+          Hata durumunda durması için <Mono>set -euo pipefail</Mono> önerilir.
+        </p>
+      </Well>
+
+      {/* PROJE DİZİNİ — betik yazarının bilmediği tek şey bu.
+          Kullanıcı projesinin İÇİNDEKİ yolu biliyor; kökün nereye açıldığını
+          kaynağı okumadan öğrenemezdi. */}
+      <Well className="mt-3 p-3">
+        <p className="text-xs">
+          <strong>Proje <Mono>{PROJECT_DIR}</Mono> altına klonlanır</strong> ve
+          bu yol betiğe <Mono>$PROJECT_DIR</Mono> olarak geçer. Çalışma dizinine
+          güvenmeyin, bu değişkeni kullanın:{" "}
+          <Mono>&quot;$PROJECT_DIR/config/webpack.config.js&quot;</Mono>
+        </p>
+        <p className="mt-2 text-2xs text-ink-2">
+          Kalıcı olması gereken her değişiklik bu dizinin altında olmalı —
+          başka bir yere yazılan dosya değişiklik kaydına girmez ve
+          çalıştırma bitince kaybolur.
         </p>
       </Well>
 

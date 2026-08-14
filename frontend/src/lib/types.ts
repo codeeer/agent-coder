@@ -191,6 +191,22 @@ export interface Script {
   /** Agent'ın talimatına yazılır — betiğin NE ZAMAN çağrılacağını anlatır. */
   description: string;
   content: string;
+  /** Ait olduğu kampanya klasörü; null ise klasörsüz. */
+  folderId: string | null;
+  /** Yolu üretmek için: `<SCRIPT_DIR>/<folderName>/<name>.sh`. */
+  folderName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Bir upgrade kampanyasının betiklerini toplayan klasör (spec 022). */
+export interface ScriptFolder {
+  id: string;
+  name: string;
+  /** Agent'ın talimatına yazılır: kampanyanın NE OLDUĞUNU anlatan tek şey. */
+  description: string;
+  scriptCount: number;
+  agentCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -199,16 +215,45 @@ export interface CreateScriptRequest {
   name: string;
   description?: string;
   content: string;
+  /** Ait olacağı klasör; verilmezse klasörsüz. */
+  folderId?: string;
 }
 
 export interface UpdateScriptRequest {
   name?: string;
   description?: string;
   content?: string;
+  folderId?: string;
+  /**
+   * Betiği klasörden çıkarır.
+   *
+   * AYRI BİR ALAN olmak zorunda: `folderId` gönderilmemesi ile null
+   * gönderilmesi JSON'da aynı görünüyor ve ilki \"dokunma\", ikincisi
+   * \"klasörden çıkar\" demek.
+   */
+  clearFolder?: boolean;
 }
 
 /** Betiklerin container içindeki dizini — arayüzde yol göstermek için. */
 export const SCRIPT_DIR = "/home/agent/scripts";
+
+/**
+ * Klonlanan projenin container içindeki kökü.
+ *
+ * Betikler bu yolu `$PROJECT_DIR` değişkeninden okur ve çalışma dizinine
+ * GÜVENMEZ — bash aracını hangi dizinde çalıştırdığı motorun kararı.
+ */
+export const PROJECT_DIR = "/work";
+
+/** Bir betiğin container içindeki tam yolu. */
+export function scriptPath(s: {
+  name: string;
+  folderName?: string;
+}): string {
+  return s.folderName
+    ? `${SCRIPT_DIR}/${s.folderName}/${s.name}.sh`
+    : `${SCRIPT_DIR}/${s.name}.sh`;
+}
 
 // ─── Jira (credentials) ─────────────────────────────────────────────────────
 
@@ -425,6 +470,8 @@ export interface Agent {
   scriptIds: string[];
   createdAt: string;
   updatedAt: string;
+  /** Agent'a atanmış kampanya klasörleri (spec 022). */
+  scriptFolderIds?: string[];
 }
 
 export interface CreateAgentRequest {
@@ -437,6 +484,7 @@ export interface CreateAgentRequest {
   allowEdit: boolean;
   allowBash: boolean;
   allowWebfetch: boolean;
+  scriptFolderIds?: string[];
 }
 
 export interface UpdateAgentRequest {
@@ -453,6 +501,7 @@ export interface UpdateAgentRequest {
   mcpServerIds?: string[];
   /** Aynı kural: nil dokunulmaz, boş dizi "hiçbiri". */
   scriptIds?: string[];
+  scriptFolderIds?: string[];
 }
 
 // ─── Çalıştırmalar ──────────────────────────────────────────────────────────

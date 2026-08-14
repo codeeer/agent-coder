@@ -97,29 +97,29 @@ Docker ile kanıtlanabilir.
 
 ## Blok 6 — Arayüz
 
-- [ ] T50 Ayarlar → Script'ler gruplu listelenir: klasörler ve klasörsüzler
+- [x] T50 Ayarlar → Script'ler gruplu listelenir: klasörler ve klasörsüzler
       ayrı → boş kurulumda da anlamlı görünür
-- [ ] T51 Klasör oluşturma, yeniden adlandırma, silme → silmede kaç script'in
+- [x] T51 Klasör oluşturma, yeniden adlandırma, silme → silmede kaç script'in
       klasörsüz kalacağı yazılı onay
-- [ ] T57 Script düzenleme ekranında `$PROJECT_DIR` notu görünür → kullanıcı
+- [x] T57 Script düzenleme ekranında `$PROJECT_DIR` notu görünür → kullanıcı
       kaynağı okumadan öğrenir
-- [ ] T52 Script formunda klasör seçimi (klasörsüz dahil) → var olan script'in
+- [x] T52 Script formunda klasör seçimi (klasörsüz dahil) → var olan script'in
       klasörü değiştirilebilir
-- [ ] T53 Agent formunda klasör + tekil script seçimi → ikisi bir arada
-- [ ] T54 Agent kartında atanmış klasörler görünür → tekil script'lerden ayırt
+- [x] T53 Agent formunda klasör + tekil script seçimi → ikisi bir arada
+- [x] T54 Agent kartında atanmış klasörler görünür → tekil script'lerden ayırt
       edilebilir
-- [ ] T55 **Bash yetkisi kapalı agent'a klasör atanmışsa uyarı görünür** →
+- [x] T55 **Bash yetkisi kapalı agent'a klasör atanmışsa uyarı görünür** →
       spec kararı: engellemek yerine söylemek
-- [ ] T56 `ui.md` doğrulaması: iki tema, geniş ve dar masaüstü, boş ve dolu
+- [x] T56 `ui.md` doğrulaması: iki tema, geniş ve dar masaüstü, boş ve dolu
       hâller → tarayıcıda ölçülür
 
 ## Blok 7 — Kapanış
 
-- [ ] T60 `README`: kampanya kurma anlatımı (klasör aç, adımları `01-` ile
+- [x] T60 `README`: kampanya kurma anlatımı (klasör aç, adımları `01-` ile
       adlandır, agent'a klasörü ata, prompt'ta sırayı anlat)
-- [ ] T61 Kapı temiz → `make test-integration` · `npx tsc --noEmit` ·
+- [x] T61 Kapı temiz → `make test-integration` · `npx tsc --noEmit` ·
       `npx eslint .` · `make lint-backend`
-- [ ] T62 Spec kabul kriterleri elle doğrulanır; `spec.md` durumu "Uygulandı"
+- [x] T62 Spec kabul kriterleri elle doğrulanır; `spec.md` durumu "Uygulandı"
 
 ---
 
@@ -175,3 +175,19 @@ klasör bir süre sonra işlevini yitirirdi.
 okur, çalıştırma katmanı birleşimi kullanmaya devam eder. Testi ayrıca yazıldı
 (`TestDirectScriptIDs_KlasordenGelenleriIcermez`) — aynı fonksiyonu iki amaç
 için kullanan bir tasarım o testte düşer.
+
+**Arayüz gerçek akışla doğrulandı.** Bir klasör (`node-24-upgrade`), içine üç
+adım ve bir de klasörsüz ortak betik oluşturuldu:
+
+| Ne | Sonuç |
+| --- | --- |
+| Klasörlü betiğin yolu | `/home/agent/scripts/node-24-upgrade/01-….sh` |
+| Klasörsüz betiğin yolu | `/home/agent/scripts/ortak-temizlik.sh` — DEĞİŞMEDİ |
+| Klasör seçilince tekil satırlar | seçili **ve kilitli** |
+| Koyu tema, yatay taşma | doğru, taşma yok |
+
+**Blok 5'te düzeltilen hata uçtan uca kanıtlandı:** klasör atandı →
+`scriptIds=0`; arayüzün kaydı taklit edildi → hâlâ `0`; klasör çıkarıldı →
+hâlâ `0`. Düzeltme öncesi ilk adımda 3, son adımda yine 3 kalırdı.
+
+Doğrulama verileri (klasör + dört betik) silindi.
