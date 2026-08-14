@@ -2,7 +2,7 @@
 
 - **Spec no:** 020
 - **Tarih:** 2026-08-14
-- **Durum:** Taslak
+- **Durum:** Uygulandı (2026-08-14)
 
 ---
 
@@ -75,14 +75,14 @@ Ayrı bir iş olarak değerlendirilecek.
 
 Kabul kriterleri:
 
-- [ ] Proxy adresi tanımlıyken başlatılan bir çalıştırmada, agent ortamının kurduğu
+- [x] Proxy adresi tanımlıyken başlatılan bir çalıştırmada, agent ortamının kurduğu
       dış bağlantıların **tamamı** proxy üzerinden geçer; doğrudan kurulan bağlantı
       sayısı sıfırdır
-- [ ] Bu, proxy'yi yok sayan bir araç için de geçerlidir: böyle bir araç dışarı
+- [x] Bu, proxy'yi yok sayan bir araç için de geçerlidir: böyle bir araç dışarı
       çıkamaz, bağlantısı başarısız olur
-- [ ] Proxy adresi tanımlı değilken hiçbir şey değişmez; çalıştırmalar bugünkü gibi
+- [x] Proxy adresi tanımlı değilken hiçbir şey değişmez; çalıştırmalar bugünkü gibi
       çalışır
-- [ ] Doğrudan bağlantı sayısının sıfır olduğu ölçülür ve ölçüm belgeye yazılır
+- [x] Doğrudan bağlantı sayısının sıfır olduğu ölçülür ve ölçüm belgeye yazılır
 
 ### H2 — Çıkılabilecek domain'leri sınırlamak
 
@@ -92,14 +92,14 @@ taşınmasına açık kapı bırakıyor.
 
 Kabul kriterleri:
 
-- [ ] Ayarlar ekranında whitelist girilebilir; her satır bir domain
-- [ ] Tam domain (`ornek.com`) yalnızca o adresi açar
-- [ ] Subdomain'ler için bir yazım biçimi vardır ve yardım metninde gösterilir
-- [ ] Whitelist'te olmayan bir domain'e çıkış girişimi engellenir
-- [ ] Whitelist boş bırakılırsa domain kısıtı uygulanmaz; proxy zorunluluğu sürer
-- [ ] Whitelist yalnızca proxy adresi tanımlıyken anlam taşır; proxy boşken hiçbir
+- [x] Ayarlar ekranında whitelist girilebilir; her satır bir domain
+- [x] Tam domain (`ornek.com`) yalnızca o adresi açar
+- [x] Subdomain'ler için bir yazım biçimi vardır ve yardım metninde gösterilir
+- [x] Whitelist'te olmayan bir domain'e çıkış girişimi engellenir
+- [x] Whitelist boş bırakılırsa domain kısıtı uygulanmaz; proxy zorunluluğu sürer
+- [x] Whitelist yalnızca proxy adresi tanımlıyken anlam taşır; proxy boşken hiçbir
       etkisi yoktur ve bu durum arayüzde söylenir
-- [ ] Geçersiz bir satır (domain yerine URL, port, boşluk içeren metin) kaydedilmez
+- [x] Geçersiz bir satır (domain yerine URL, port, boşluk içeren metin) kaydedilmez
       ve hata mesajı ne yazılması gerektiğini söyler
 
 ### H3 — Engellenen çıkışı görmek
@@ -110,12 +110,12 @@ neden yarım kaldığını anlayamam ve whitelist'e ne ekleyeceğimi bilemem.
 
 Kabul kriterleri:
 
-- [ ] Engellenen her domain, çalıştırmanın olay akışında uyarı olarak görünür ve
+- [x] Engellenen her domain, çalıştırmanın olay akışında uyarı olarak görünür ve
       hangi domain'in engellendiğini yazar
-- [ ] Aynı domain tekrar tekrar denendiğinde olay akışı okunmaz hale gelmez
-- [ ] Engellenen bir çıkış, backend'i hataya düşürmez; yalnızca o istek başarısız
+- [x] Aynı domain tekrar tekrar denendiğinde olay akışı okunmaz hale gelmez
+- [x] Engellenen bir çıkış, backend'i hataya düşürmez; yalnızca o istek başarısız
       olur
-- [ ] Uyarı metni, domain'in whitelist'e eklenmesi gerektiğini söyler
+- [x] Uyarı metni, domain'in whitelist'e eklenmesi gerektiğini söyler
 
 ### H4 — Her zaman izinli adresleri görmek
 
@@ -125,11 +125,11 @@ adres varsa bunu bilmem gerekir.
 
 Kabul kriterleri:
 
-- [ ] Whitelist alanının yanında "her zaman izinli" domain'ler ayrıca görünür
-- [ ] Bu domain'ler gerçek yapılandırmadan gelir: LLM provider'ın adresi, git
+- [x] Whitelist alanının yanında "her zaman izinli" domain'ler ayrıca görünür
+- [x] Bu domain'ler gerçek yapılandırmadan gelir: LLM provider'ın adresi, git
       repository adresi, tanımlıysa npm/Maven registry adresi
-- [ ] opencode'un kendi çalışması için gereken domain'ler de bu listede görünür
-- [ ] Kullanıcı bu domain'leri whitelist'e ayrıca yazmak zorunda kalmaz; boş
+- [x] opencode'un kendi çalışması için gereken domain'ler de bu listede görünür
+- [x] Kullanıcı bu domain'leri whitelist'e ayrıca yazmak zorunda kalmaz; boş
       whitelist bırakmak ürünü çalışmaz hale getirmez
 
 ---

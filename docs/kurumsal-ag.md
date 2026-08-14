@@ -1,7 +1,7 @@
-# Kurumsal ağ: paket deposu ve kök sertifika
+# Kurumsal ağ: paket deposu, kök sertifika ve çıkış denetimi
 
-Bu belge, agent'ın **kapalı bir kurumsal ağda** çalışması için gereken iki
-ayarı, kurulumu **canlıya çıkmadan önce provasını yapmayı** ve bugün neyin
+Bu belge, agent'ın **kapalı bir kurumsal ağda** çalışması için gereken
+ayarları, kurulumu **canlıya çıkmadan önce provasını yapmayı** ve bugün neyin
 kapsandığını anlatır.
 
 README'deki [SSL inspection yapan kurumsal ağlar](../README.md#ssl-inspection-yapan-kurumsal-ağlar)
@@ -18,6 +18,8 @@ anlaşılıyor ve hata mesajı çoğu zaman asıl sebebi göstermiyor.
 | --- | --- | --- |
 | npm kayıt defteri adresi + kullanıcı adı | Arayüz → **Ayarlar → Paket deposu** | Genel npm deposuna çıkılamıyorsa |
 | Maven deposu adresi | Aynı ekran | Maven Central'a çıkılamıyorsa |
+| Çıkış proxy'si | Arayüz → **Ayarlar → Kurumsal ağ** | İnternete yalnızca kurumun proxy'sinden çıkılabiliyorsa |
+| İzinli domain listesi | Aynı ekran | Sandbox'ın çıkabileceği adresler sınırlanacaksa |
 | Paket deposu süre sınırı | Aynı ekran | Ulaşılamayan depoda çalıştırma dakikalarca beklemesin diye |
 | Parola / token | Aynı ekran → **Kimlik doğrulama** kartı | Depo anonim okumaya kapalıysa |
 | Kurumsal kök sertifika | Arayüz → **Ayarlar → Kurumsal ağ** | Ağ HTTPS'i kendi sertifikasıyla açıp yeniden imzalıyorsa |
@@ -300,6 +302,117 @@ kaldırılmıştı (spec 014).
 | npm istekleri `localhost:8081`'e gidiyor | TLS sonlandıran vekilde `X-Forwarded-Proto` / `Host` başlıkları eksik. |
 | `çalışma ortamı hazırlanamadı` | Genelde depo klonlaması; önce sertifikayı, sonra Git erişimini kontrol edin. |
 | Agent `--registry` verip genel depoya kaçıyor | Adres ayarda tanımlı değil. Tanımlıysa agent'ın talimatına "adresi değiştirme" notu ekleniyor. |
+
+---
+
+## Sandbox çıkış denetimi
+
+Varsayılan olarak agent'ın çalıştığı ortam **internetteki her adrese
+çıkabilir**. Bu bir varsayım değil ölçüm:
+[veri sızıntısı analizi](veri-sizintisi-analizi.md) sırasında agent, imajda
+zaten kurulu olan JDK ve Maven yerine internetten kendi kopyalarını indirip
+çalıştırdı ve alakasız bir siteye bağlandı — görev bunların hiçbirini
+istememişti.
+
+Çıkış denetimi bu kapıyı kapatır.
+
+### İki ayar, tek anahtar
+
+**Çıkış proxy'si ana anahtardır.** Boşken hiçbir şey değişmez: bugünkü
+davranış aynen sürer ve izinli domain listesi de yok sayılır.
+
+| Proxy | İzinli domain listesi | Sonuç |
+| --- | --- | --- |
+| boş | (fark etmez) | Denetim kapalı — agent her adrese çıkabilir |
+| dolu | boş | Tüm domain'ler açık, ama çıkış **proxy'den geçmek zorunda** |
+| dolu | dolu | Yalnızca listedekiler + her zaman izinliler |
+
+Boş listenin "hiçbir şeye izin yok" sayılmaması bilinçli: ayarı ilk açan
+herkesin kurulumu kilitlenirdi.
+
+### Zorlama nereden geliyor
+
+**Ayardan değil, ağdan.** Proxy tanımlıyken runner container'ı, internete
+**rotası olmayan** ayrı bir Docker network'ünde doğar. Dışarıya tek yol
+Agent Coder'ın içindeki çıkış kapısıdır.
+
+Bu ayrım önemli, çünkü ölçüldü: yalnızca `HTTP_PROXY` ortam değişkeniyle
+yapılan yönlendirme **atlanabiliyor** — sızıntı analizinde Maven'ın JVM tarafı
+26 bağlantının 5'ini proxy'yi atlayarak kurdu. Kısıtlı network'te böyle bir
+kaçış mümkün değil: DNS `Could not resolve host`, doğrudan IP'ye bağlantı ise
+0 ms'de `Could not connect` veriyor.
+
+Denetim açıkken aynı Maven'lı görev tekrarlandığında kapı dışına giden bağlantı
+sayısı **0** ölçüldü.
+
+### Kapı TLS açmaz
+
+Karar yalnızca `CONNECT` satırındaki domain'e bakılarak verilir; trafik
+açılmaz. Yani Agent Coder, LLM sağlayıcıya giden isteğin içini **göremez**.
+
+Bunun bedeli: izin verilen bir domain'in **tamamı** açılır — her yol ve her
+port. `github.com` izinliyse oradaki her içerik erişilebilir olur. Domain
+listesi bunu kapatmaz.
+
+### Yazım biçimi
+
+Satır başına bir domain; boş satırlar ve `#` ile başlayan satırlar atlanır.
+
+```text
+nexus.sirket.local
+*.npmjs.org
+# yorum
+```
+
+- `ornek.com` → yalnızca o adres
+- `*.ornek.com` → alt alan adları (apex hariç)
+- Şema, port ve yol **yazılmaz**; izinli bir domain'e tüm portlar açıktır
+- Tek parçalı iç adlar geçerlidir (`nexus`, `gitlab`)
+- Uluslararası adlar punycode olarak yazılmalıdır (`xn--...`)
+
+### Her zaman izinli adresler
+
+Kullanıcı yazmasa da açık olan adresler var; hepsi **Ayarlar → Kurumsal ağ**
+ekranında görünür:
+
+| Kaynak | Nereden geliyor |
+| --- | --- |
+| LLM sağlayıcı | Tanımlı sağlayıcıların adresi |
+| Kod deposu | Tanımlı projelerin depo adresi |
+| Paket deposu | npm / Maven registry ayarları |
+| Çalıştırma motoru | `models.opencode.ai`, `github.com`, `release-assets.githubusercontent.com` |
+
+Motorun adresleri ölçümle biliniyor: opencode her çalıştırmada model kataloğu
+çekiyor ve GitHub'dan bir yardımcı program indiriyor. Bunlar kapalıyken motor
+hiç açılmaz.
+
+> **Bilinen genişlik:** `github.com` tek bir indirme için açılıyor ama GitHub'ın
+> tamamını açıyor. Çözümü o programı imaja gömmek; ayrı bir iş olarak
+> değerlendirilecek.
+
+### Engellenen çıkış nasıl görünür
+
+Hem backend logunda hem çalıştırmanın kendi olay akışında:
+
+```text
+çıkış engellendi: archive.apache.org — erişim gerekiyorsa
+Ayarlar → Kurumsal ağ → izinli domain listesine ekleyin
+```
+
+Agent tarafında istek `CONNECT tunnel failed, response 403` ile düşer.
+Çalıştırma devam eder; yalnızca o istek başarısız olur.
+
+Aynı adres tekrar tekrar denenirse olay akışı boğulmaz — ilk denemede yazılır,
+sonra seyrekleşerek, ama kaç kez denendiği belirtilerek.
+
+### Bilinen sınırlar
+
+| Sınır | Sonuç |
+| --- | --- |
+| Doğrudan `java -jar` proxy ayarını okumaz | O çağrı düşer (sertifikadaki boşluğun aynısı) |
+| İzinli domain'in tamamı açılır | Domain listesi içerik denetimi yapmaz |
+| Kimlik doğrulaması isteyen proxy | Desteklenmiyor; adres kullanıcı adı/parola içeremez |
+| Backend yeniden başlarsa | Süren çalıştırmanın dış erişimi kesilir |
 
 ---
 

@@ -106,14 +106,14 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
       görev koşulur → çalıştırma ekranında ret uyarısı, backend 5xx yok
 - [x] T62 **Kapalı davranış:** proxy boşken çalıştırma → runner eski network'te,
       hiçbir proxy değişkeni yazılmamış (`docker inspect` ile env kontrolü)
-- [ ] T63 `docs/kurumsal-ag.md`: yeni ayarlar, kapsam tablosu, `java -jar` sınırı
+- [x] T63 `docs/kurumsal-ag.md`: yeni ayarlar, kapsam tablosu, `java -jar` sınırı
       ve "izinli host üzerinden sızdırma" uyarısı
-- [ ] T64 `README.md` ve `.env.example` güncellenir → yeni ortam değişkenleri
+- [x] T64 `README.md` ve `.env.example` güncellenir → yeni ortam değişkenleri
       belgelenmiş
-- [ ] T65 `docs/veri-sizintisi-analizi.md`'ye "Öneriler" bölümünün 1. maddesinin
+- [x] T65 `docs/veri-sizintisi-analizi.md`'ye "Öneriler" bölümünün 1. maddesinin
       karşılandığı ve yeni ölçüm sonucu eklenir
-- [ ] T66 `specs/README.md` tablosuna 016–020 eklenir (tablo 015'te kalmış)
-- [ ] T67 `make test` · `make lint-backend` · `npx tsc --noEmit` · `npx eslint .`
+- [x] T66 `specs/README.md` tablosuna 016–020 eklenir (tablo 015'te kalmış)
+- [x] T67 `make test` · `make lint-backend` · `npx tsc --noEmit` · `npx eslint .`
       temiz
 
 ---

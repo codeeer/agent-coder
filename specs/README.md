@@ -23,6 +23,11 @@ anlaşılıyordu. Birleştirildi.
 | [013](013-node-surumlu-runner-imajlari/spec.md) | Node sürümlü runner imajları | koşu öncesi sürüm seçimi, sürüm başına imaj | Uygulandı · **spec geriye dönük** |
 | [014](014-kurumsal-paket-deposu/spec.md) | Kurumsal paket deposu | npm kayıt defteri adresi ve opsiyonel kimlik | Uygulandı · **spec geriye dönük** |
 | [015](015-motor-loglari/spec.md) | Motor logları | ham logların toplanması, maskelenmesi, saklanması ve gösterimi | Uygulandı · **spec geriye dönük** |
+| [016](016-ayar-denetimi-ve-arama/spec.md) | Ayar denetimi ve arama | iki durumlu ayarın anahtara dönmesi, ayarlarda arama | Uygulandı |
+| [017](017-kurumsal-ag-sertifikasi/spec.md) | Kurumsal ağ sertifikası | kök sertifikanın arayüzden tanımlanması, ürünün kendi çağrılarının kapsanması | Uygulandı |
+| [018](018-maven-paket-deposu/spec.md) | Maven paket deposu | Maven deposu adresi, iki JDK, paket deposu süre sınırı | Uygulandı |
+| [019](019-projeler-ekrani/spec.md) | Projeler ekranı | liste/kart görünümü, bilgi yoğunluğu | Taslak |
+| [020](020-sandbox-cikis-denetimi/spec.md) | **Sandbox çıkış denetimi** | çıkış proxy'si, izinli domain listesi, ağ seviyesinde zorlama | Uygulandı |
 
 ## Hangi spec'e bakmalı?
 

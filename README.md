@@ -231,6 +231,26 @@ araçları kapsadığını görmek ve hata mesajlarını sebeplerine eşlemek i�
 [docs/kurumsal-ag.md](docs/kurumsal-ag.md) — gerçek bir Nexus'u kendi kök
 sertifikanızla ayağa kaldıran, adım adım doğrulanabilir bir rehber.
 
+### Sandbox çıkış denetimi
+
+Varsayılan olarak agent'ın çalıştığı ortam internetteki her adrese çıkabilir.
+Bunu sınırlamak için **Ayarlar → Kurumsal ağ**:
+
+- **Çıkış proxy'si** — tanımlanırsa agent ortamı internete YALNIZCA o proxy
+  üzerinden çıkabilir. Bu bir yönlendirme değil zorlamadır: runner, internete
+  rotası olmayan bir Docker network'ünde doğar ve dışarıya tek yol ürünün
+  kendi çıkış kapısıdır.
+- **İzinli domain'ler** — satır başına bir domain. Boş bırakılırsa domain
+  kısıtı uygulanmaz, ama çıkış yine proxy'den geçer.
+
+Proxy boşsa hiçbir kısıt uygulanmaz ve davranış bugünküyle aynıdır.
+
+LLM sağlayıcı, kod deposu, paket deposu ve çalıştırma motorunun kendi
+adresleri **kullanıcı yazmasa da izinlidir** ve aynı ekranda listelenir.
+
+Ayrıntı, ölçümler ve bilinen sınırlar:
+[docs/kurumsal-ag.md → Sandbox çıkış denetimi](docs/kurumsal-ag.md#sandbox-çıkış-denetimi)
+
 ### Kurumsal paket deposu (Nexus)
 
 **Ev/ofis ağındaysanız bu bölümü atlayın.**
