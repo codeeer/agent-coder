@@ -28,6 +28,8 @@
 import {
   BookOpen,
   Bot,
+  LayoutGrid,
+  Rows3,
   ChartColumn,
   Check,
   ChevronDown,
@@ -114,6 +116,10 @@ export const IconEdit = icon(Pencil);
 export const IconRefresh = icon(RefreshCw);
 export const IconUndo = icon(Undo2);
 export const IconSearch = icon(Search);
+
+// Görünüm anahtarı: satır listesi ve kart ızgarası.
+export const IconRows = icon(Rows3);
+export const IconGrid = icon(LayoutGrid);
 export const IconExternal = icon(ExternalLink);
 export const IconPlay = icon(CirclePlay);
 // Kurumsal paket deposu (Nexus, Artifactory…).

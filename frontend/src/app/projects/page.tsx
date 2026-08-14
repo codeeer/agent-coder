@@ -2,8 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import {
+  PAGE_SIZE,
+  readView,
+  writeView,
+  type ProjectView,
+} from "@/lib/project-view";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
 import type {
@@ -21,12 +27,14 @@ import {
   formatPercent,
 } from "@/components/charts/format";
 import {
-  IconAlert,
   IconEdit,
   IconFolder,
+  IconAlert,
+  IconGrid,
   IconPlus,
-  IconTrash,
+  IconRows,
   IconWorkflow,
+  IconTrash,
 } from "@/components/ui/icons";
 import {
   Badge,
@@ -34,8 +42,10 @@ import {
   EmptyState,
   IconTile,
   Input,
+  ConfirmStrip,
   Metric,
   Notice,
+  RowAction,
   PageHeader,
   Panel,
   SearchField,
@@ -66,10 +76,22 @@ import {
  * kartın kendi hücresinde açılır — ızgara yerinden oynamaz.
  */
 
-const PAGE_SIZE = 24;
 
 /** Etkinlik rakamlarının dönemi. Agent'lar ekranıyla aynı. */
 const USAGE_DAYS = 30;
+
+/*
+ * Görünüm seçenekleri.
+ *
+ * Etiketler METİN DEĞİL İKON: araç çubuğunda arama ve süzgeç zaten yer
+ * kaplıyor, "Liste" ve "Kart" kelimeleri satırı taşırıyordu. Ekran okuyucu
+ * ve fare kullanıcısı için `title` metni duruyor; etkin görünüm ayrıca
+ * zeminle işaretli, yani renk tek kanal değil.
+ */
+const VIEWS = [
+  { id: "list", label: <IconRows className="size-4" />, title: "Liste görünümü" },
+  { id: "card", label: <IconGrid className="size-4" />, title: "Kart görünümü" },
+] as const;
 
 const FILTERS = [
   { id: "all", label: "Tümü" },
@@ -83,12 +105,23 @@ export default function ProjectsPage() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+
+  /*
+   * Görünüm tercihi.
+   *
+   * İlk çizim SUNUCUDA yapılıyor ve orada `localStorage` yok; bu yüzden
+   * varsayılanla başlanır ve kaydedilmiş tercih ilk efektle uygulanır. Tema
+   * anahtarındaki kalıbın aynısı — aksi halde sunucu ve istemci çıktısı
+   * uyuşmaz ve React uyarı basar.
+   */
+  const [view, setView] = useState<ProjectView>("list");
+  useEffect(() => setView(readView()), []);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterId>("all");
 
   const projects = useQuery({
-    queryKey: ["projects", offset],
-    queryFn: () => api.projects.list({ limit: PAGE_SIZE, offset }),
+    queryKey: ["projects", offset, view],
+    queryFn: () => api.projects.list({ limit: PAGE_SIZE[view], offset }),
   });
   const gitProviders = useQuery({
     queryKey: ["git-providers"],
@@ -142,7 +175,11 @@ export default function ProjectsPage() {
   const total = projects.data?.total ?? 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    /* `min-w-0`: bu kap, kenar çubuğunun yanındaki esnek satırın çocuğu.
+       Varsayılan `min-width: auto` ile içeriğinden dar olmayı reddediyor ve
+       tablonun `min-w-240`'ı SAYFA GÖVDESİNİ yatay kaydırıyordu. Kayma
+       yalnızca tablo kabına ait olmalı (spec 019). */
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <PageHeader
         title="Projeler"
         description="Agent'ların üzerinde çalışacağı kod depoları. Bir kez tanımlanır, her çalıştırmada listeden seçilir."
@@ -211,6 +248,22 @@ export default function ProjectsPage() {
                 value={filter}
                 onChange={setFilter}
               />
+              {/* Görünüm anahtarı arama ve süzgeçle AYNI YERDE: ui.md
+                  araç çubuğunu "arama, süzgeç, görünüm anahtarı tek yerde"
+                  diye tanımlıyor. Etkin görünüm hem zeminle hem ikonla
+                  belli — renk tek kanal değil. */}
+              <Segmented
+                label="Görünüm"
+                options={VIEWS}
+                value={view}
+                onChange={(v) => {
+                  setView(v);
+                  writeView(v);
+                  // Sayfa boyutu görünüme göre değişiyor; eski offset yeni
+                  // boyutta anlamsız (hatta toplamın ötesinde) olabilir.
+                  setOffset(0);
+                }}
+              />
               <span className="ml-auto hidden text-2xs text-ink-3 lg:block">
                 {items.length === projects.data?.items.length
                   ? `${items.length} proje`
@@ -219,19 +272,34 @@ export default function ProjectsPage() {
             </Toolbar>
           )}
 
-          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
+          {/* `min-w-0`: esnek kutu çocuğu varsayılan olarak içeriğinden dar
+              olmayı reddeder. Onsuz tablonun `min-w-240`'ı SAYFA GÖVDESİNİ
+              yatay kaydırıyordu; kaymanın yalnızca tablo kabına ait olması
+              gerekiyor (spec 019). */}
+          <div className="-mx-1 min-h-0 min-w-0 flex-1 overflow-y-auto px-1 pb-1">
             {items.length === 0 ? (
-              <Notice>Bu süzgece uyan proje yok.</Notice>
-            ) : (
+              /*
+               * Boş sonuç NEDEN boş olduğunu söylemeli.
+               *
+               * Önceki metin her durumda "Bu süzgece uyan proje yok" diyordu —
+               * kullanıcı bir kelime ARADIYSA yanlış yeri gösteriyordu:
+               * süzgeç "Tümü"de dururken sorun aramadaydı. Hangi ölçütün
+               * sonuç vermediği ve nasıl geri dönüleceği yazılıyor.
+               */
+              <Notice>
+                {q.trim() && filter !== "all"
+                  ? `“${q.trim()}” aramasına ve seçili erişim süzgecine birlikte uyan proje yok. Aramayı temizleyin veya süzgeci “Tümü” yapın.`
+                  : q.trim()
+                    ? `“${q.trim()}” aramasına uyan proje yok. Başka bir kelime deneyin veya aramayı temizleyin.`
+                    : "Seçili erişim süzgecine uyan proje yok. Süzgeci “Tümü” yaparak hepsini görebilirsiniz."}
+              </Notice>
+            ) : view === "card" ? (
               /* `items-start`: kartlar satır boyunca eşit yüksekliğe
                  ÇEKİLMEZ. Çekilseydi bir kartın silme onayıyla büyümesi
                  komşusunun ortasında boşluk açardı — nitekim açtı. */
               <ul className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
                 {items.map((p) =>
                   editingId === p.id ? (
-                    /* Düzenleme kartın KENDİ HÜCRESİNDE, tam genişlikte
-                       açılıyor: ızgaranın altına ya da üstüne taşınsaydı
-                       hangi projeyi düzenlediğiniz kaybolurdu. */
                     <li key={p.id} className="col-span-full">
                       <ProjectForm
                         project={p}
@@ -242,6 +310,79 @@ export default function ProjectsPage() {
                   ) : (
                     <li key={p.id}>
                       <ProjectCard
+                        project={p}
+                        provider={gitProviders.data?.find((g) => g.id === p.gitProviderId)}
+                        usage={report.data?.byProject.find((g) => g.key === p.id)}
+                        lastRun={lastRunOf(p.id)}
+                        workflows={
+                          workflows.data?.items.filter((w) => w.projectId === p.id) ?? []
+                        }
+                        onEdit={() => {
+                          setEditingId(p.id);
+                          setAdding(false);
+                        }}
+                      />
+                    </li>
+                  ),
+                )}
+              </ul>
+            ) : (
+              /*
+               * IZGARA DEĞİL TABLO — ve bu ölçülmüş bir karar.
+               *
+               * Kart düzeninde bir proje 227 piksel yer kaplıyordu; 665
+               * piksellik alanda altı proje görünüyor, sayfa boyutu ise 24
+               * idi. Yani bir sayfa dolduğunda sayfalama denetimine varmak
+               * için dört ekran boyu kaydırmak gerekiyordu: kaydırma,
+               * sayfalamanın yerine geçmişti (spec 019).
+               *
+               * Asıl kayıp yer değil KARŞILAŞTIRMA: kartlarda aynı bilgi her
+               * kartın farklı yerinde duruyor, iki projenin branch'ini yan
+               * yana görmek mümkün olmuyordu. Sütun hizası bunu çözüyor.
+               *
+               * Kalıp ÜRÜNÜN KENDİSİNDEN geliyor (Çalıştırmalar ekranı):
+               * yatay kaydırılabilir gerçek tablo, `divide-y` satırlar,
+               * sağa hizalı üstveri sütunları, başlıksız eylem sütunu.
+               */
+              <div className="overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card)">
+                <div className="overflow-x-auto">
+                  {/* `table-fixed`: sütun genişlikleri BAĞLAYICI olsun diye. Otomatik
+                      düzende hücre içeriğe göre genişliyor ve `truncate` hiç
+                      devreye girmiyordu — uzun bir depo yolu komşu sütunun
+                      üstüne taşıyordu. */}
+                  <table className="w-full min-w-240 table-fixed text-sm">
+                    <thead>
+                      <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
+                        <th className="py-2.5 pl-4 font-medium">Proje</th>
+                        <th className="w-64 py-2.5 font-medium">Erişim</th>
+                        <th className="w-40 py-2.5 font-medium">Akışlar</th>
+                        <th className="w-52 py-2.5 font-medium">Kullanım (30g)</th>
+                        <th className="w-44 py-2.5 font-medium">Son çalışma</th>
+                        {/* Başlıksız: her satırda iki ikon duran bir sütuna
+                            "Eylemler" yazmak gereksiz bir kademe eklerdi. */}
+                        <th className="w-20 py-2.5 pr-4">
+                          <span className="sr-only">Eylemler</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                {items.map((p) =>
+                  editingId === p.id ? (
+                    /* Düzenleme SATIRIN YERİNDE, tüm sütunları kaplayarak
+                       açılıyor: listenin altına ya da üstüne taşınsaydı hangi
+                       projeyi düzenlediğiniz kaybolurdu. */
+                    <tr key={p.id}>
+                      <td colSpan={6} className="p-4">
+                        <ProjectForm
+                          project={p}
+                          gitProviders={gitProviders.data ?? []}
+                          onDone={() => setEditingId(null)}
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    <ProjectRow
+                      key={p.id}
                         project={p}
                         provider={gitProviders.data?.find(
                           (g) => g.id === p.gitProviderId,
@@ -260,16 +401,18 @@ export default function ProjectsPage() {
                           setAdding(false);
                         }}
                       />
-                    </li>
                   ),
                 )}
-              </ul>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
 
           <Pagination
             total={total}
-            limit={projects.data?.limit ?? PAGE_SIZE}
+            limit={projects.data?.limit ?? PAGE_SIZE[view]}
             offset={projects.data?.offset ?? 0}
             onChange={(next) => {
               setOffset(next);
@@ -496,6 +639,219 @@ function ProjectCard({
         </div>
       )}
     </div>
+  );
+}
+
+
+/**
+ * Bir projenin liste satırı.
+ *
+ * KART DEĞİL SATIR — ve hiçbir bilgi kaybedilmedi. Kartta beş yatay bant
+ * hâlinde duran sekiz alan (ad, depo, branch, sunucu, git erişimi, akışlar,
+ * otuz günlük ölçüler, son çalışma) burada sütunlara dağılıyor. Kazanç yerden
+ * çok KARŞILAŞTIRMADAN geliyor: kartlarda iki projenin branch'ini yan yana
+ * görmek mümkün değildi (spec 019).
+ */
+function ProjectRow({
+  project,
+  provider,
+  usage,
+  lastRun,
+  workflows,
+  onEdit,
+}: {
+  project: Project;
+  provider?: GitProvider;
+  usage?: ReportGroup;
+  lastRun?: Run;
+  workflows: Workflow[];
+  onEdit: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: () => api.projects.remove(project.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setConfirming(false);
+    },
+  });
+
+  const repo = repoLabel(project.repoUrl);
+
+  return (
+    <>
+      <tr className="group transition-colors hover:bg-raised">
+        {/* ── Proje: ad + depo yolu ── */}
+        <td className="py-2 pl-4">
+          <div className="flex items-center gap-2.5">
+            {/* `sm`: bileşenin kendi belgesi bu boyutu "liste satırı içi"
+                diye tanımlıyor. `md` (36px) satırı 53 pikselde tutuyordu ve
+                ekrana sığan satır sayısını belirleyen tek şey oydu. */}
+            <IconTile tone={toneFromKey(project.id)} size="sm">
+              <IconFolder className="size-3.5" />
+            </IconTile>
+            <div className="min-w-0">
+              <div className="truncate leading-tight font-medium" title={project.name}>
+                {project.name}
+              </div>
+              {/* Depo kimliği `kullanici/depo`; ham URL'de en çok yeri
+                  `https://` kaplıyordu — yani en az bilgi taşıyan parça. */}
+              <div
+                className="truncate font-mono text-2xs leading-tight text-ink-2"
+                title={project.repoUrl}
+              >
+                {repo.path}
+              </div>
+            </div>
+          </div>
+        </td>
+
+        {/* ── Erişim: bu depo NASIL klonlanır ── */}
+        <td className="py-2">
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            <Badge title={`Varsayılan branch: ${project.defaultBranch}`}>
+              {project.defaultBranch}
+            </Badge>
+            {repo.host && <Badge>{repo.host}</Badge>}
+            {provider ? (
+              <Badge
+                tone={provider.verified ? "info" : "warning"}
+                title={
+                  provider.verified
+                    ? `${provider.name} kimliğiyle klonlanır`
+                    : `${provider.name} — erişim doğrulanamadan kaydedilmiş`
+                }
+              >
+                {/* Renk TEK KANAL DEĞİL: doğrulanmamış erişim rozetin
+                    metninde de belli olur. */}
+                {provider.verified ? provider.name : `${provider.name} · doğrulanmadı`}
+              </Badge>
+            ) : (
+              <Badge title="Kimlik doğrulaması olmadan klonlanır">açık depo</Badge>
+            )}
+          </div>
+        </td>
+
+        {/* ── Akışlar: SAYIYLA DEĞİL ADLARIYLA ──
+            "3 akış" bir sayaçtır ve "bu depoda hangi otomasyonlar var"
+            sorusuna cevap vermez. Sütuna ikisi sığar; kalanı listeye bırakılır. */}
+        <td className="py-2">
+          {workflows.length === 0 ? (
+            <span className="text-2xs text-ink-3">—</span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {workflows.slice(0, 2).map((w) => (
+                <Link
+                  key={w.id}
+                  href={`/workflows/${w.id}`}
+                  className="max-w-32 truncate rounded-md border border-line bg-raised px-1.5 py-px text-2xs text-ink-2 transition-colors hover:border-accent/40 hover:text-accent"
+                  title={w.name}
+                >
+                  {w.name}
+                </Link>
+              ))}
+              {workflows.length > 2 && (
+                <Link
+                  href="/workflows"
+                  className="rounded text-2xs text-ink-3 transition-colors hover:text-accent"
+                  title={workflows.slice(2).map((w) => w.name).join(", ")}
+                >
+                  +{workflows.length - 2}
+                </Link>
+              )}
+            </div>
+          )}
+        </td>
+
+        {/* ── Kullanım: ÜÇ KUTU DEĞİL TEK SATIR ──
+            Bilgi korunuyor (spec 019: hiçbir alan kaldırılmaz), yalnızca
+            kartın en büyük dikey payını kaplayan üç ölçü kutusu sessiz bir
+            üstveri satırına iniyor. */}
+        <td className="py-2">
+          {usage ? (
+            <span className="text-2xs whitespace-nowrap text-ink-2">
+              {formatCount(usage.runs)} çalıştırma
+              {" · "}
+              <span className={usage.succeeded / usage.runs >= 0.8 ? "text-ok" : "text-warn"}>
+                {formatPercent(usage.succeeded, usage.runs)} başarı
+              </span>
+              {" · "}
+              {formatMoney(usage.costUsd)}
+            </span>
+          ) : (
+            /* "0" YAZILMAZ: hiç çalıştırılmamış bir projeyi başarısız gibi
+               gösterirdi. Proje eski ama kullanılmış olabilir. */
+            <span className="text-2xs text-ink-3">
+              kayıt yok
+              {project.runCount > 0 && ` · toplam ${formatCount(project.runCount)}`}
+            </span>
+          )}
+        </td>
+
+        {/* ── Son çalışma ── */}
+        <td className="py-2">
+          {lastRun ? (
+            <span className="flex items-center gap-1.5 text-2xs whitespace-nowrap text-ink-3">
+              <RunStatusBadge status={lastRun.status} />
+              {formatRelative(lastRun.createdAt)}
+            </span>
+          ) : (
+            <span className="text-2xs whitespace-nowrap text-ink-3">
+              {formatRelative(project.createdAt)} eklendi
+            </span>
+          )}
+        </td>
+
+        {/* ── Eylemler ──
+            `RowAction`: durgunken saydam, hover VE odakta beliriyor. Saydamlık
+            düğmeye değil sarmalayıcıya veriliyor — düğmeye verildiğinde
+            `disabled:opacity` onu eziyor ve görünürlük tersine dönüyordu. */}
+        <td className="py-2 pr-4">
+          <RowAction className="justify-end gap-1">
+            <Button
+              size="sm"
+              onClick={onEdit}
+              icon={<IconEdit className="size-4" />}
+              aria-label={`${project.name} projesini düzenle`}
+            />
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => setConfirming(true)}
+              aria-label={`${project.name} projesini sil`}
+            >
+              <IconTrash className="size-4" />
+            </Button>
+          </RowAction>
+        </td>
+      </tr>
+
+      {/* Silme onayı SATIRIN ALTINDA, tüm sütunları kaplayarak: neyi
+          onayladığınızı görmeye devam edersiniz. */}
+      {confirming && (
+        <tr>
+          <td colSpan={6} className="p-0">
+            <ConfirmStrip
+              question={`"${project.name}" projesi silinsin mi?`}
+              consequence={
+                project.runCount > 0 ? (
+                  <>
+                    {formatCount(project.runCount)} çalıştırma geçmişi de
+                    silinecek. Bu geri alınamaz.
+                  </>
+                ) : undefined
+              }
+              busy={remove.isPending}
+              error={remove.isError ? describeError(remove.error).message : undefined}
+              onConfirm={() => remove.mutate()}
+              onCancel={() => setConfirming(false)}
+            />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
