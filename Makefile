@@ -279,8 +279,14 @@ lint-frontend: ## eslint
 
 .PHONY: lint-shell
 lint-shell: ## Kabuk betiklerini shellcheck ile denetle
+	@# Liste ELLE tutuluyor ve bir kez geride kaldı: `java-truststore.sh`
+	@# (spec 018) eklenmemişti. İki sonucu vardı — dosya hiç denetlenmiyordu ve
+	@# `entrypoint.sh` onu `source` ettiği için SC1091 veriyordu, yani hedef
+	@# sürekli kırmızıydı. Yeni bir betik eklenince BURAYA DA eklenmeli.
 	docker run --rm -v "$(CURDIR)":/mnt -w /mnt koalaman/shellcheck-alpine:stable \
-		shellcheck runner/entrypoint.sh runner/git-credentials.sh runner/git-credentials-test.sh
+		shellcheck runner/entrypoint.sh runner/git-credentials.sh \
+		runner/git-credentials-test.sh runner/java-truststore.sh \
+		runner/offline_test.sh scripts/runner-teshis.sh
 
 .PHONY: fmt
 fmt: ## Go kodunu biçimlendir
