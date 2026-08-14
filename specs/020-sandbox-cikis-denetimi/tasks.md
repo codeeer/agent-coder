@@ -26,20 +26,20 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 2 — Çıkış kapısı
 
-- [ ] T10 `internal/netgate`: `New` + `Serve` dinleyiciyi açar, `Address()` runner'a
+- [x] T10 `internal/netgate`: `New` + `Serve` dinleyiciyi açar, `Address()` runner'a
       verilecek URL'i döner → test rastgele portta ayağa kaldırır ve bağlanır
-- [ ] T11 `CONNECT` izinli host için upstream'e devredilir → sahte upstream proxy
+- [x] T11 `CONNECT` izinli host için upstream'e devredilir → sahte upstream proxy
       ile test: gövde uçtan uca akar
-- [ ] T12 `CONNECT` izinsiz host için reddedilir ve `OnDeny` çağrılır → istemci
+- [x] T12 `CONNECT` izinsiz host için reddedilir ve `OnDeny` çağrılır → istemci
       hata alır, `OnDeny` bir kez host adıyla çağrılır
-- [ ] T13 Kayıtsız IP'den gelen istek reddedilir → ayar boşken kapının fiilen
+- [x] T13 Kayıtsız IP'den gelen istek reddedilir → ayar boşken kapının fiilen
       kapalı olduğu testle gösterilir
-- [ ] T14 Düz HTTP (mutlak URL'li istek) aynı kararı alır → izinli geçer, izinsiz
+- [x] T14 Düz HTTP (mutlak URL'li istek) aynı kararı alır → izinli geçer, izinsiz
       reddedilir
-- [ ] T15 Upstream ulaşılamazken anlaşılır hata döner → test sahte upstream'i
+- [x] T15 Upstream ulaşılamazken anlaşılır hata döner → test sahte upstream'i
       kapatır, dönen hata "bilinmeyen" değil, sebebi yazar
-- [ ] T16 `Register`/`Unregister` eşzamanlı çağrılarda güvenli → `-race` ile test
-- [ ] T17 Gövde tamponlanmaz, akıtılır → 8 MB'lık gövde sabit bellekte geçer
+- [x] T16 `Register`/`Unregister` eşzamanlı çağrılarda güvenli → `-race` ile test
+- [x] T17 Gövde tamponlanmaz, akıtılır → 8 MB'lık gövde sabit bellekte geçer
       (ölçüm notu tasks sonuna yazılır)
 
 ## Blok 3 — Ayarlar
@@ -124,6 +124,7 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 |----|-------|
 | Kapı dışına giden bağlantı (önce) | 5 — `repo.maven.apache.org` |
 | Kapı dışına giden bağlantı (sonra) | _ölçülecek — T60_ |
+| 8 MB tünelden akarken heap artışı | < 4 MB (T17, `-race` ile) |
 
 ## Notlar
 
