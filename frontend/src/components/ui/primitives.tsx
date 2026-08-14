@@ -124,7 +124,15 @@ export function Panel({
         </div>
         {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
       </header>
-      <div className={`min-w-0 flex-1 ${padded ? "p-4" : ""}`}>{children}</div>
+      {/*
+        `min-h-0`: bir flex çocuğu varsayılan olarak içeriğinden KÜÇÜLEMEZ.
+        Bu olmadan, yüksekliği sınırlı bir panoda uzun içerik gövdeyi şişirip
+        panoyu kabından taşırıyordu. Kendiliğinden yükselen panolarda etkisi
+        yok — yalnızca yükseklik sınırı olan yerleşimde iş görüyor.
+      */}
+      <div className={`flex min-h-0 w-full min-w-0 flex-1 flex-col ${padded ? "p-4" : ""}`}>
+        {children}
+      </div>
     </section>
   );
 }

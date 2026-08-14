@@ -301,12 +301,32 @@ export default function RunDetailPage() {
           geçerdi; oysa oraya yalnızca bir şey ters gittiğinde bakılır. */}
       <RunTabs active={sekme} onSelect={setSekme} />
 
-      {/* Kayan bölge: künye ve sekmeler sabit kalırken içerik kayıyor. */}
-      <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
+      {/*
+        Kayan bölge: künye ve sekmeler sabit kalırken içerik kayıyor.
+
+        İLERLEME SEKMESİ AYRI DAVRANIYOR. Diğerlerinde (sonuç, diff, engine
+        logları) içerik uzun ve sayfanın kayması doğru: metin baştan sona
+        okunuyor. İlerleme ise CANLI bir akış — panonun başlığı ve "canlı"
+        göstergesi gözden kaybolmamalı, akan olaylar kendi kutusunda kaymalı.
+        Terminal ve CI log kalıbının aynısı.
+
+        Bu yüzden o sekmede dış kaydırma KAPALI ve yerleşim `flex` ile tam
+        alanı dolduruyor. Öncesi `calc(100vh-18rem)` ile başlık yüksekliğini
+        TAHMİN ediyordu; tahmin tutmayınca 620px pencerede iki kaydırma
+        çubuğu birden çıkıyordu (ölçüldü). Flex ile tahmin yok.
+      */}
+      <div
+        className={`-mx-1 min-h-0 flex-1 px-1 pb-1 ${
+          sekme === "ilerleme"
+            ? "flex flex-col overflow-hidden"
+            : "space-y-4 overflow-y-auto"
+        }`}
+      >
         {sekme === "motor" && <EngineLogs runId={id} live={active} />}
 
         {sekme === "ilerleme" && (
           <Panel
+            className="flex min-h-0 flex-1 flex-col"
             title="İlerleme"
             action={
               active ? (
@@ -636,18 +656,21 @@ function EventLog({
      * Kendi kutusu YOK: pano zaten bir kutu ve `Well` ile sarılınca iç içe
      * iki çerçeve çıkıyordu. Kayan alan doğrudan panonun gövdesi.
      *
-     * YÜKSEKLİK PENCEREYE GÖRE, sabit değil. Sabit 320px'ti ve bu, İlerleme
-     * ile çıktı ve diff'in ALT ALTA yığıldığı düzenden kalmıştı: sınır
-     * olmasaydı diğerlerine ulaşmak imkânsızdı. Her biri kendi sekmesine
-     * taşınınca sınır anlamını yitirdi ama kalmıştı — ÖLÇÜLDÜ: olaylar 320px'e
-     * sıkışıp içeride kayarken altında 165px boş alan duruyordu.
+     * YÜKSEKLİK YERLEŞİMDEN GELİYOR, sayıdan değil. Sabit 320px'ti ve bu,
+     * İlerleme ile çıktı ve diff'in ALT ALTA yığıldığı düzenden kalmıştı;
+     * her biri kendi sekmesine taşınınca anlamını yitirdi ama kalmıştı —
+     * ÖLÇÜLDÜ: olaylar 320px'e sıkışıp içeride kayarken altında 165px boş
+     * alan duruyordu. Ardından `calc(100vh-18rem)` denendi, o da başlık
+     * yüksekliğini TAHMİN ediyordu ve tahmin tutmayınca iki kaydırma çubuğu
+     * çıkıyordu. Artık kutu, `flex-1` ile sekme alanının kalanını alıyor:
+     * tahmin yok, her pencere boyunda tam oturuyor.
      *
      * Kaydırma KALIYOR: yeni olay geldikçe dibe kayan takip bu kutunun kendi
      * kaydırmasına bağlı (bkz. yukarıdaki `boxRef`).
      */
     <div
       ref={boxRef}
-      className="max-h-[calc(100vh-18rem)] min-h-40 overflow-auto px-4 py-3.5"
+      className="min-h-0 flex-1 overflow-auto px-4 py-3.5"
     >
       <ul className="space-y-1.5">
         {items.map((e) => (
