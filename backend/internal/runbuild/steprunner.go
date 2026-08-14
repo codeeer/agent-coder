@@ -81,13 +81,13 @@ func (r *StepRunner) RunStep(ctx context.Context, req workflow.StepRequest) (
 		if err != nil {
 			return outcome, fmt.Errorf("değişiklik branch'e gönderilemedi: %w", err)
 		}
-		branch, err := r.pusher.Push(ctx, runs.PushRequest{
+		sonuc, err := r.pusher.Push(ctx, runs.PushRequest{
 			Run: run, Repo: repoURL, Creds: creds,
 		})
 		if err != nil {
 			return outcome, fmt.Errorf("değişiklik branch'e gönderilemedi: %w", err)
 		}
-		outcome.Branch = branch
+		outcome.Branch = sonuc.Branch
 	}
 
 	// Çalıştırma başarısızsa akış da durmalı. Kayıt oluştuğu için RunID yine

@@ -558,11 +558,21 @@ function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {
   const suggested = `agent-coder/${run.agentSlug}-${run.id.slice(0, 8)}`;
   const [branch, setBranch] = useState(suggested);
 
+  /*
+   * Atlanan ikili dosya VARSA form KAPANMIYOR.
+   *
+   * Kapansaydı "gönderildi" dışında hiçbir şey görünmez ve eksik bir branch
+   * tam sanılırdı. Atlanan yoksa eskisi gibi kapanıyor — söylenecek bir şey
+   * olmadığında kullanıcıyı bir kutuyu kapatmaya zorlamak gereksiz.
+   */
+  const [atlanan, setAtlanan] = useState<string[]>([]);
+
   const push = useMutation({
     mutationFn: () => api.runs.push(run.id, branch.trim()),
-    onSuccess: () => {
+    onSuccess: (sonuc) => {
       void queryClient.invalidateQueries({ queryKey: ["run", run.id] });
-      onDone();
+      if (sonuc.skippedBinaries?.length) setAtlanan(sonuc.skippedBinaries);
+      else onDone();
     },
   });
 
@@ -590,6 +600,27 @@ function PushForm({ run, onDone }: { run: Run; onDone: () => void }) {
         <p className="max-w-md text-right text-xs text-danger">
           {describeError(push.error).message}
         </p>
+      )}
+
+      {atlanan.length > 0 && (
+        <div className="max-w-md rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-left text-xs">
+          <p className="font-medium text-warn">
+            Gönderildi, ama {atlanan.length} ikili dosya dışarıda kaldı
+          </p>
+          <p className="mt-1 text-ink-2">
+            Bu dosyalar yamada veri taşımıyor, uygulanamazlar. Genellikle
+            derleme çıktısıdır; deponuzda <code>.gitignore</code> yoksa
+            <code> target/</code>, <code>dist/</code> gibi klasörler değişiklik
+            sayılır.
+          </p>
+          <ul className="mt-1.5 space-y-0.5 font-mono text-2xs text-ink-3">
+            {atlanan.map((d) => (
+              <li key={d} className="truncate" title={d}>
+                {d}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

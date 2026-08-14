@@ -48,19 +48,31 @@ func SuggestBranch(r Run) string {
 	return fmt.Sprintf("agent-coder/%s-%s", r.AgentSlug, short)
 }
 
+/*
+ * PushResult, gönderimin sonucu.
+ *
+ * SkippedBinaries BOŞ BIRAKILMAZ, taşınır: uygulanamayan ikili blokları sessizce
+ * atmak, kullanıcıya eksik bir branch'i tam gibi göstermek olurdu.
+ */
+type PushResult struct {
+	Branch string
+	// SkippedBinaries, yamada veri taşımadığı için gönderilemeyen dosyalar.
+	SkippedBinaries []string
+}
+
 // Push, diff'i yeni bir branch olarak depoya gönderir.
 //
 // Aynı çalıştırma ikinci kez gönderilemez: iki farklı branch'in aynı işten
 // çıkması karışıklık yaratır ve kullanıcı hangisinin geçerli olduğunu bilemez.
-func (p *Pusher) Push(ctx context.Context, req PushRequest) (string, error) {
+func (p *Pusher) Push(ctx context.Context, req PushRequest) (PushResult, error) {
 	if !req.Run.HasChanges() {
-		return "", ErrNoChanges
+		return PushResult{}, ErrNoChanges
 	}
 	if req.Run.PushedBranch != nil && *req.Run.PushedBranch != "" {
-		return "", fmt.Errorf("%w: %s", ErrAlreadyPushed, *req.Run.PushedBranch)
+		return PushResult{}, fmt.Errorf("%w: %s", ErrAlreadyPushed, *req.Run.PushedBranch)
 	}
 	if req.Creds == nil || req.Creds.Secret == "" {
-		return "", ErrNoGitAccess
+		return PushResult{}, ErrNoGitAccess
 	}
 
 	branch := strings.TrimSpace(req.Branch)
@@ -73,13 +85,13 @@ func (p *Pusher) Push(ctx context.Context, req PushRequest) (string, error) {
 
 	dir, err := os.MkdirTemp("", "agent-coder-push-")
 	if err != nil {
-		return "", fmt.Errorf("geçici dizin oluşturulamadı: %w", err)
+		return PushResult{}, fmt.Errorf("geçici dizin oluşturulamadı: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	askpass, cleanupAskpass, err := projects.WriteAskpass(req.Creds.Secret)
 	if err != nil {
-		return "", fmt.Errorf("kimlik bilgisi hazırlanamadı: %w", err)
+		return PushResult{}, fmt.Errorf("kimlik bilgisi hazırlanamadı: %w", err)
 	}
 	defer cleanupAskpass()
 
@@ -114,43 +126,62 @@ func (p *Pusher) Push(ctx context.Context, req PushRequest) (string, error) {
 	}
 
 	if err := run("clone", "--depth", "1", "--branch", req.Run.Branch, repoURL, work); err != nil {
-		return "", err
+		return PushResult{}, err
 	}
 	if err := run("checkout", "-b", branch); err != nil {
-		return "", err
+		return PushResult{}, err
 	}
 
 	// Diff dosyaya yazılıp uygulanır; boru hattı yerine dosya kullanmak
 	// hata mesajlarını okunabilir tutuyor.
+	/*
+	 * UYGULANAMAZ İKİLİ BLOKLAR AYIKLANIYOR.
+	 *
+	 * opencode'un diff'i ikili dosyalar için yalnızca "Binary files … differ"
+	 * yazıyor — yük yok. `git apply` bunu uygulayamıyor ve TEK blok tüm yamayı
+	 * düşürüyordu: dokuz dosyanın yedisi düzgün metin olduğu hâlde hiçbiri
+	 * gönderilemiyordu (ölçüldü, `mvn` çalıştıran bir koşuda).
+	 *
+	 * Atılan blokta uygulanacak veri zaten yok; ama atlananlar çağırana
+	 * bildiriliyor ve kullanıcıya yazılıyor.
+	 */
+	temizDiff, atlanan := stripUnappliableBinary(req.Run.Diff)
+	if strings.TrimSpace(temizDiff) == "" {
+		return PushResult{}, fmt.Errorf(
+			"%w: değişikliklerin tamamı yamada veri taşımayan ikili dosya (%s)",
+			ErrNoChanges, strings.Join(atlanan, ", "))
+	}
+
 	patch := filepath.Join(dir, "changes.patch")
-	if err := os.WriteFile(patch, []byte(ensureTrailingNewline(req.Run.Diff)), 0o600); err != nil {
-		return "", fmt.Errorf("diff yazılamadı: %w", err)
+	if err := os.WriteFile(patch, []byte(ensureTrailingNewline(temizDiff)), 0o600); err != nil {
+		return PushResult{}, fmt.Errorf("diff yazılamadı: %w", err)
 	}
 
 	// --3way: hedef branch çalıştırmadan sonra ilerlediyse birleştirmeyi dener.
 	if err := run("apply", "--3way", "--whitespace=nowarn", patch); err != nil {
-		return "", fmt.Errorf("değişiklikler uygulanamadı (depo bu arada değişmiş olabilir): %w", err)
+		return PushResult{}, fmt.Errorf("değişiklikler uygulanamadı (depo bu arada değişmiş olabilir): %w", err)
 	}
 
 	if err := run("add", "-A"); err != nil {
-		return "", err
+		return PushResult{}, err
 	}
 
 	message := fmt.Sprintf("%s: %s", req.Run.AgentSlug, firstLines(req.Run.Task, 1))
 	if err := run("commit", "-m", message); err != nil {
-		return "", err
+		return PushResult{}, err
 	}
 
 	if err := run("push", "-u", "origin", branch); err != nil {
-		return "", err
+		return PushResult{}, err
 	}
 
 	if err := p.store.SetPushedBranch(context.WithoutCancel(ctx), req.Run.ID, branch); err != nil {
 		// Push başarılı ama kayıt tutulamadı: kullanıcıya branch adını yine
 		// söyleriz, aksi halde iki kez göndermeye çalışır.
-		return branch, fmt.Errorf("branch gönderildi (%s) ama kayıt güncellenemedi: %w", branch, err)
+		return PushResult{Branch: branch, SkippedBinaries: atlanan},
+			fmt.Errorf("branch gönderildi (%s) ama kayıt güncellenemedi: %w", branch, err)
 	}
-	return branch, nil
+	return PushResult{Branch: branch, SkippedBinaries: atlanan}, nil
 }
 
 func ensureTrailingNewline(s string) string {

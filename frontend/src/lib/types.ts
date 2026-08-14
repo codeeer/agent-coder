@@ -324,6 +324,18 @@ export interface EgressStatus {
   };
 }
 
+/**
+ * POST /api/runs/:id/push yanıtı.
+ *
+ * `skippedBinaries` boş DEĞİLSE gönderim eksiktir: yamada veri taşımayan ikili
+ * dosyalar (derleme çıktısı JAR gibi) uygulanamadığı için dışarıda kaldı.
+ * Kullanıcıya söylenmeli — eksik bir branch tam sanılmamalı.
+ */
+export interface PushResult {
+  branch: string;
+  skippedBinaries?: string[];
+}
+
 export type SettingKind = "int" | "bool" | "text" | "certificate" | "host_list";
 
 /**

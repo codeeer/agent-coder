@@ -204,6 +204,15 @@ func (h *Handler) deleteRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// pushResponse, gönderim sonucu.
+type pushResponse struct {
+	Branch string `json:"branch"`
+	// SkippedBinaries, yamada veri taşımadığı için gönderilemeyen dosyalar.
+	// Boşsa alan hiç yazılmaz — arayüz "hiçbir şey atlanmadı" ile "bilinmiyor"
+	// arasındaki farkı görmek zorunda değil, ikisi de aynı anlama geliyor.
+	SkippedBinaries []string `json:"skippedBinaries,omitempty"`
+}
+
 // pushRun, çalıştırmanın değişikliklerini yeni bir branch'e gönderir.
 func (h *Handler) pushRun(w http.ResponseWriter, r *http.Request) {
 	if h.deps.Pusher == nil {
@@ -238,7 +247,7 @@ func (h *Handler) pushRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	branch, err := h.deps.Pusher.Push(ctx, runs.PushRequest{
+	sonuc, err := h.deps.Pusher.Push(ctx, runs.PushRequest{
 		Run:    run,
 		Repo:   repoURL,
 		Creds:  creds,
@@ -249,8 +258,15 @@ func (h *Handler) pushRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.InfoContext(ctx, "değişiklikler gönderildi", "run_id", id, "branch", branch)
-	respondJSON(w, http.StatusOK, map[string]string{"branch": branch})
+	slog.InfoContext(ctx, "değişiklikler gönderildi",
+		"run_id", id, "branch", sonuc.Branch, "atlanan_ikili", len(sonuc.SkippedBinaries))
+
+	// Atlananlar YANITTA: arayüz "gönderildi" derken neyin gitmediğini de
+	// söylemeli, yoksa eksik bir branch tam sanılır.
+	respondJSON(w, http.StatusOK, pushResponse{
+		Branch:          sonuc.Branch,
+		SkippedBinaries: sonuc.SkippedBinaries,
+	})
 }
 
 func (h *Handler) respondRunError(w http.ResponseWriter, r *http.Request, err error) {

@@ -45,6 +45,7 @@ import type {
   SettingsResponse,
   CACertStatus,
   EgressStatus,
+  PushResult,
   CANormalizeResult,
   UpdateAgentRequest,
   PutCredentialRequest,
@@ -414,7 +415,7 @@ export const api = {
     remove: (id: string) => apiFetch<null>(`/api/runs/${id}`, { method: "DELETE" }),
 
     push: (id: string, branch?: string) =>
-      apiFetch<{ branch: string }>(`/api/runs/${id}/push`, {
+      apiFetch<PushResult>(`/api/runs/${id}/push`, {
         method: "POST",
         body: { branch: branch ?? "" },
         timeoutMs: 120_000,
