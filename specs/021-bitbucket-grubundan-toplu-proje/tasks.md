@@ -15,37 +15,37 @@ yanıtı saklamayan hata mesajları ise sahadan gelecek bildirimi işe yarar kı
 
 ## Blok 1 — Grup adresinin çözülmesi
 
-- [ ] T01 `internal/bitbucket` paketi: `ParseGroupURL` düz grup adresini çözer →
+- [x] T01 `internal/bitbucket` paketi: `ParseGroupURL` düz grup adresini çözer →
       `https://bb.sirket.com/projects/ODEME` → base `https://bb.sirket.com`,
       key `ODEME`
-- [ ] T02 Context path korunur → `https://sirket.com/bitbucket/projects/ODEME`
+- [x] T02 Context path korunur → `https://sirket.com/bitbucket/projects/ODEME`
       → base `https://sirket.com/bitbucket`
-- [ ] T03 Sondaki eğik çizgi ve fazladan yol parçası tolere edilir →
+- [x] T03 Sondaki eğik çizgi ve fazladan yol parçası tolere edilir →
       `…/projects/ODEME/`, `…/projects/ODEME/repos/api/browse` aynı sonucu verir
-- [ ] T04 Kişisel repository yolu çözülür → `…/users/ahmet` → key `~AHMET`
-- [ ] T05 Grup adresi olmayan girdi reddedilir → `ErrNotGroupURL`; mesaj
+- [x] T04 Kişisel repository yolu çözülür → `…/users/ahmet` → key `~AHMET`
+- [x] T05 Grup adresi olmayan girdi reddedilir → `ErrNotGroupURL`; mesaj
       beklenen biçimi **örnekle** söyler
-- [ ] T06 Bulut adresi ayrı hata döner → `api.bitbucket.org` ve
+- [x] T06 Bulut adresi ayrı hata döner → `api.bitbucket.org` ve
       `bitbucket.org/…` için `ErrCloudAddress`; denetim ayrıştırmadan ÖNCE
       koşar (plan → tuzaklar)
 
 ## Blok 2 — Repository listesinin çekilmesi
 
-- [ ] T10 `Client.ListRepos` tek sayfalık yanıtı ayrıştırır → `httptest`
+- [x] T10 `Client.ListRepos` tek sayfalık yanıtı ayrıştırır → `httptest`
       sunucusundan 3 repository döner
-- [ ] T11 **Sayfalama tükenene kadar devam eder** → `httptest` iki sayfa
+- [x] T11 **Sayfalama tükenene kadar devam eder** → `httptest` iki sayfa
       döndürür (`isLastPage:false` + `nextPageStart`), sonuç 30 kayıt olur.
       Tek çağrı yapan kod bu testte düşer
-- [ ] T12 Klonlama adresi `links.clone` içinden **http** olanı seçer →
+- [x] T12 Klonlama adresi `links.clone` içinden **http** olanı seçer →
       http+ssh karışık girdide http seçilir; ssh yoksa da çalışır
-- [ ] T13 Adrese gömülü kullanıcı adı ayıklanır →
+- [x] T13 Adrese gömülü kullanıcı adı ayıklanır →
       `https://ahmet@bb/scm/ODEME/api.git` → `https://bb/scm/ODEME/api.git`.
       Ayıklanmazsa `Input.Normalize` her kaydı reddederdi
-- [ ] T14 `archived` alanı yoksa `false` sayılır → alanı taşımayan yanıtta
+- [x] T14 `archived` alanı yoksa `false` sayılır → alanı taşımayan yanıtta
       hiçbir repository arşivli işaretlenmez
-- [ ] T15 Hata sınıflandırma → 404 `ErrGroupNotFound`, 401/403 `ErrForbidden`,
+- [x] T15 Hata sınıflandırma → 404 `ErrGroupNotFound`, 401/403 `ErrForbidden`,
       bağlantı hatası `ErrUnreachable`; her biri ayrı test
-- [ ] T16 Ayrıştırılamayan gövde sessiz boş liste DÖNMEZ → hata döner ve
+- [x] T16 Ayrıştırılamayan gövde sessiz boş liste DÖNMEZ → hata döner ve
       mesaj ham gövdenin kısaltılmış halini taşır (plan → riskler)
 
 ## Blok 3 — Varsayılan branch ve mükerrer denetimi
@@ -123,3 +123,19 @@ yanıtı saklamayan hata mesajları ise sahadan gelecek bildirimi işe yarar kı
 ## Notlar
 
 Plandan sapılırsa **neden** sapıldığı buraya yazılır.
+
+**T06 — bulut denetiminde plandan sapıldı.** Plan `gitprovider.bitbucketCloud`'un
+yeniden kullanılacağını yazıyordu. Kod okununca host kümelerinin FARKLI olduğu
+görüldü: o fonksiyon API adresine bakıyor ve yalnızca `api.bitbucket.org`'u
+tanıyor, oysa kullanıcının yapıştıracağı tarayıcı adresi `bitbucket.org`.
+Olduğu gibi çağrılsaydı en olası bulut adresi kurumsal sanılırdı.
+
+Kural tek yerde toplandı: `gitprovider.IsCloudHost` dışa açıldı ve iki host'u
+da kapsıyor (`api.bitbucket.org` zaten `bitbucket.org`'un alt alan adı, ayrıca
+yazılmadı). `bitbucketCloud` artık onu çağırıyor ve boş adresi Cloud sayma
+davranışını kendinde tutuyor. Mevcut `gitprovider` testleri değişmeden geçti.
+
+**T13'ün gerekçesi kod okumasından çıktı, spec'ten değil.** `Input.Normalize`
+gömülü kimlik taşıyan adresi reddediyor; ayıklama olmasaydı içe aktarmanın
+tamamı başarısız olurdu. Aynı yerde ikinci bir tuzak var: `Normalize` boş
+branch'i sessizce `main` yapıyor — Blok 3'te boş branch asla geçirilmeyecek.

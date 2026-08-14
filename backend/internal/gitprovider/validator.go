@@ -103,16 +103,40 @@ func bitbucketCloud(apiURL string) bool {
 		return true
 	}
 
-	u, err := url.Parse(apiURL)
-	if err != nil || u.Host == "" {
+	if u, err := url.Parse(apiURL); err != nil || u.Host == "" {
 		return strings.Contains(apiURL, bitbucketCloudHost)
 	}
-
-	host := strings.ToLower(u.Hostname())
-	return host == bitbucketCloudHost || strings.HasSuffix(host, "."+bitbucketCloudHost)
+	return IsCloudHost(apiURL)
 }
 
 const bitbucketCloudHost = "api.bitbucket.org"
+
+/*
+ * IsCloudHost, adresin Bitbucket Cloud'a ait olup olmadığını söyler.
+ *
+ * `bitbucketCloud`'dan AYRI ve dışa açık: orası API adresine bakıyor ve boş
+ * adresi "Cloud varsayılanı" sayıyor; burası ise kullanıcının tarayıcıdan
+ * kopyaladığı herhangi bir adrese bakıyor ve boşu Cloud saymıyor. İkisi aynı
+ * host kuralını paylaşsın diye kural tek yerde.
+ *
+ * `api.bitbucket.org` ayrıca yazılmıyor — o zaten `bitbucket.org`'un alt alan
+ * adı. Kullanıcı tarayıcıda `bitbucket.org` görüyor, API ise
+ * `api.bitbucket.org` kullanıyor; ikisi de Cloud.
+ *
+ * Karşılaştırma HOST üzerinden, metin araması DEĞİL:
+ * `https://bitbucket.sirket.local/api.bitbucket.org/x` düz metin aramasıyla
+ * yanlışlıkla Cloud sayılırdı.
+ */
+func IsCloudHost(rawURL string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || u.Host == "" {
+		return false
+	}
+
+	host := strings.ToLower(u.Hostname())
+	const cloud = "bitbucket.org"
+	return host == cloud || strings.HasSuffix(host, "."+cloud)
+}
 
 // check, doğrulama isteğinin sonucunu ortak kurallara göre yorumlar.
 func (v *Validator) check(req *http.Request) error {
