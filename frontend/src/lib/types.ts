@@ -302,7 +302,7 @@ export interface RefreshResponse {
  * "certificate" ADI BİÇİM DEĞİL: değer normalleştirilmiş PEM olarak saklanır
  * ama kullanıcı DER veya PKCS#7 de verebiliyor (bkz. network.normalizeCA).
  */
-export type SettingKind = "int" | "bool" | "text" | "certificate";
+export type SettingKind = "int" | "bool" | "text" | "certificate" | "host_list";
 
 /**
  * Bir ayarın tanımı ve mevcut değeri.

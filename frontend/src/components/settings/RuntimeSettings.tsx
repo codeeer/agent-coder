@@ -138,6 +138,49 @@ export function RuntimeSettings({
   );
 }
 
+/*
+ * HostListField, izinli domain listesi.
+ *
+ * Sertifika alanının aksine dosya seçme yok — liste elle yazılan bir şey.
+ * Buna karşılık YAZIM BİÇİMİ görünür olmalı: kullanıcı `*.` ile alt alan
+ * adlarını açabildiğini ve şema/port yazmaması gerektiğini yalnızca yardım
+ * metninden öğrenirse ilk denemede hata alır. Örnek, alanın hemen altında
+ * duruyor.
+ */
+function HostListField({
+  value,
+  onChange,
+  disabled,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const satirSayisi = value ? value.split("\n").filter((s) => s.trim() && !s.startsWith("#")).length : 0;
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        rows={value ? 8 : 4}
+        spellCheck={false}
+        placeholder={"ornek.com\n*.npmjs.org\n# yorum satırı"}
+        className="resize-y font-mono text-xs"
+      />
+      <p className="text-xs text-muted">
+        {satirSayisi > 0
+          ? `${satirSayisi} domain — şema ve port yazılmaz; alt alan adları için *.ornek.com`
+          : "Boş bırakılırsa domain kısıtı uygulanmaz; çıkış yine proxy'den geçer."}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Sertifika alanı — yapıştırma ve dosya seçme.
  *
@@ -239,7 +282,11 @@ function SettingRow({ setting }: { setting: SettingValue }) {
    * kalırdı ya da sütunu genişletip diğer sekiz satırın hizasını bozardı.
    * Bu yüzden hizaya KATILMAZ, kendi satırına iner.
    */
-  const cokSatirli = setting.kind === "certificate";
+  /*
+   * İzinli domain listesi de çok satırlı: kurumsal bir listede onlarca satır
+   * olabiliyor ve tek satırlık bir kutuda ne yazdığı görünmezdi.
+   */
+  const cokSatirli = setting.kind === "certificate" || setting.kind === "host_list";
 
   // Sunucudan gelen değer değişirse (kaydetme veya sıfırlama sonrası) taslağı eşitle.
   useEffect(() => setDraft(setting.value), [setting.value]);
@@ -304,7 +351,14 @@ function SettingRow({ setting }: { setting: SettingValue }) {
                   : "w-28"
             }
           >
-            {cokSatirli ? (
+            {setting.kind === "host_list" ? (
+              <HostListField
+                value={draft}
+                onChange={setDraft}
+                disabled={busy}
+                label={setting.label}
+              />
+            ) : cokSatirli ? (
               <CertificateField
                 value={draft}
                 onChange={setDraft}
