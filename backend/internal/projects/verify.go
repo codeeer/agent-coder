@@ -20,6 +20,13 @@ var (
 
 	// ErrBranchNotFound, belirtilen branch depoda yok.
 	ErrBranchNotFound = errors.New("branch depoda bulunamadı")
+
+	// ErrDefaultBranchUnknown, deponun varsayılan branch'i okunamadı.
+	//
+	// Erişim hatasından AYRI tutuluyor: depoya ulaşılabiliyor ama HEAD'in
+	// gösterdiği yer okunamıyor. İkisini karıştırmak, kullanıcıyı yanlış
+	// yere — kimlik bilgisine — bakmaya yönlendirirdi.
+	ErrDefaultBranchUnknown = errors.New("deponun varsayılan branch'i okunamadı")
 )
 
 // verifyTimeout, erişim kontrolünün azami süresi.
@@ -44,6 +51,62 @@ type Credentials struct {
 //
 // branch boşsa yalnızca erişim sınanır.
 func (v *Verifier) Verify(ctx context.Context, repoURL, branch string, creds *Credentials) error {
+	var ekArgs []string
+	if branch != "" {
+		ekArgs = append(ekArgs, "refs/heads/"+branch)
+	}
+
+	out, err := lsRemote(ctx, repoURL, creds, []string{"--heads"}, ekArgs)
+	if err != nil {
+		return err
+	}
+
+	// Branch istendiyse ls-remote onu bulamazsa BOŞ döner ve hata vermez.
+	if branch != "" && strings.TrimSpace(out) == "" {
+		return fmt.Errorf("%w: %q", ErrBranchNotFound, branch)
+	}
+	return nil
+}
+
+/*
+DefaultBranch, deponun HEAD'inin gösterdiği branch'i döner ve AYNI çağrıda
+erişimi sınar.
+
+NEDEN KAYNAK SİSTEMİN API'Sİ DEĞİL (spec 021): toplu içe aktarmada erişim
+sınaması zaten koşuyor; `--symref` eklemek ek maliyet getirmiyor. Buna karşılık
+kaynak sistemin "varsayılan branch" ucu sürümler arasında değişenlerin başında
+ve ölçüm yapılacak bir kurumsal sunucumuz yok. Git protokolü sürümden bağımsız
+— üstelik klonlama anında geçerli olan cevabı zaten o veriyor.
+
+BOŞ DÖNMEZ: HEAD okunamazsa `ErrDefaultBranchUnknown` döner. `main` varsaymak,
+her çalıştırmada patlayacak bir projeyi sessizce kaydetmek olurdu.
+*/
+func (v *Verifier) DefaultBranch(ctx context.Context, repoURL string, creds *Credentials) (string, error) {
+	out, err := lsRemote(ctx, repoURL, creds, []string{"--symref"}, []string{"HEAD"})
+	if err != nil {
+		return "", err
+	}
+
+	branch := symrefBranch(out)
+	if branch == "" {
+		return "", fmt.Errorf("%w: %q", ErrDefaultBranchUnknown, repoURL)
+	}
+	return branch, nil
+}
+
+/*
+lsRemote, ortak ortam ve kimlik hazırlığıyla `git ls-remote` çalıştırır.
+
+TEK YERDE: `GIT_TERMINAL_PROMPT=0` gibi bayraklar güvenlik taşıyor. İki kopya
+olsaydı birine eklenen bir bayrak diğerine eklenmeyebilir ve fark ancak
+üretimde asılı kalan bir süreçle görülürdü.
+
+`oncekiArgs` URL'den ÖNCE, `sonrakiArgs` sonra gelir — `ls-remote`'un
+sözdizimi buna duyarlı.
+*/
+func lsRemote(ctx context.Context, repoURL string, creds *Credentials,
+	oncekiArgs, sonrakiArgs []string) (string, error) {
+
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
 
@@ -59,7 +122,7 @@ func (v *Verifier) Verify(ctx context.Context, repoURL, branch string, creds *Cr
 	if creds != nil && creds.Secret != "" {
 		askpass, cleanup, err := WriteAskpass(creds.Secret)
 		if err != nil {
-			return fmt.Errorf("kimlik bilgisi hazırlanamadı: %w", err)
+			return "", fmt.Errorf("kimlik bilgisi hazırlanamadı: %w", err)
 		}
 		defer cleanup()
 
@@ -70,24 +133,50 @@ func (v *Verifier) Verify(ctx context.Context, repoURL, branch string, creds *Cr
 		repoURL = InjectUsername(repoURL, creds.Username)
 	}
 
-	args := []string{"ls-remote", "--heads", repoURL}
-	if branch != "" {
-		args = append(args, "refs/heads/"+branch)
-	}
+	args := append([]string{"ls-remote"}, oncekiArgs...)
+	args = append(args, repoURL)
+	args = append(args, sonrakiArgs...)
 
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Env = env
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return classifyGitError(ctx, string(out), creds != nil)
+		return "", classifyGitError(ctx, string(out), creds != nil)
 	}
+	return string(out), nil
+}
 
-	// Branch istendiyse ls-remote onu bulamazsa BOŞ döner ve hata vermez.
-	if branch != "" && strings.TrimSpace(string(out)) == "" {
-		return fmt.Errorf("%w: %q", ErrBranchNotFound, branch)
+/*
+symrefBranch, `ls-remote --symref` çıktısındaki HEAD satırından branch adını
+çıkarır.
+
+Beklenen biçim:
+
+	ref: refs/heads/develop	HEAD
+	9f1a2b3c…	HEAD
+
+`ref:` satırı yoksa BOŞ döner — çağıran hata üretir. Varsayılan uydurmak
+ürünün en sert kuralını çiğnerdi.
+*/
+func symrefBranch(out string) string {
+	const onek = "ref: refs/heads/"
+
+	for _, satir := range strings.Split(out, "\n") {
+		satir = strings.TrimSpace(satir)
+		if !strings.HasPrefix(satir, onek) {
+			continue
+		}
+		// Satırın kalanı "<branch>\tHEAD" — sekmeden önceki parça ad.
+		kalan := strings.TrimPrefix(satir, onek)
+		if i := strings.IndexAny(kalan, " \t"); i >= 0 {
+			kalan = kalan[:i]
+		}
+		if kalan != "" {
+			return kalan
+		}
 	}
-	return nil
+	return ""
 }
 
 // WriteAskpass, parolayı stdout'a yazan geçici bir betik üretir.

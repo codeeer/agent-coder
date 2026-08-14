@@ -89,6 +89,58 @@ func (s *Store) List(ctx context.Context, page paging.Page) ([]Project, int, err
 	return out, total, rows.Err()
 }
 
+/*
+ExistingRepoURLs, kayıtlı tüm depo adreslerini normalize edilmiş anahtarlarla
+döner — anahtar → proje kimliği.
+
+NEDEN VAR: toplu içe aktarma aynı grup için tekrar tekrar çalıştırılacak
+(gruba yeni repository ekleniyor). `repo_url` üzerinde unique kısıt olmadığı
+için mükerrer denetimi burada yapılıyor; olmasaydı her tekrar kopya üretirdi.
+
+Tamamı okunuyor, adres adres sorgulanmıyor: yüz repository'lik bir içe
+aktarmada yüz sorgu yerine tek sorgu.
+*/
+func (s *Store) ExistingRepoURLs(ctx context.Context) (map[string]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, repo_url FROM projects`)
+	if err != nil {
+		return nil, fmt.Errorf("proje adresleri okunamadı: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[string]uuid.UUID{}
+	for rows.Next() {
+		var (
+			id  uuid.UUID
+			url string
+		)
+		if err := rows.Scan(&id, &url); err != nil {
+			return nil, fmt.Errorf("proje adresi taranamadı: %w", err)
+		}
+		out[normalizeRepoURL(url)] = id
+	}
+	return out, rows.Err()
+}
+
+/*
+normalizeRepoURL, mükerrer denetimi için adresi karşılaştırılabilir hale
+getirir: sondaki `.git` ve eğik çizgi atılır, tamamı küçük harfe çevrilir.
+
+KÜÇÜK HARFE ÇEVİRME BİLİNÇLİ BİR ÖDÜNÇ. Gerçek senaryo: kullanıcı bir
+repository'yi elle `…/scm/odeme/api.git` diye eklemiş, kaynak sistem ise
+`…/scm/ODEME/api.git` veriyor. Yalnızca sunucu adı küçültülseydi ikisi ayrı
+sayılır ve kopya oluşurdu. Aynı sunucuda yalnızca harf büyüklüğüyle ayrılan iki
+farklı repository ise pratikte yok.
+
+Ayrıştırılamayan adres KAYBOLMAZ: kendi metni anahtar olur. Boş anahtara
+düşseydi bozuk adresli iki proje aynı sayılırdı.
+*/
+func normalizeRepoURL(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	s = strings.TrimSuffix(s, "/")
+	s = strings.TrimSuffix(s, ".git")
+	return strings.TrimSuffix(s, "/")
+}
+
 // Get, tek bir projeyi döner.
 func (s *Store) Get(ctx context.Context, id uuid.UUID) (Project, error) {
 	p, err := scan(s.pool.QueryRow(ctx, `SELECT `+columns+` FROM projects WHERE id = $1`, id))

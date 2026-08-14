@@ -50,13 +50,13 @@ yanıtı saklamayan hata mesajları ise sahadan gelecek bildirimi işe yarar kı
 
 ## Blok 3 — Varsayılan branch ve mükerrer denetimi
 
-- [ ] T20 `Verifier.DefaultBranch`: `ls-remote --symref` çıktısından branch
+- [x] T20 `Verifier.DefaultBranch`: `ls-remote --symref` çıktısından branch
       okunur → `ref: refs/heads/develop\tHEAD` girdisinden `develop` çıkar
-- [ ] T21 HEAD okunamazsa **hata döner, varsayılan uydurulmaz** → boş çıktıda
+- [x] T21 HEAD okunamazsa **hata döner, varsayılan uydurulmaz** → boş çıktıda
       hata; `main` dönmez (spec → davranış kuralları)
-- [ ] T22 Aynı çağrı erişimi de sınar → erişim reddinde `ErrRepoAuth`,
+- [x] T22 Aynı çağrı erişimi de sınar → erişim reddinde `ErrRepoAuth`,
       ulaşılamamada `ErrRepoUnreachable` (mevcut sınıflandırma paylaşılır)
-- [ ] T23 `Store.ExistingRepoURLs` kayıtlı adresleri normalize edilmiş
+- [x] T23 `Store.ExistingRepoURLs` kayıtlı adresleri normalize edilmiş
       anahtarlarla döner → büyük/küçük harf, sondaki `.git` ve `/` farkı olan
       iki adres aynı anahtara düşer
 
@@ -139,3 +139,11 @@ davranışını kendinde tutuyor. Mevcut `gitprovider` testleri değişmeden ge�
 gömülü kimlik taşıyan adresi reddediyor; ayıklama olmasaydı içe aktarmanın
 tamamı başarısız olurdu. Aynı yerde ikinci bir tuzak var: `Normalize` boş
 branch'i sessizce `main` yapıyor — Blok 3'te boş branch asla geçirilmeyecek.
+
+**Blok 3'te `Verify` refactor edildi.** `ls-remote` çağrısının ortak hazırlığı
+(`GIT_TERMINAL_PROMPT=0` gibi güvenlik taşıyan bayraklar, askpass, kullanıcı
+adı enjeksiyonu) `lsRemote` içinde toplandı. İki kopya bırakılsaydı birine
+eklenen bir bayrak diğerine eklenmeyebilir ve fark ancak üretimde asılı kalan
+bir süreçle görülürdü. `Verify`'ın testi YOKTU; refactor'dan önce dört koruma
+testi yazıldı (erişilebilen depo, var olan branch, olmayan branch, ulaşılamayan
+depo) — testsiz refactor çalıştığını iddia edip kanıtlayamaz.
