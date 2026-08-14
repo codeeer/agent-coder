@@ -42,12 +42,15 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 3 — Uzlaştırma, iptal, devam
 
-- [ ] T20 `InterruptRunning` açılışta `running` olanları `interrupted` yapar
-      ve kaçını düşürdüğünü loglar
-- [ ] T21 `Cancel` yalnızca BEKLEYENLERİ düşürür → çalışan öğe dokunulmaz
-- [ ] T22 `Resume` yalnızca `interrupted` olanları `pending` yapar →
-      `succeeded` ve `failed` dokunulmaz
-- [ ] T23 Bitmiş toplu işi iptal hata DEĞİL → durumu söylenir
+- [x] T20 `InterruptRunning` açılışta `running` olanları `interrupted` yapar
+      ve kaçını düşürdüğünü loglar (`Scheduler.Reconcile`, `main.go`'da açılışta
+      çağrılıyor). İkinci tur sıfır döner: sayı "bu açılışta kesilenler"
+- [x] T21 `Cancel` yalnızca BEKLEYENLERİ düşürür → çalışan öğe dokunulmaz ve
+      sonucu iptalden sonra da kaydedilir
+- [x] T22 `Resume` yalnızca `interrupted` olanları `pending` yapar →
+      `succeeded`, `failed` ve `cancelled` dokunulmaz; sıraya alınan öğe
+      gerçekten `NextPending`'den gelir
+- [x] T23 Bitmiş toplu işi iptal hata DEĞİL → 0 döner, durumu `done` kalır
 
 ## Blok 4 — Uçlar
 
