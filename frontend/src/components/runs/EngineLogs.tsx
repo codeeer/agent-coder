@@ -35,7 +35,7 @@ import {
  */
 const KAYNAKLAR = [
   { id: "stdout", label: "Container" },
-  { id: "file", label: "Motor" },
+  { id: "file", label: "Engine" },
   { id: "session", label: "Oturum" },
 ] as const;
 
@@ -164,7 +164,7 @@ export function EngineLogs({ runId, live }: { runId: string; live: boolean }) {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Log içinde ara…"
-                aria-label="Motor loglarında ara"
+                aria-label="Engine loglarında ara"
               />
             )}
             <span className="ml-auto text-2xs text-ink-3">

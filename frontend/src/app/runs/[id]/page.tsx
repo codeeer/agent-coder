@@ -313,7 +313,7 @@ export default function RunDetailPage() {
 
 const SEKMELER = [
   { id: "cikti", label: "Çalıştırma", Icon: IconAgent },
-  { id: "motor", label: "Motor logları", Icon: IconTerminal },
+  { id: "motor", label: "Engine logları", Icon: IconTerminal },
 ] as const;
 
 type SekmeID = (typeof SEKMELER)[number]["id"];

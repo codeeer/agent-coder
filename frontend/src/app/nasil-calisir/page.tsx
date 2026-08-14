@@ -74,7 +74,7 @@ export default function HowItWorksPage() {
             Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi
             talimat.
           </Mini>
-          <Mini title="Motor">
+          <Mini title="Engine">
             Grafı seviyelere ayırır, sırayı ve paralelliği belirler, her adımı
             kaydeder.
           </Mini>
@@ -152,7 +152,7 @@ export default function HowItWorksPage() {
           silinince motorun teşhis verisi de gider; oysa asıl ihtiyaç tam olarak
           düşen ve zaman aşımına uğrayan koşularda. Bu yüzden loglar{" "}
           <b>silmeden hemen önce</b> toplanıyor: koşu detayındaki{" "}
-          <b>Motor logları</b> sekmesinde container&apos;ın çıktısı, motorun
+          <b>Engine logları</b> sekmesinde container&apos;ın çıktısı, motorun
           kendi log dosyaları ve agent&apos;ın tam konuşma geçmişi ayrı ayrı
           duruyor.
         </Note>
@@ -216,7 +216,7 @@ export default function HowItWorksPage() {
       >
         <ScriptDeterminism />
         <Note>
-          Ayarlar&apos;da bir <b>betik kütüphanesi</b> var: bir kez yazarsınız,
+          Ayarlar&apos;da bir <b>script kütüphanesi</b> var: bir kez yazarsınız,
           birden fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
           <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği
           bugün de kendisi yazıp çalıştırabiliyordu. Değişen tek şey,
@@ -236,7 +236,7 @@ export default function HowItWorksPage() {
           kaynak olur ve er geç ayrışırlardı.
         </Note>
         <Note>
-          <b>Motor logları ayrı yaşar.</b> Çalıştırma kaydı yıllarca değerli
+          <b>Engine logları ayrı yaşar.</b> Çalıştırma kaydı yıllarca değerli
           olabilir; iki megabaytlık ham logu bir haftadan sonra değil. Bu yüzden
           ham log kendi tablosunda, kendi saklama süresiyle duruyor — süresi
           dolunca yalnızca o siliniyor, koşu geçmişi ve maliyet raporu yerinde
@@ -292,7 +292,7 @@ export default function HowItWorksPage() {
             bellek sınırlıdır.
           </Decision>
           <Decision title="Loglar maskelenerek saklanır">
-            Motor logları veritabanına <b>yazılmadan önce</b> temizlenir:
+            Engine logları veritabanına <b>yazılmadan önce</b> temizlenir:
             sağlayıcı anahtarı, git token&apos;ı, MCP sırları ve paket deposu
             kimliği — <code className="font-mono text-xs">.npmrc</code>
             &apos;deki base64 hâli dahil — maskelenir. Sonradan temizlemek bir
@@ -318,7 +318,7 @@ export default function HowItWorksPage() {
             <b>hiç sunulmaz</b>. Bağlanamayan bir sunucu sessiz kalmaz, uyarı
             üretir.
           </Decision>
-          <Decision title="Betikler yeni bir kapı açmaz">
+          <Decision title="Script'ler yeni bir kapı açmaz">
             Bir betik yalnızca <b>komut çalıştırma yetkisi zaten açık</b>{" "}
             agent&apos;a kopyalanır; kapalıysa dosya ortama hiç girmez. Yetki
             kuralları bu özellik için değişmedi. &quot;Bash kapalı ama şu betiğe

@@ -100,11 +100,11 @@ const NEXUS_SPEC: CredentialSpec = {
 
 const TABS = [
   { id: "models", label: "Modeller", Icon: IconChip },
-  { id: "repos", label: "Kod depoları", Icon: IconFolder },
+  { id: "repos", label: "Git repository'ler", Icon: IconFolder },
   { id: "jira", label: "Jira", Icon: IconComment },
   { id: "mcp", label: "Dış araçlar", Icon: IconPlug },
-  { id: "scripts", label: "Betikler", Icon: IconTerminal },
-  { id: "packages", label: "Paket deposu", Icon: IconPackage },
+  { id: "scripts", label: "Script'ler", Icon: IconTerminal },
+  { id: "packages", label: "Package repository", Icon: IconPackage },
   { id: "runner", label: "Çalıştırma", Icon: IconPlay },
   { id: "reports", label: "Rapor", Icon: IconReport },
   { id: "network", label: "Kurumsal ağ", Icon: IconShield },

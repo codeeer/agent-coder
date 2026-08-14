@@ -43,7 +43,7 @@ export function ScriptSection() {
 
   return (
     <Panel
-      title="Betikler"
+      title="Script'ler"
       description="Agent'ların çalıştırabileceği hazır kabuk betikleri. Hangi agent'ın hangi betiği kullanabileceğini Agent'lar ekranından seçersiniz."
       action={
         !adding && (

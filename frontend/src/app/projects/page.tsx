@@ -992,7 +992,7 @@ function ProjectForm({
           <Notice tone="warning">
             Tanımlı git erişimi yok. Özel bir depo bağlayacaksanız önce{" "}
             <Link href="/settings" className="underline">
-              Ayarlar → Kod depoları
+              Ayarlar → Git repository&apos;ler
             </Link>{" "}
             bölümünden bir erişim ekleyin.
           </Notice>

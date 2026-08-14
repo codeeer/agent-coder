@@ -121,7 +121,7 @@ var GroupLabels = map[string]string{
 	GroupReports:  "Rapor",
 	GroupJira:     "Jira tetikleyici",
 	GroupMCP:      "Dış araçlar (MCP)",
-	GroupPackages: "Paket deposu",
+	GroupPackages: "Package repository",
 	GroupNetwork:  "Kurumsal ağ",
 }
 
@@ -160,14 +160,14 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyCloneDepth, Group: GroupRunner, Kind: KindInt,
-		Label: "Depo klonlama derinliği", Unit: "commit",
+		Label: "Repository clone depth", Unit: "commit",
 		Help: "Kaç commit'lik geçmiş klonlanacak. 1 en hızlısıdır; agent'ın geçmişe " +
 			"bakması gerekiyorsa arttırın.",
 		Default: "1", Min: p(1), Max: p(1000),
 	},
 	{
 		Key: KeyMaxPromptKB, Group: GroupRunner, Kind: KindInt,
-		Label: "Azami agent talimatı boyutu", Unit: "KB",
+		Label: "Azami agent prompt boyutu", Unit: "KB",
 		Help:    "Bir agent'ın talimatı bu boyutu aşamaz.",
 		Default: "32", Min: p(1), Max: p(256),
 	},
@@ -236,7 +236,7 @@ var Registry = []Definition{
 	 */
 	{
 		Key: KeyEngineLogPersist, Group: GroupRunner, Kind: KindBool,
-		Label: "Motor loglarını sakla",
+		Label: "Engine loglarını sakla",
 		Help: "Çalıştırma bitince motorun ham logları veritabanına yazılır ve " +
 			"koşu detayında görünür. Kapatılırsa loglar container ile birlikte " +
 			"silinir ve sonradan incelenemez.",
@@ -244,14 +244,14 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyEngineLogRetention, Group: GroupRunner, Kind: KindInt,
-		Label: "Motor logu saklama süresi", Unit: "gün",
+		Label: "Engine logu saklama süresi", Unit: "gün",
 		Help: "Bu süreden eski motor logları düzenli olarak silinir. " +
 			"Çalıştırma kaydının kendisi silinmez, yalnızca ham logu.",
 		Default: "7", Min: p(1), Max: p(365),
 	},
 	{
 		Key: KeyEngineLogMaxKB, Group: GroupRunner, Kind: KindInt,
-		Label: "Motor logu boyut sınırı", Unit: "KB",
+		Label: "Engine logu boyut sınırı", Unit: "KB",
 		Help: "Kaynak başına saklanacak azami ham boyut. Aşılırsa SON kısım " +
 			"korunur — hata genelde sonda olur — ve kayıt kırpılmış olarak " +
 			"işaretlenir.",
@@ -260,7 +260,7 @@ var Registry = []Definition{
 
 	{
 		Key: KeyNPMRegistry, Group: GroupPackages, Kind: KindText, Optional: true,
-		Label: "npm kayıt defteri adresi",
+		Label: "npm registry URL",
 		Help: "Kurumsal paket deposunun npm adresi " +
 			"(örn. https://nexus.sirket.local/repository/npm-group/). " +
 			"Boş bırakılırsa npm'in kendi kayıt defteri kullanılır. " +
@@ -278,7 +278,7 @@ var Registry = []Definition{
 
 	{
 		Key: KeyMavenRegistry, Group: GroupPackages, Kind: KindText, Optional: true,
-		Label: "Maven deposu adresi",
+		Label: "Maven repository URL",
 		Help: "Kurumsal paket deposunun Maven adresi " +
 			"(örn. https://nexus.sirket.local/repository/maven-public/). " +
 			"Boş bırakılırsa Maven kendi genel deposunu kullanır. " +

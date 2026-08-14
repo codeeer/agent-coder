@@ -787,7 +787,7 @@ function AgentDetail({
                 empty="Hiçbir dış araç sunucusu açılmamış."
               />
               <ToolList
-                label="Betikler"
+                label="Script'ler"
                 names={scriptNames}
                 empty="Hazır betik atanmamış."
                 mono

@@ -499,7 +499,7 @@ export function StepLifecycle() {
     ["5", "Kayıt yazılır", "çıktı, token, maliyet"],
     // 6. adım SİLMEDEN ÖNCE: teşhis verisi container'ın içinde duruyor ve
     // sıra ters olsaydı hiç var olmamış gibi kaybolurdu.
-    ["6", "Motor logları alınır", "maskelenip saklanır"],
+    ["6", "Engine logları alınır", "maskelenip saklanır"],
     ["7", "Container silinir", "volume ile birlikte"],
   ];
 
@@ -897,7 +897,7 @@ export function MCPDirections() {
  */
 export function ScriptDeterminism() {
   return (
-    <Frame viewBox="0 0 1020 340" label="Betiklerin getirdiği belirlilik">
+    <Frame viewBox="0 0 1020 340" label="Script'lerin getirdiği belirlilik">
       <text
         x={30}
         y={30}
