@@ -10,18 +10,18 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
 
 ## Blok 1 — Whitelist dilbilgisi
 
-- [ ] T01 `internal/hostlist` paketi: `Parse` satırları ayrıştırır, boş satır ve
+- [x] T01 `internal/hostlist` paketi: `Parse` satırları ayrıştırır, boş satır ve
       `#` yorumunu atlar → birim testi: 3 satırlık metinden 2 desen çıkar
-- [ ] T02 `Match` tam domain eşleştirir → `ornek.com` deseni `ornek.com`'u geçirir,
+- [x] T02 `Match` tam domain eşleştirir → `ornek.com` deseni `ornek.com`'u geçirir,
       `alt.ornek.com`'u geçirmez
-- [ ] T03 `*.ornek.com` deseni subdomain'leri geçirir, apex'i geçirmez →
+- [x] T03 `*.ornek.com` deseni subdomain'leri geçirir, apex'i geçirmez →
       `alt.ornek.com` true, `ornek.com` false
-- [ ] T04 Büyük/küçük harf ve sondaki nokta normalleştirilir → `ORNEK.com.`
+- [x] T04 Büyük/küçük harf ve sondaki nokta normalleştirilir → `ORNEK.com.`
       deseniyle `ornek.com` eşleşir
-- [ ] T05 Geçersiz satırlar reddedilir, hata satır numarasını söyler → URL
+- [x] T05 Geçersiz satırlar reddedilir, hata satır numarasını söyler → URL
       (`https://a.com`), port (`a.com:443`), boşluklu metin, ASCII dışı karakter
       için ayrı ayrı hata
-- [ ] T06 Boş liste `Match`'te her host'u geçirir → spec'teki "boş whitelist
+- [x] T06 Boş liste `Match`'te her host'u geçirir → spec'teki "boş whitelist
       kısıtsızlıktır" kuralı testle kilitlenir
 
 ## Blok 2 — Çıkış kapısı
