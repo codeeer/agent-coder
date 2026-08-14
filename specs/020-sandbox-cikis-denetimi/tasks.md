@@ -104,7 +104,7 @@ ağ ve arayüz sonra. İlk üç blok ağ olmadan test edilebilir.
       (önceki ölçümde 5'ti). Sayı `## Ölçümler`e yazılır
 - [x] T61 **Ret yolu ölçümü:** whitelist'ten `archive.apache.org` çıkarılıp aynı
       görev koşulur → çalıştırma ekranında ret uyarısı, backend 5xx yok
-- [ ] T62 **Kapalı davranış:** proxy boşken çalıştırma → runner eski network'te,
+- [x] T62 **Kapalı davranış:** proxy boşken çalıştırma → runner eski network'te,
       hiçbir proxy değişkeni yazılmamış (`docker inspect` ile env kontrolü)
 - [ ] T63 `docs/kurumsal-ag.md`: yeni ayarlar, kapsam tablosu, `java -jar` sınırı
       ve "izinli host üzerinden sızdırma" uyarısı
