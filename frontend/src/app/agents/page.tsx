@@ -782,7 +782,7 @@ function AgentDetail({
 
             <div className="mt-4 space-y-3 border-t border-line pt-3">
               <ToolList
-                label="Dış araçlar (MCP)"
+                label="MCP Server'lar"
                 names={mcpNames}
                 empty="Hiçbir dış araç sunucusu açılmamış."
               />

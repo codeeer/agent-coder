@@ -120,7 +120,7 @@ var GroupLabels = map[string]string{
 	GroupCatalog:  "Model kataloğu",
 	GroupReports:  "Rapor",
 	GroupJira:     "Jira tetikleyici",
-	GroupMCP:      "Dış araçlar (MCP)",
+	GroupMCP:      "MCP Server",
 	GroupPackages: "Package repository",
 	GroupNetwork:  "Kurumsal ağ",
 }
@@ -208,7 +208,7 @@ var Registry = []Definition{
 	},
 	{
 		Key: KeyMCPTimeoutSeconds, Group: GroupMCP, Kind: KindInt,
-		Label: "MCP sunucu süre sınırı", Unit: "saniye",
+		Label: "MCP Server süre sınırı", Unit: "saniye",
 		Help: "Bir dış araç sunucusuna bağlanma ve araç çağırma süresi. " +
 			"Değer her sunucuya AÇIKÇA yazılır; çalıştırma motorunun kendi " +
 			"varsayılanı sürümden sürüme değişebiliyor.",

@@ -34,7 +34,7 @@ export function McpServerSection() {
 
   return (
     <Panel
-      title="Dış araçlar (MCP)"
+      title="MCP Server'lar"
       description="Agent'ların erişebileceği dış araç sunucuları. Bir sunucu tanımladıktan sonra hangi agent'ların kullanabileceğini Agent'lar ekranından seçersiniz."
       action={
         !adding && (
@@ -217,7 +217,7 @@ function ServerForm({ server, onDone }: { server?: McpServer; onDone: () => void
   return (
     <PanelCard>
       <p className="text-sm font-medium">
-        {editing ? "Sunucuyu düzenle" : "Yeni MCP sunucusu"}
+        {editing ? "Server'ı düzenle" : "Yeni MCP Server"}
       </p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

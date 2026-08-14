@@ -195,7 +195,7 @@ export default function HowItWorksPage() {
 
       <Step
         no={6}
-        title="Dış araçlar — iki yön"
+        title="MCP Server — iki yön"
         lead="Bir agent yalnızca klonlanmış depoyla çalışırsa çok şey bilmez. MCP, standart bir protokolle dış kaynaklara bağlanmayı sağlıyor — ve aynı protokol ters yönde de işliyor."
       >
         <MCPDirections />
@@ -312,7 +312,7 @@ export default function HowItWorksPage() {
             <code className="font-mono text-xs">env</code> yazdırdığında token
             görünmez. Tanımlanmazsa npm&apos;in genel deposu kullanılır.
           </Decision>
-          <Decision title="Dış araçlar agent başına açılır">
+          <Decision title="MCP Server'lar agent başına açılır">
             Bir MCP sunucusu tanımlamak onu her agent&apos;a açmaz. Hangi
             agent&apos;ın kullanabileceği ayrı seçilir; seçilmeyenlere araçlar{" "}
             <b>hiç sunulmaz</b>. Bağlanamayan bir sunucu sessiz kalmaz, uyarı
