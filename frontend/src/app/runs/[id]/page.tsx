@@ -615,9 +615,23 @@ function EventLog({
   }
 
   return (
-    /* Kendi kutusu YOK: pano zaten bir kutu ve `Well` ile sarılınca iç içe
-       iki çerçeve çıkıyordu. Kayan alan doğrudan panonun gövdesi. */
-    <div ref={boxRef} className="max-h-80 overflow-auto px-4 py-3.5">
+    /*
+     * Kendi kutusu YOK: pano zaten bir kutu ve `Well` ile sarılınca iç içe
+     * iki çerçeve çıkıyordu. Kayan alan doğrudan panonun gövdesi.
+     *
+     * YÜKSEKLİK PENCEREYE GÖRE, sabit değil. Sabit 320px'ti ve bu, İlerleme
+     * ile çıktı ve diff'in ALT ALTA yığıldığı düzenden kalmıştı: sınır
+     * olmasaydı diğerlerine ulaşmak imkânsızdı. Her biri kendi sekmesine
+     * taşınınca sınır anlamını yitirdi ama kalmıştı — ÖLÇÜLDÜ: olaylar 320px'e
+     * sıkışıp içeride kayarken altında 165px boş alan duruyordu.
+     *
+     * Kaydırma KALIYOR: yeni olay geldikçe dibe kayan takip bu kutunun kendi
+     * kaydırmasına bağlı (bkz. yukarıdaki `boxRef`).
+     */
+    <div
+      ref={boxRef}
+      className="max-h-[calc(100vh-18rem)] min-h-40 overflow-auto px-4 py-3.5"
+    >
       <ul className="space-y-1.5">
         {items.map((e) => (
           <li key={e.seq} className="flex items-start gap-2.5 text-xs">
@@ -714,7 +728,7 @@ function Changes({ run }: { run: Run }) {
       </div>
 
       <Well className="mt-3">
-        <pre className="max-h-112 overflow-auto p-3.5 font-mono text-xs leading-relaxed">
+        <pre className="max-h-[calc(100vh-22rem)] min-h-40 overflow-auto p-3.5 font-mono text-xs leading-relaxed">
           {run.diff.split("\n").map((line, i) => (
             <div
               key={i}

@@ -208,7 +208,7 @@ export function EngineLogs({ runId, live }: { runId: string; live: boolean }) {
 
           {/* Yatay kaydırma KENDİ KABINDA: uzun bir log satırı sayfayı
               yatayda kaydırmamalı. */}
-          <div className="max-h-140 overflow-auto">
+          <div className="max-h-[calc(100vh-20rem)] min-h-40 overflow-auto">
             {konusmaGoster && <SessionTranscript mesajlar={konusma} />}
             {!konusmaGoster && (
               <table className="w-full border-collapse font-mono text-2xs">
