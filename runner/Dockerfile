@@ -29,6 +29,63 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
+# ─── Java ve Maven ──────────────────────────────────────────────────────────
+#
+# NEDEN BURADA, opencode'dan ÖNCE: Docker katmanları sırayla önbelleklenir.
+# opencode sürümü aşağıda değiştiğinde bu katman geçerli kalır ve ~500MB'lık
+# JDK indirmesi tekrarlanmaz. Ters sırada her opencode yükseltmesi JDK'ları da
+# yeniden indirirdi.
+#
+# İKİ SÜRÜM BİRDEN: Java sürümü projeden projeye değişiyor ve hangisinin
+# kullanılacağı agent'a TALİMATLA söyleniyor (spec 018 H1) — koşuda seçici yok.
+# Ayrı imaj etiketi yapılsaydı etiket ekseni ikiye çıkar, beş ayrı yer (etiket
+# kurgusu, Makefile, CI, doğrulama, arayüz) bunu öğrenmek zorunda kalırdı.
+ARG JDK_DEFAULT=25
+ARG JDK_ALT=17
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends gnupg; \
+    mkdir -p /etc/apt/keyrings; \
+    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public \
+        | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg; \
+    . /etc/os-release; \
+    echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb ${VERSION_CODENAME} main" \
+        > /etc/apt/sources.list.d/adoptium.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        "temurin-${JDK_ALT}-jdk" "temurin-${JDK_DEFAULT}-jdk"; \
+    apt-get purge -y --auto-remove gnupg; \
+    rm -rf /var/lib/apt/lists/*; \
+    \
+    # MİMARİDEN BAĞIMSIZ SABİT YOL. Temurin'in kurulum dizini mimariye göre
+    # değişiyor (`…-jdk-amd64` / `…-jdk-arm64`); agent'ın talimatına yazılacak
+    # yol her iki mimaride de aynı olmak zorunda.
+    mkdir -p /opt/java; \
+    ln -s "/usr/lib/jvm/temurin-${JDK_ALT}-jdk-$(dpkg --print-architecture)" "/opt/java/${JDK_ALT}"; \
+    ln -s "/usr/lib/jvm/temurin-${JDK_DEFAULT}-jdk-$(dpkg --print-architecture)" "/opt/java/${JDK_DEFAULT}"; \
+    "/opt/java/${JDK_ALT}/bin/java" -version; \
+    "/opt/java/${JDK_DEFAULT}/bin/java" -version
+
+# Maven APT'TAN DEĞİL, sürümü sabitlenmiş tarball'dan.
+#
+# Debian'ın `maven` paketi `default-jdk`'yı bağımlılık olarak sürüklüyor: imaja
+# üçüncü bir JDK girer ve hangi Java'nın kullanıldığı belirsizleşirdi. Sürümün
+# sabit olması ayrıca imajı tekrarlanabilir kılıyor (opencode'daki kararın
+# aynısı).
+ARG MAVEN_VERSION=3.9.16
+ARG MAVEN_SHA512=831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f6
+RUN set -eux; \
+    curl -fsSL -o /tmp/maven.tar.gz \
+        "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"; \
+    echo "${MAVEN_SHA512}  /tmp/maven.tar.gz" | sha512sum -c -; \
+    mkdir -p /opt/maven; \
+    tar -xzf /tmp/maven.tar.gz -C /opt/maven --strip-components=1; \
+    rm /tmp/maven.tar.gz; \
+    ln -s /opt/maven/bin/mvn /usr/local/bin/mvn
+
+ENV JAVA_HOME=/opt/java/25
+ENV PATH="${JAVA_HOME}/bin:/opt/maven/bin:${PATH}"
+
 # Sürüm pinlenir — opencode API'si sürümler arası değişebilir.
 # Yükseltirken backend/internal/runner/opencode istemcisi de doğrulanmalı.
 ARG OPENCODE_VERSION=1.18.15
@@ -80,7 +137,14 @@ ENV HOME=/home/agent
 # scripts/ — agent'a atanmış hazır kabuk betikleri (spec 012). Bunlar da
 # çalıştırma anında kopyalanır; imaja gömülmezler. /work altında DEĞİL: orası
 # klonlama hedefi ve boş olmak zorunda.
-RUN mkdir -p /home/agent/.config/opencode/agents /home/agent/scripts
+# `.m2` BURADA AÇILIR — bir hatanın kaydı.
+#
+# Dizin önceden açılmadığında Docker'ın tar kopyası onu ROOT sahipliğiyle
+# yaratıyor: `settings.xml` sorunsuz yazılıyor ama Maven kendi yerel deposunu
+# (`~/.m2/repository`) içine açamıyor ve gerçek bir koşuda
+# `AccessDeniedException` ile düşüyor. Dosyanın yazılmış olması dizinin
+# kullanılabilir olduğu anlamına gelmiyordu.
+RUN mkdir -p /home/agent/.config/opencode/agents /home/agent/scripts /home/agent/.m2
 
 # Motorun paket deposuna çıkmasını engelleyen ayar — YALNIZCA MOTOR İÇİN.
 #
@@ -113,6 +177,7 @@ COPY --chmod=755 runner/entrypoint.sh /usr/local/bin/entrypoint.sh
 # entrypoint tarafından source edilir; testi de aynı dosyayı source ediyor ki
 # mantık iki yerde kopyalanmasın.
 COPY --chmod=755 runner/git-credentials.sh /usr/local/bin/git-credentials.sh
+COPY --chmod=755 runner/java-truststore.sh /usr/local/bin/java-truststore.sh
 
 WORKDIR /work
 EXPOSE 4096

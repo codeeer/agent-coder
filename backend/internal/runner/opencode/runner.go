@@ -21,18 +21,18 @@ type Runner struct {
 	sandbox *sandbox.Manager
 	image   string
 	network string
-	// extraCACert, HOST üzerindeki kurumsal kök sertifikanın yolu; boşsa
-	// hiçbir şey bağlanmaz (bkz. sandbox.Spec.ExtraCACert).
-	extraCACert string
 }
 
 // New yeni runner üretir.
-func New(mgr *sandbox.Manager, image, network, extraCACert string) *Runner {
+//
+// Kurumsal sertifika BURADA DEĞİL, her isteğin içinde taşınır
+// (runner.Request.CACert): ayar çalışma anında değişebiliyor ve
+// yapılandırmanın kurucuya bağlanması yeniden başlatma gerektirirdi.
+func New(mgr *sandbox.Manager, image, network string) *Runner {
 	return &Runner{
-		sandbox:     mgr,
-		image:       image,
-		network:     network,
-		extraCACert: extraCACert,
+		sandbox: mgr,
+		image:   image,
+		network: network,
 	}
 }
 
@@ -65,6 +65,11 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", runner.ErrSandbox, err)
 	}
+	// Kurumsal sertifika, diğer yapılandırma dosyalarıyla aynı yoldan gider:
+	// container'a KOPYALANIR, host'tan bağlanmaz.
+	if caFile, ok := runner.CACertFile(req.CACert); ok {
+		configFiles = append(configFiles, caFile)
+	}
 
 	/*
 	 * İmaj, seçilen Node sürümüne göre belirlenir; sürüm boşsa taban imaj.
@@ -88,14 +93,13 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	}
 
 	ct, err := r.sandbox.Create(runCtx, sandbox.Spec{
-		RunID:       req.RunID.String(),
-		Image:       image,
-		Network:     r.network,
-		Env:         buildEnv(req, r.extraCACert),
-		CPUCores:    req.Limits.CPUCores,
-		MemoryGB:    req.Limits.MemoryGB,
-		Files:       toSandboxFiles(configFiles),
-		ExtraCACert: r.extraCACert,
+		RunID:    req.RunID.String(),
+		Image:    image,
+		Network:  r.network,
+		Env:      buildEnv(req),
+		CPUCores: req.Limits.CPUCores,
+		MemoryGB: req.Limits.MemoryGB,
+		Files:    toSandboxFiles(configFiles),
 	})
 	if err != nil {
 		return nil, classify(err, runCtx, ctx)
@@ -326,7 +330,7 @@ func (r *Runner) warnFailedMCP(ctx context.Context, cli *client, req runner.Requ
 // Sağlayıcı anahtarı buradan geçer; yapılandırma dosyası ona referans verir.
 // Depo kimlik bilgisi de burada — entrypoint bunu credential store'a yazar ve
 // remote URL'e gömmez.
-func buildEnv(req runner.Request, extraCACert string) map[string]string {
+func buildEnv(req runner.Request) map[string]string {
 	env := map[string]string{
 		runner.APIKeyEnvVar: req.Provider.APIKey,
 		"REPO_URL":          req.Repo.URL,
@@ -343,9 +347,36 @@ func buildEnv(req runner.Request, extraCACert string) map[string]string {
 	 *
 	 * TLS doğrulaması KAPATILMIYOR; yalnızca güvenilen kök ekleniyor.
 	 */
-	if extraCACert != "" {
-		env["NODE_EXTRA_CA_CERTS"] = sandbox.ExtraCACertPath
-		env["GIT_SSL_CAINFO"] = sandbox.ExtraCACertPath
+	if req.CACert != "" {
+		env["NODE_EXTRA_CA_CERTS"] = runner.CACertPath
+		env["GIT_SSL_CAINFO"] = runner.CACertPath
+		/*
+		 * CURL_CA_BUNDLE SONRADAN EKLENDİ ve bir ölçümün kaydıdır: kurumsal
+		 * Nexus provasında (spec 017) node ve git sertifikayı tanırken curl
+		 * `unable to get local issuer certificate` ile düşüyordu. Agent'ın en
+		 * sık kullandığı araçlardan biri, sertifika tanıtılmış bir kurulumda
+		 * sessizce çalışmıyordu.
+		 */
+		env["CURL_CA_BUNDLE"] = runner.CACertPath
+	}
+
+	/*
+	 * Maven süre sınırı — ÖLÇÜLEREK bulunmuş özellik adları.
+	 *
+	 * Ulaşılamayan bir adrese karşı tutuldu: varsayılanla 98 saniye, 3
+	 * saniyelik sınırla 31 saniye. `maven.wagon.http.*` özellikleri HİÇBİR
+	 * ETKİ YAPMIYOR — Maven 3.9 wagon'u değil kendi çözümleyici taşıyıcısını
+	 * kullanıyor. Adı tahmin edilseydi ayar sessizce etkisiz kalır ve bunu
+	 * hiçbir test yakalamazdı.
+	 *
+	 * MAVEN_OPTS burada KURULUR, entrypoint ise kurumsal sertifika varsa
+	 * üstüne EKLER (`${MAVEN_OPTS:+…}`). İkisi ayrı bilgiye sahip: süre ayardan
+	 * gelir, sertifikanın varlığı container içinde belli olur.
+	 */
+	if req.Packages.MavenEnabled() && req.Packages.TimeoutSec > 0 {
+		ms := fmt.Sprint(req.Packages.TimeoutSec * 1000)
+		env["MAVEN_OPTS"] = "-Daether.connector.connectTimeout=" + ms +
+			" -Daether.connector.requestTimeout=" + ms
 	}
 	if req.Repo.Branch != "" {
 		env["REPO_BRANCH"] = req.Repo.Branch

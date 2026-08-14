@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/agent-coder/backend/internal/certfmt"
 )
 
 var (
@@ -216,6 +218,25 @@ func Validate(def Definition, value string) error {
 	case KindBool:
 		if _, err := strconv.ParseBool(value); err != nil {
 			return fmt.Errorf("%w: doğru/yanlış bekleniyor", ErrInvalidValue)
+		}
+		return nil
+
+	case KindCertificate:
+		// Opsiyonel ayarda boş, "kapalı" demektir — hata değil.
+		if value == "" {
+			if def.Optional {
+				return nil
+			}
+			return fmt.Errorf("%w: boş olamaz", ErrInvalidValue)
+		}
+		/*
+		 * Doğrulama, KAYDEDİLECEK değerin okunabilir olduğunu garanti eder.
+		 * Aynı çevirici arayüzün dosya seçme yolunda da kullanılıyor; iki
+		 * yolun aynı kabul mantığını paylaşması, dosyadan geçen bir
+		 * sertifikanın yapıştırıldığında reddedilmesini önlüyor.
+		 */
+		if _, err := certfmt.ToPEM([]byte(value)); err != nil {
+			return fmt.Errorf("%w: geçerli bir sertifika değil", ErrInvalidValue)
 		}
 		return nil
 

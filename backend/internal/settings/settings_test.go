@@ -1,6 +1,9 @@
 package settings
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -87,6 +90,36 @@ func TestValidate_Metin(t *testing.T) {
 
 	require.NoError(t, Validate(def, "bir değer"))
 	require.ErrorIs(t, Validate(def, ""), ErrInvalidValue)
+}
+
+func TestValidate_Sertifika(t *testing.T) {
+	def := Definition{Key: KeyCorporateCA, Kind: KindCertificate, Default: "", Optional: true}
+
+	// Boş = özellik kapalı, hata değil.
+	require.NoError(t, Validate(def, ""))
+
+	require.ErrorIs(t, Validate(def, "bu bir sertifika degil"), ErrInvalidValue)
+	require.ErrorIs(t, Validate(def, "-----BEGIN CERTIFICATE-----\nYnV6dWs=\n-----END CERTIFICATE-----"), ErrInvalidValue)
+
+	pemMetin, err := os.ReadFile(filepath.Join("..", "certfmt", "testdata", "kok.pem"))
+	require.NoError(t, err)
+	require.NoError(t, Validate(def, string(pemMetin)))
+}
+
+/*
+ * PEM'in satır sonları KIRPILMAYA dayanmalı.
+ *
+ * Service.Set değeri TrimSpace'ten geçiriyor; kırpma blok içine dokunursa
+ * sertifika sessizce bozulur ve bunu ancak bir çalıştırma düştüğünde fark
+ * ederdik.
+ */
+func TestValidate_SertifikaBoslukKirpmayaDayanir(t *testing.T) {
+	def := Definition{Key: KeyCorporateCA, Kind: KindCertificate, Default: "", Optional: true}
+
+	pemMetin, err := os.ReadFile(filepath.Join("..", "certfmt", "testdata", "kok.pem"))
+	require.NoError(t, err)
+
+	require.NoError(t, Validate(def, strings.TrimSpace("\n\n  "+string(pemMetin)+"  \n\n")))
 }
 
 func TestValidate_TanimsizTip(t *testing.T) {

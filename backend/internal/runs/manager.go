@@ -40,6 +40,11 @@ type Limits struct {
 	// ayar değişince yeniden başlatma gerekmesin diye her koşuda okunur.
 	// Token da buradan gelir — ayarda değil, şifreli kimlik bilgisi deposunda.
 	Packages func() runner.PackageRegistry
+
+	// CACert, kurumsal kök sertifikanın PEM içeriği. Diğerleri gibi FONKSİYON:
+	// sertifika arayüzden değiştirilebiliyor ve değişiklik yeniden başlatma
+	// beklemeden sonraki koşuda geçerli olmalı (spec 017 H1).
+	CACert func() string
 }
 
 // Manager, çalıştırmaları yürütür ve eşzamanlılığı sınırlar.
@@ -197,6 +202,7 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 		RunID:       run.ID,
 		NodeVersion: in.NodeVersion,
 		Packages:    m.packages(),
+		CACert:      m.caCert(),
 		Repo:        in.Repo,
 		Agent:       in.Agent,
 		Provider:    in.Provider,
@@ -435,6 +441,17 @@ func (m *Manager) packages() runner.PackageRegistry {
 		return runner.PackageRegistry{}
 	}
 	return m.limits.Packages()
+}
+
+// caCert, kurumsal kök sertifikayı okur.
+//
+// Tanımsız olabilir (testler doldurmuyor); o durumda özellik kapalıdır ve
+// container bugünküyle aynı davranır.
+func (m *Manager) caCert() string {
+	if m.limits.CACert == nil {
+		return ""
+	}
+	return m.limits.CACert()
 }
 
 /*

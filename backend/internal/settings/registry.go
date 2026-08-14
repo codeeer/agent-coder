@@ -22,6 +22,18 @@ const (
 	KindInt  Kind = "int"
 	KindBool Kind = "bool"
 	KindText Kind = "text"
+
+	/*
+	 * KindCertificate, bir veya birden çok X.509 sertifikası.
+	 *
+	 * ADI BİÇİM DEĞİL, ŞEY: saklanan değer normalleştirilmiş PEM'dir ama tip
+	 * "pem" diye adlandırılmadı. PEM bir yazılış biçimi; ayarın ne olduğu ise
+	 * sertifika. Kullanıcı DER veya PKCS#7 de verebiliyor (bkz. certfmt) —
+	 * tip adı biçime bağlansaydı ilk başka biçimde yalan olurdu.
+	 *
+	 * Değer ÇOK SATIRLIDIR; arayüz denetimi bu tipten türetir.
+	 */
+	KindCertificate Kind = "certificate"
 )
 
 // Definition, bir ayarın kod tarafındaki tanımı.
@@ -51,8 +63,12 @@ const (
 	KeyEngineLogRetention = "runner.engine_log_retention_days"
 	KeyEngineLogMaxKB     = "runner.engine_log_max_kb"
 
-	KeyNPMRegistry = "packages.npm_registry"
-	KeyNPMUsername = "packages.npm_username"
+	KeyNPMRegistry     = "packages.npm_registry"
+	KeyNPMUsername     = "packages.npm_username"
+	KeyMavenRegistry   = "packages.maven_registry"
+	KeyPackagesTimeout = "packages.timeout_seconds"
+
+	KeyCorporateCA = "network.corporate_ca"
 
 	KeyRunTimeoutMinutes  = "runner.timeout_minutes"
 	KeyMaxConcurrentRuns  = "runner.max_concurrent"
@@ -76,6 +92,7 @@ const (
 	GroupJira     = "jira"
 	GroupMCP      = "mcp"
 	GroupPackages = "packages"
+	GroupNetwork  = "network"
 )
 
 // GroupLabels, grup kimliklerinin insan okunur karşılıkları.
@@ -86,6 +103,7 @@ var GroupLabels = map[string]string{
 	GroupJira:     "Jira tetikleyici",
 	GroupMCP:      "Dış araçlar (MCP)",
 	GroupPackages: "Paket deposu",
+	GroupNetwork:  "Kurumsal ağ",
 }
 
 func p(v int) *int { return &v }
@@ -236,6 +254,58 @@ var Registry = []Definition{
 		Label: "Kullanıcı adı",
 		Help: "Kayıt defteri kimlik doğrulama istiyorsa kullanıcı adı. " +
 			"Parola/token buraya değil, kimlik doğrulama bölümüne girilir.",
+		Default: "",
+	},
+
+	{
+		Key: KeyMavenRegistry, Group: GroupPackages, Kind: KindText, Optional: true,
+		Label: "Maven deposu adresi",
+		Help: "Kurumsal paket deposunun Maven adresi " +
+			"(örn. https://nexus.sirket.local/repository/maven-public/). " +
+			"Boş bırakılırsa Maven kendi genel deposunu kullanır. " +
+			"Kimlik bilgisi npm ile ORTAKTIR; aşağıdaki kimlik doğrulama " +
+			"bölümünden girilir.",
+		Default: "",
+	},
+
+	/*
+	 * Paket deposu süre sınırı — npm ve Maven için ORTAK.
+	 *
+	 * Neden ayar, neden sabit değil: ölçüldü ki paket yöneticilerinin
+	 * varsayılanı tek istek için beş dakika ve üstüne birkaç kez yeniden
+	 * deniyorlar; ulaşılamayan bir depoda çalıştırma dakikalarca sessizce
+	 * bekliyor. Ama doğru değer kuruma göre değişiyor — iç ağdaki bir depo
+	 * için kısa olan süre, yavaş bir hattın ucundaki depoda büyük bir paketi
+	 * keserdi.
+	 */
+	{
+		Key: KeyPackagesTimeout, Group: GroupPackages, Kind: KindInt,
+		Label: "Paket deposu süre sınırı", Unit: "saniye",
+		Help: "Paket deposuna yapılan tek bir isteğin azami süresi. " +
+			"Depoya ulaşılamadığında çalıştırmanın dakikalarca beklememesi " +
+			"için. npm ve Maven için aynı değer geçerlidir. Yavaş bağlantıda " +
+			"büyük paketler kesiliyorsa yükseltin.",
+		Default: "60", Min: p(5), Max: p(600),
+	},
+
+	/*
+	 * Kurumsal kök sertifika.
+	 *
+	 * SIR DEĞİL, o yüzden şifreli kimlik deposunda değil burada: kök sertifika
+	 * tanımı gereği her istemciye dağıtılan genel bir belgedir. Sır deposuna
+	 * konsaydı maskelenir ve "hangi sertifika tanımlı" sorusu ekranda
+	 * cevaplanamazdı.
+	 *
+	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez.
+	 */
+	{
+		Key: KeyCorporateCA, Group: GroupNetwork, Kind: KindCertificate, Optional: true,
+		Label: "Kurumsal kök sertifika",
+		Help: "SSL denetimi yapan ağlarda kurumun kök sertifikası. " +
+			"Dosya seçebilir veya içeriğini yapıştırabilirsiniz; " +
+			"zincir taşıyan dosyalarda ara sertifikalar da alınır. " +
+			"Tanımlanırsa güvenilen kök listesine EKLENİR, genel sertifikalar " +
+			"geçerli kalmaya devam eder. Boş bırakılırsa hiçbir şey değişmez.",
 		Default: "",
 	},
 }

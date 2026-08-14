@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/agent-coder/backend/internal/agentreg"
+	"github.com/agent-coder/backend/internal/cacert"
 	"github.com/agent-coder/backend/internal/catalog"
 	"github.com/agent-coder/backend/internal/config"
 	"github.com/agent-coder/backend/internal/credentials"
@@ -41,6 +42,7 @@ import (
 	"github.com/agent-coder/backend/internal/scripts"
 	"github.com/agent-coder/backend/internal/secrets"
 	"github.com/agent-coder/backend/internal/settings"
+	"github.com/agent-coder/backend/internal/tlstrust"
 	"github.com/agent-coder/backend/internal/workflow"
 )
 
@@ -102,6 +104,21 @@ func run() error {
 		return err
 	}
 
+	/*
+	 * Kurumsal kök sertifika — tek çözümleyici, üç tüketici.
+	 *
+	 * BURADA kuruluyor çünkü aşağıdaki her giden çağrı istemcisi ondan
+	 * besleniyor. Ayar kazanır, ortam değişkeni yedekte kalır; ikisini de tek
+	 * yerde çözmek, üç tüketicinin farklı sertifikalara bakmasını önlüyor.
+	 */
+	caResolver := cacert.NewResolver(
+		func() string { return settingsSvc.Text(settings.KeyCorporateCA) },
+		cfg.Runner.ExtraCACert,
+	)
+	// Giden HTTPS çağrılarının taşıyıcısı. Sertifika değişince kendini
+	// yeniler — yeniden başlatma gerekmez (spec 017 H5).
+	trustRT := tlstrust.New(caResolver.PEM).RoundTripper()
+
 	llmStore := llm.NewStore(database.Pool, cipher)
 	gitStore := gitprovider.NewStore(database.Pool, cipher)
 	credStore := credentials.NewStore(database.Pool, cipher)
@@ -109,7 +126,7 @@ func run() error {
 	scriptStore := scripts.NewStore(database.Pool)
 	mcpClient := mcp.NewClient(func() time.Duration {
 		return time.Duration(settingsSvc.Int(settings.KeyMCPTimeoutSeconds)) * time.Second
-	})
+	}, trustRT)
 
 	// Hiç sağlayıcı yoksa .env'deki OpenRouter anahtarından biri oluşturulur;
 	// mevcut kurulumlar hiçbir şey yapmadan çalışmaya devam eder.
@@ -118,7 +135,7 @@ func run() error {
 	}
 
 	catalogStore := catalog.NewStore(database.Pool)
-	syncer := catalog.NewSyncer(database.Pool, llmStore)
+	syncer := catalog.NewSyncer(database.Pool, llmStore, trustRT)
 
 	projectStore := projects.NewStore(database.Pool)
 	agentStore := agentreg.NewStore(database.Pool, func() int {
@@ -139,8 +156,7 @@ func run() error {
 	}
 	defer sandboxMgr.Close()
 
-	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network,
-		cfg.Runner.ExtraCACert)
+	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network)
 
 	// Docker ve runner imajı hazır mı? Eksikse çalıştırma denenene kadar
 	// fark edilmez; açılışta uyarmak kullanıcıyı erken bilgilendirir.
@@ -180,10 +196,16 @@ func run() error {
 		// kimlik bilgisi hata değildir.
 		Packages: func() runner.PackageRegistry {
 			pkg := runner.PackageRegistry{
-				NPMRegistry: settingsSvc.Text(settings.KeyNPMRegistry),
-				Username:    settingsSvc.Text(settings.KeyNPMUsername),
+				NPMRegistry:   settingsSvc.Text(settings.KeyNPMRegistry),
+				MavenRegistry: settingsSvc.Text(settings.KeyMavenRegistry),
+				Username:      settingsSvc.Text(settings.KeyNPMUsername),
+				// Süre sınırı npm ve Maven için ORTAK: "paket deposu ne kadar
+				// bekler" sorusunun tek cevabı olmalı.
+				TimeoutSec: settingsSvc.Int(settings.KeyPackagesTimeout),
 			}
-			if pkg.NPMRegistry == "" || pkg.Username == "" {
+			// Kimlik yalnızca bir depo tanımlıysa ve kullanıcı adı verilmişse
+			// aranır; anonim okumaya açık depolarda kayıt zaten yoktur.
+			if (pkg.NPMRegistry == "" && pkg.MavenRegistry == "") || pkg.Username == "" {
 				return pkg
 			}
 			token, _, err := credStore.Reveal(ctx, credentials.KindNexus)
@@ -196,6 +218,11 @@ func run() error {
 			pkg.Token = token
 			return pkg
 		},
+
+		// Kurumsal kök sertifika: ayardan ya da ortam değişkeniyle verilen
+		// dosyadan. Her koşuda okunur — arayüzden değiştirilince yeniden
+		// başlatma beklenmez.
+		CACert: caResolver.PEM,
 	})
 	defer runManager.Shutdown()
 
@@ -234,9 +261,9 @@ func run() error {
 				runbuild.NewStepRunner(runBuilder, runManager, runPusher),
 			),
 			workflow.KindGitHubPR: runbuild.NewPRHandler(
-				runBuilder, projectStore, github.New(cfg.GitHubAPIURL), graphOf,
+				runBuilder, projectStore, github.New(cfg.GitHubAPIURL, trustRT), graphOf,
 			),
-			workflow.KindJiraComment: runbuild.NewJiraHandler(credStore, jira.New(), workflowStore),
+			workflow.KindJiraComment: runbuild.NewJiraHandler(credStore, jira.New(trustRT), workflowStore),
 			workflow.KindMCPCall:     runbuild.NewMCPHandler(mcpStore, mcpClient),
 		},
 		busPublisher{bus},
@@ -258,7 +285,7 @@ func run() error {
 
 	// Jira tetikleyici: tarama ve webhook aynı işleme yolundan geçer.
 	jiraTrigger := jiratrigger.New(
-		workflowStore, workflowLauncher, credStore, jira.New(),
+		workflowStore, workflowLauncher, credStore, jira.New(trustRT),
 		func() time.Duration {
 			return time.Duration(settingsSvc.Int(settings.KeyJiraPollMinutes)) * time.Minute
 		},
@@ -277,9 +304,11 @@ func run() error {
 		MCPClient:     mcpClient,
 		MCPAccess:     mcpAccess,
 		MCPServer:     mcpOut,
-		GitValidator:  gitprovider.NewValidator(),
+		HTTPTransport: trustRT,
+		CACert:        caResolver,
+		GitValidator:  gitprovider.NewValidator(trustRT),
 		Credentials:   credStore,
-		JiraValidator: credentials.NewValidator(),
+		JiraValidator: credentials.NewValidator(trustRT),
 		Settings:      settingsSvc,
 		Projects:      projectStore,
 		RepoVerifier:  projects.NewVerifier(),

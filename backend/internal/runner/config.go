@@ -3,7 +3,9 @@ package runner
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -81,6 +83,11 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegi
 	 */
 	if npmrc := buildNPMRC(pkg); npmrc != nil {
 		files = append(files, ConfigFile{Path: npmrcPath, Content: npmrc, Mode: 0o600})
+	}
+	// Maven yapılandırması npm'den BAĞIMSIZ: bir kurum yalnızca birini
+	// kurumsal depoya almış olabilir.
+	if sx := buildSettingsXML(pkg); sx != nil {
+		files = append(files, ConfigFile{Path: settingsXMLPath, Content: sx, Mode: 0o600})
 	}
 
 	/*
@@ -259,6 +266,18 @@ func buildAgentFile(a AgentSpec, pkg PackageRegistry) []byte {
 	}
 	b.WriteString(scriptSection(a))
 	b.WriteString(packageSection(pkg))
+	/*
+	 * Java bölümü KOŞULSUZ yazılır.
+	 *
+	 * Runner, projenin hangi dilde olduğunu bilmiyor — ve bilemez, çünkü depo
+	 * container başlatıldıktan sonra klonlanıyor. Bölümü "Maven tanımlıysa"
+	 * gibi bir koşula bağlamak, kurumsal deposu olmayan bir kurulumda Java
+	 * projesiyle çalışan agent'ı ikinci JDK'dan habersiz bırakırdı.
+	 *
+	 * Bedeli altı satırlık talimat; karşılığı agent'ın "bu proje Java 17
+	 * istiyor ama ortamda 25 var" diye rapor edip durmaması.
+	 */
+	b.WriteString(javaSection())
 
 	return []byte(b.String())
 }
@@ -409,6 +428,37 @@ func defaultIfEmpty(v, def string) string {
 const npmrcPath = "/home/agent/.npmrc"
 
 /*
+ * CACertPath, kurumsal kök sertifikanın container içindeki yolu.
+ *
+ * `/etc/ssl/certs` ALTINDA DEĞİL, `$HOME` altında — ve bu bilinçli: sistem
+ * sertifika dizinine yazmak root ayrıcalığı ve dizin sahipliği varsayımları
+ * getiriyordu. Sertifikayı gösteren üç ortam değişkeni mutlak yol aldığı için
+ * dosyanın nerede durduğu önemli değil; önemli olan agent kullanıcısının onu
+ * okuyabilmesi.
+ *
+ * Dışa açık çünkü ortam değişkenlerini kuran paket (opencode) da bu yolu
+ * bilmek zorunda.
+ */
+const CACertPath = "/home/agent/kurumsal-ca.pem"
+
+/*
+ * CACertFile, kurumsal sertifikayı container'a yazılacak dosyaya çevirir.
+ *
+ * BuildConfigFiles'a parametre olarak EKLENMEDİ: o fonksiyonun imzası yirmiden
+ * fazla yerden çağrılıyor ve sertifika, sağlayıcı/agent/model üçlüsüyle aynı
+ * cümlenin parçası değil — bağımsız bir ortam gerçeği. Ayrı bir fonksiyon
+ * ikisini de olduğu yerde bırakıyor.
+ *
+ * Mod 0644: dosya sır değil ve agent'ın çalıştırdığı her araç okuyabilmeli.
+ */
+func CACertFile(pemText string) (ConfigFile, bool) {
+	if strings.TrimSpace(pemText) == "" {
+		return ConfigFile{}, false
+	}
+	return ConfigFile{Path: CACertPath, Content: []byte(pemText), Mode: 0o644}, true
+}
+
+/*
  * buildNPMRC, kurumsal paket deposu yapılandırması.
  *
  * Adres yoksa nil döner ve dosya HİÇ yazılmaz: özellik kapalıyken container
@@ -432,6 +482,12 @@ func buildNPMRC(p PackageRegistry) []byte {
 		 * kayıt defterlerine de gönderilirdi.
 		 *
 		 * Şema atılır ve sondaki `/` korunur — npm'in beklediği biçim bu.
+		 *
+		 * `always-auth` BİLEREK YAZILMIYOR: npm 9'da kaldırıldı ve runner
+		 * npm 11 taşıyor. Yazılırsa npm HER çağrıda "Unknown user config"
+		 * uyarısı basar; dosya kullanıcı seviyesinde olduğu için o uyarı
+		 * agent'ın okuduğu her araç çıktısına düşer. Kimlik zaten `_auth`
+		 * ile hem üstveri hem tarball isteğinde gidiyor (ölçüldü).
 		 */
 		anahtar := strings.TrimPrefix(strings.TrimPrefix(p.NPMRegistry, "https:"), "http:")
 		if !strings.HasSuffix(anahtar, "/") {
@@ -439,10 +495,90 @@ func buildNPMRC(p PackageRegistry) []byte {
 		}
 		kimlik := base64.StdEncoding.EncodeToString([]byte(p.Username + ":" + p.Token))
 		b.WriteString(anahtar + ":_auth=" + kimlik + "\n")
-		b.WriteString(anahtar + ":always-auth=true\n")
+	}
+
+	/*
+	 * Süre sınırı — ÖLÇÜLMÜŞ bir sorunun karşılığı.
+	 *
+	 * npm'in varsayılanı tek istek için 300 saniye ve üstüne iki kez daha
+	 * deniyor. Kurumsal depoya ulaşılamayan bir çalıştırmada tek bir paket
+	 * için ~4 dakika harcandığı ölçüldü (spec 017 doğrulaması); kullanıcı o
+	 * süre boyunca ekranda yalnızca "çalışıyor" görüyordu.
+	 *
+	 * `fetch-retries=1`: kurumsal ağda depo ya ayaktadır ya değildir. Ölü bir
+	 * adresi üç kez denemek sonucu değiştirmiyor, yalnızca koşunun süre
+	 * bütçesini yakıyor.
+	 */
+	if p.TimeoutSec > 0 {
+		b.WriteString("fetch-timeout=" + strconv.Itoa(p.TimeoutSec*1000) + "\n")
+		b.WriteString("fetch-retries=1\n")
 	}
 
 	return []byte(b.String())
+}
+
+// settingsXMLPath, agent'ın Maven yapılandırması.
+//
+// Kullanıcı seviyesinde (`$HOME/.m2/settings.xml`): agent hangi dizinde
+// çalışırsa çalışsın geçerli — `~/.npmrc` ile aynı karar.
+const settingsXMLPath = "/home/agent/.m2/settings.xml"
+
+/*
+ * buildSettingsXML, kurumsal Maven deposu yapılandırması.
+ *
+ * Adres yoksa nil döner ve dosya HİÇ yazılmaz: özellik kapalıyken container
+ * bugünküyle birebir aynı davranır (buildNPMRC'deki kararın aynısı).
+ *
+ * `mirrorOf=*` BU İŞİN CAN DAMARI. npm'de agent'ın kaçış yolu `--registry`
+ * bayrağıydı; Maven'da kaçış yolu daha geniş: projenin kendi `pom.xml`'i
+ * `<repositories>` ile başka bir depo ilan edebiliyor. `*` onu da kuruma
+ * çeviriyor — aksi halde kapalı ağda derleme, sebebi anlaşılmayan bir zaman
+ * aşımıyla düşerdi.
+ *
+ * XML `encoding/xml` ile üretiliyor, metin şablonuyla değil: parola bu dosyaya
+ * giriyor ve kaçırılmamış tek bir `&` dosyayı sessizce bozardı.
+ */
+func buildSettingsXML(p PackageRegistry) []byte {
+	if !p.MavenEnabled() {
+		return nil
+	}
+
+	type server struct {
+		ID       string `xml:"id"`
+		Username string `xml:"username"`
+		Password string `xml:"password"`
+	}
+	type mirror struct {
+		ID       string `xml:"id"`
+		MirrorOf string `xml:"mirrorOf"`
+		URL      string `xml:"url"`
+	}
+	type settings struct {
+		XMLName xml.Name `xml:"settings"`
+		NS      string   `xml:"xmlns,attr"`
+		Servers []server `xml:"servers>server,omitempty"`
+		Mirrors []mirror `xml:"mirrors>mirror"`
+	}
+
+	const ayna = "kurumsal"
+	s := settings{
+		NS:      "http://maven.apache.org/SETTINGS/1.0.0",
+		Mirrors: []mirror{{ID: ayna, MirrorOf: "*", URL: p.MavenRegistry}},
+	}
+	// Kimlik OPSİYONEL: anonim okumaya açık depolarda `<server>` hiç yazılmaz.
+	// Boş kullanıcı adıyla bir sunucu bloğu yazmak, Maven'ı kimliksiz bir
+	// kimlik doğrulama denemesine sokardı.
+	if p.HasAuth() {
+		s.Servers = []server{{ID: ayna, Username: p.Username, Password: p.Token}}
+	}
+
+	gövde, err := xml.MarshalIndent(s, "", "  ")
+	if err != nil {
+		// Yapı sabit; buraya düşmek programlama hatası olurdu. Yine de
+		// çalıştırmayı düşürmek yerine yapılandırmasız devam edilir.
+		return nil
+	}
+	return append([]byte(xml.Header), append(gövde, '\n')...)
 }
 
 /*
@@ -456,19 +592,81 @@ func buildNPMRC(p PackageRegistry) []byte {
  * Adres yoksa blok hiç yazılmaz — boş bir başlık modelin dikkatini harcar.
  */
 func packageSection(p PackageRegistry) string {
-	if !p.Enabled() {
+	if !p.Enabled() && !p.MavenEnabled() {
 		return ""
 	}
 
 	var b strings.Builder
 	b.WriteString("\n## Paket deposu\n\n")
-	b.WriteString("Bu ortamda npm paketleri kurumsal depodan çekiliyor: ")
-	b.WriteString(p.NPMRegistry + "\n\n")
-	b.WriteString("Yapılandırma `~/.npmrc` içinde hazır. `--registry` bayrağı verme, ")
-	b.WriteString("`.npmrc` yazma veya değiştirme, kayıt defteri adresini değiştirme — ")
-	b.WriteString("bu ağdan npm'in genel deposuna erişilemez. ")
-	b.WriteString("Bir paket bulunamıyorsa kurumsal depoda gerçekten yok demektir; ")
-	b.WriteString("başka bir kaynak denemek yerine bunu bildir.\n")
+
+	if p.Enabled() {
+		b.WriteString("Bu ortamda npm paketleri kurumsal depodan çekiliyor: ")
+		b.WriteString(p.NPMRegistry + "\n\n")
+		b.WriteString("Yapılandırma `~/.npmrc` içinde hazır. `--registry` bayrağı verme, ")
+		b.WriteString("`.npmrc` yazma veya değiştirme, kayıt defteri adresini değiştirme — ")
+		b.WriteString("bu ağdan npm'in genel deposuna erişilemez. ")
+		b.WriteString("Bir paket bulunamıyorsa kurumsal depoda gerçekten yok demektir; ")
+		b.WriteString("başka bir kaynak denemek yerine bunu bildir.\n")
+	}
+
+	if p.MavenEnabled() {
+		if p.Enabled() {
+			b.WriteString("\n")
+		}
+		b.WriteString("Maven bağımlılıkları da kurumsal depodan çekiliyor: ")
+		b.WriteString(p.MavenRegistry + "\n\n")
+		/*
+		 * Maven'da kaçış yolu npm'dekinden GENİŞ: `-s` ile başka bir
+		 * yapılandırma vermek, `settings.xml`'i değiştirmek ve pom'a
+		 * `<repositories>` eklemek. Üçü de ayrı ayrı yasaklanıyor; yalnızca
+		 * "adresi değiştirme" demek yetmezdi.
+		 */
+		b.WriteString("Yapılandırma `~/.m2/settings.xml` içinde hazır ve tüm depoları ")
+		b.WriteString("kuruma yönlendiriyor. `-s` veya `--settings` bayrağı verme, ")
+		b.WriteString("`settings.xml` yazma veya değiştirme, `pom.xml` içine ")
+		b.WriteString("`<repositories>` veya `<pluginRepositories>` ekleme — ")
+		b.WriteString("bu ağdan Maven Central'a erişilemez. ")
+		b.WriteString("Bir bağımlılık bulunamıyorsa kurumsal depoda gerçekten yok ")
+		b.WriteString("demektir; başka bir kaynak denemek yerine bunu bildir.\n")
+	}
 
 	return b.String()
+}
+
+/*
+ * javaSection, agent'a hangi Java sürümlerinin nerede olduğunu söyler.
+ *
+ * NEDEN TALİMATTA: Java sürümü projeden projeye değişiyor ama koşuda bir sürüm
+ * seçici YOK (spec 018: Kapsam dışı). Seçim, agent'a bu bilgiyi vererek
+ * yapılıyor. Yazılmasaydı agent ikinci sürümün varlığını bilemez, `java
+ * -version` gördüğünü tek seçenek sanar ve "bu proje Java 17 istiyor ama
+ * ortamda 25 var" diye rapor edip dururdu.
+ *
+ * Yollar MİMARİDEN BAĞIMSIZ sabit bağlar (`runner/Dockerfile`): Temurin'in
+ * gerçek kurulum dizini `…-amd64` / `…-arm64` ile bitiyor ve talimata o yol
+ * yazılsaydı imajın koştuğu mimariye göre yanlış olurdu.
+ */
+func javaSection() string {
+	/*
+	 * "java" ile "mvn" AYNI ŞEKİLDE sürüm değiştirmiyor — bu bir ölçümün
+	 * kaydı. Gerçek bir koşuda agent `JAVA_HOME=/opt/java/17 java -version`
+	 * çalıştırdı ve **25** aldı; sonra "dizin yok galiba" diye rapor etti.
+	 *
+	 * Sebep: `java` kabuktan `PATH` ile bulunuyor ve `PATH` imajda varsayılan
+	 * JDK'ya işaret ediyor; `JAVA_HOME` onu etkilemiyor. Maven'ın başlatıcısı
+	 * ise `JAVA_HOME`'u okuyor, yani `mvn` için çalışıyor.
+	 *
+	 * Talimat bu farkı AÇIKÇA söylemek zorunda: söylemezse agent, çalışan bir
+	 * ortamı bozuk sanıp raporunu yanlış yazıyor.
+	 */
+	return "\n## Java\n\n" +
+		"Ortamda iki JDK var:\n\n" +
+		"- `/opt/java/25` — **varsayılan** (`java` ve `mvn` bunu kullanır)\n" +
+		"- `/opt/java/17`\n\n" +
+		"Başka bir sürüm gerekiyorsa:\n\n" +
+		"- **Maven için** o komuta `JAVA_HOME` ver: `JAVA_HOME=/opt/java/17 mvn -B test`\n" +
+		"- **Doğrudan `java` için** tam yolu kullan: `/opt/java/17/bin/java -version`\n\n" +
+		"`JAVA_HOME=... java` ÇALIŞMAZ: `java` kabuktan `PATH` ile bulunur ve " +
+		"`PATH` varsayılan JDK'ya işaret eder. Bu bir arıza değil.\n\n" +
+		"Yeni bir JDK kurmaya çalışma; bu ağda indirilemez.\n"
 }

@@ -55,6 +55,19 @@ type Request struct {
 	// kendi kayıt defterini kullanır.
 	Packages PackageRegistry
 
+	/*
+	 * CACert, kurumsal kök sertifikanın PEM İÇERİĞİ — dosya yolu değil.
+	 *
+	 * İÇERİK TAŞINIYOR çünkü sertifika artık host'ta bir dosya olmak zorunda
+	 * değil: arayüzden girilebiliyor ve container'a diğer yapılandırma
+	 * dosyaları gibi KOPYALANIYOR. Yol taşınsaydı dosyanın Docker host'unda
+	 * bulunması gerekirdi — uzak bir Docker host'ta çalışmayan, üstelik
+	 * ürünün kendi üretim tavsiyesiyle çelişen bir varsayım (spec 017).
+	 *
+	 * Boşsa hiçbir dosya yazılmaz ve hiçbir ortam değişkeni tanımlanmaz.
+	 */
+	CACert string
+
 	// NodeVersion, sandbox'ın koşacağı Node sürümü. Boşsa taban imaj kullanılır.
 	//
 	// Sürüm KOŞU ANINDA İNDİRİLMEZ: her desteklenen sürümün imajı derleme
@@ -86,6 +99,27 @@ type Request struct {
  * token boş kalır.
  */
 type PackageRegistry struct {
+	/*
+	 * MavenRegistry, kurumsal Maven deposunun adresi. Boşsa Maven
+	 * yapılandırması HİÇ yazılmaz ve davranış bugünküyle aynı kalır.
+	 */
+	MavenRegistry string
+
+	/*
+	 * TimeoutSec, paket deposu çağrılarının bekleme süresi — npm ve Maven
+	 * için ORTAK.
+	 *
+	 * Neden var: paket yöneticilerinin varsayılanı tek istek için beş dakika
+	 * ve üstüne birkaç kez yeniden deniyorlar. Ulaşılamayan bir depoda
+	 * çalıştırma dakikalarca sessizce bekliyor, kullanıcı ekranda yalnızca
+	 * "çalışıyor" görüyor ve koşunun süre bütçesi boşa gidiyor (spec 017
+	 * doğrulamasında ~4 dakika ölçüldü).
+	 *
+	 * Sıfırsa süre satırları yazılmaz — paket yöneticisinin kendi varsayılanı
+	 * geçerli olur.
+	 */
+	TimeoutSec int
+
 	// NPMRegistry, npm kayıt defterinin tam adresi.
 	NPMRegistry string
 	Username    string
@@ -96,6 +130,13 @@ type PackageRegistry struct {
 
 // HasAuth, kimlik doğrulama bilgisi verilmiş mi.
 func (p PackageRegistry) HasAuth() bool { return p.Username != "" && p.Token != "" }
+
+// MavenEnabled, Maven deposu tanımlı mı.
+//
+// npm'den AYRI: bir kurum npm'i kurumsal depoya alıp Maven'ı almamış olabilir
+// (ya da tersi). İkisini tek bayrağa bağlamak, yalnızca birini tanımlayan
+// kurulumda diğerinin yapılandırmasını da yazmak demekti.
+func (p PackageRegistry) MavenEnabled() bool { return p.MavenRegistry != "" }
 
 // Enabled, kurumsal depo tanımlı mı.
 func (p PackageRegistry) Enabled() bool { return p.NPMRegistry != "" }

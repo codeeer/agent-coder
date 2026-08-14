@@ -11,6 +11,8 @@ set -euo pipefail
 
 # shellcheck source=runner/git-credentials.sh
 source /usr/local/bin/git-credentials.sh
+# shellcheck source=runner/java-truststore.sh
+source /usr/local/bin/java-truststore.sh
 
 readonly WORKDIR=/work
 readonly PORT="${OPENCODE_PORT:-4096}"
@@ -65,6 +67,10 @@ if [[ -n "${REPO_URL:-}" ]]; then
 fi
 
 cd "$WORKDIR"
+
+# Kurumsal sertifika varsa Java'ya da tanıtılır. Yoksa hiçbir şey yapmaz —
+# kurumsal olmayan kurulumların davranışı değişmez (spec 018 H3).
+java_truststore_kur "${NODE_EXTRA_CA_CERTS:-}"
 
 log "opencode serve başlatılıyor (port ${PORT})"
 exec opencode serve --hostname 0.0.0.0 --port "$PORT"
