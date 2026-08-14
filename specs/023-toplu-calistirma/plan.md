@@ -142,13 +142,45 @@ kullanıcının ancak "neden hiç başlamadı" diye sorarak fark edeceği bir ar
 
 ### Tuzak: `ErrTooManyRuns` alan öğe BAŞARISIZ SAYILMAZ
 
-Zamanlayıcı boş slot gördü diye başlatmayı denediğinde araya başka bir
-çalıştırma girmiş olabilir. O durumda `Launch` `ErrTooManyRuns` döner.
+**Bu bölüm Blok 2'ye başlarken düzeltildi — planın ilk hâli yanlış bir olguya
+dayanıyordu.** Kod okundu:
 
-Bu hata **öğeyi düşürmemeli** — öğe `pending` kalmalı ve bir sonraki turda
-tekrar denenmeli. Aksi hâlde kuyruk kendini yerdi: sınır dolu olduğu her an
-bir öğe "başarısız" diye işaretlenir ve otuz projenin çoğu hiç çalışmadan
-başarısız görünürdü.
+- `workflow.Launcher.Launch` sınıra **hiç bakmıyor**: kaydı oluşturup motoru
+  goroutine olarak başlatıyor ve `nil` dönüyor. `ErrTooManyRuns` dönmesi mümkün
+  değil.
+- Sınır **adım seviyesinde**: `runs.Manager.begin` → `tryAcquire`. Dolu
+  olduğunda `runbuild.StepRunner` hatayı yukarı veriyor ve motor akış
+  çalışmasının TAMAMINI `failed` yapıyor (`executor.go` → `e.fail`).
+- Yani bir öğe sınır yüzünden düştüğünde bu, senkron bir dönüş değil,
+  **dakikalar sonra veritabanına düşen bir sonuç.**
+- Ayrıca **bir öğe = bir slot değil**: paralel dallı bir akış aynı anda birden
+  fazla slot tutar.
+
+Tuzak yok olmadı, **yer değiştirdi.** Karşılığı iki parçalı:
+
+1. **Zamanlayıcı kendi öğe sayısını sınırlar.** Yeni öğe yalnızca *çalışan öğe
+   sayısı* sınırın altındayken VE manager'da gerçekten boş slot varken başlar.
+   İkinci koşul olmasa, slotları başka çalıştırmalar tutarken başlatılan öğe
+   anında düşer ve kuyruk kendini yerdi.
+2. **Sınır hatasıyla düşen öğe `pending`'e döner**, `failed` olmaz. Sonuç
+   okunurken hata `runs.ErrTooManyRuns`'un metniyle karşılaştırılır — sınır
+   hatası öğenin başarısızlığı değil, zamanlamanın sonucudur.
+
+Elenen alternatif: *adım sınır dolduğunda beklesin* (`StepRunner` yeniden
+denesin). Sorunu kaynağında çözerdi ama spec 023'ün kapsamı dışında BÜTÜN
+akışların davranışını değiştirirdi — bugün hızla düşen bir adım yarın sessizce
+beklemeye başlardı. Aynı gerekçeyle "`runs.Manager`'ı kuyruklu hale getirmek"
+de elenmişti.
+
+### Öğe önce SAHİPLENİLİR, sonra başlatılır
+
+`Claim` (pending → running) akış çalışması başlatılmadan ÖNCE yazılır; dönen
+çalışma kimliği `Attach` ile eklenir. Ters sırada, iki çağrı arasında düşen bir
+süreç öğeyi `pending` bırakır ve açılışta aynı iş İKİNCİ KEZ başlatılırdı — yan
+etkisi (branch'e gönderilmiş bir değişiklik) habersizce tekrarlanmış olurdu.
+
+Bu sırayla en kötü hâl, çalışma kimliği olmayan `running` bir öğedir; açılışta
+`Reconcile` onu `interrupted` yapar ve kullanıcı "kaldığı yerden devam" der.
 
 ### Açılışta uzlaştırma (`Reconcile`)
 
@@ -189,7 +221,10 @@ func (s *Store) Resume(ctx, id uuid.UUID) (int, error)   // kesilenleri pending 
 
 // Zamanlayıcının kullandıkları
 func (s *Store) NextPending(ctx) (Item, bool, error)
-func (s *Store) MarkRunning(ctx, itemID, workflowRunID uuid.UUID) error
+func (s *Store) Claim(ctx, itemID uuid.UUID) error        // pending → running
+func (s *Store) Attach(ctx, itemID, workflowRunID uuid.UUID) error
+func (s *Store) Requeue(ctx, itemID uuid.UUID) error      // sınır hatası → pending
+func (s *Store) RunningItems(ctx) ([]Item, error)         // sayım + sonuç toplama
 func (s *Store) MarkFinished(ctx, itemID uuid.UUID, status, errMsg string) error
 func (s *Store) InterruptRunning(ctx) (int, error)       // açılışta
 ```
@@ -226,7 +261,7 @@ Eylemler: **İptal** (bekleyenler düşer, çalışanlar sürer — onayda yazı
 
 | Risk | Karşılık |
 | --- | --- |
-| **`ErrTooManyRuns` öğeyi düşürür** → kuyruk kendini yer | Öğe `pending` kalır; testle kilitlenir |
+| **`ErrTooManyRuns` öğeyi düşürür** → kuyruk kendini yer | İki katman: zamanlayıcı çalışan öğe sayısını sınırın altında tutar; buna rağmen sınır hatasıyla düşen öğe `failed` değil `pending` olur. Testle kilitli |
 | Zamanlayıcı iptal edilmiş toplu işin öğesini başlatır | `NextPending` yalnızca `queued`/`running` toplu işlerden okur |
 | Uyandırma sinyali kaçarsa kuyruk donar | Dakikalık emniyet turu; ayrıca `Wake` tamponlu kanala bloklamadan yazdığı için sinyal kaybolmaz |
 | Açılışta uzlaştırma çalışmazsa öğeler sonsuza kadar `running` | `Reconcile` açılışta koşar ve kaç öğeyi düşürdüğünü loglar |

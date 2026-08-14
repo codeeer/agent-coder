@@ -54,6 +54,18 @@ type Limits struct {
 	// (provider, repository, registry, MCP) burada DEĞİL, çalıştırma
 	// kurulurken eklenir — onlar ayardan değil o koşudan geliyor.
 	Egress func() runner.EgressSpec
+
+	/*
+		OnSlotFree, bir slot boşaldığında çağrılır. nil olabilir.
+
+		Toplu çalıştırma kuyruğu (spec 023) için: kuyruk "acaba boşaldı mı" diye
+		yoklamak yerine sinyali burada alıyor. Bağımlılık yönü ters çevrilmiyor —
+		`runs` paketi kuyruğu TANIMIYOR; bağ `main.go`'da kuruluyor.
+
+		BLOKLAMAMALI: biten bir çalıştırmanın temizliği dinleyicinin hızına
+		bağlanmamalı.
+	*/
+	OnSlotFree func()
 }
 
 // Manager, çalıştırmaları yürütür ve eşzamanlılığı sınırlar.
@@ -414,6 +426,12 @@ func (m *Manager) release() {
 	m.active--
 	m.mu.Unlock()
 	m.cond.Broadcast()
+
+	// Kancanın çağrısı KİLİT DIŞINDA: dinleyici burada beklerse yönetici de
+	// beklerdi. Kanca kendi tarafında bloklamamakla yükümlü.
+	if m.limits.OnSlotFree != nil {
+		m.limits.OnSlotFree()
+	}
 }
 
 // RecoverInterrupted, açılışta yarım kalmış kayıtları kapatır.

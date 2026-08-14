@@ -186,42 +186,125 @@ bir işi başlatırdı.
 Sıra: önce eski toplu iş, sonra öğe sırası. Kullanıcı ikinci kampanyayı
 başlattı diye birincisinin kuyruğu beklemeye geçmez.
 */
-func (s *Store) NextPending(ctx context.Context) (Item, bool, error) {
-	it, err := scanItem(s.pool.QueryRow(ctx, `SELECT `+itemColumns+`
+func (s *Store) NextPending(ctx context.Context) (Pending, bool, error) {
+	var p Pending
+	row := s.pool.QueryRow(ctx, `SELECT `+itemColumns+`, b.workflow_id, b.task
 		FROM run_batch_items i
 		JOIN run_batches b ON b.id = i.batch_id
 		JOIN projects p ON p.id = i.project_id
 		WHERE i.status = 'pending' AND b.status IN ('queued', 'running')
 		ORDER BY b.created_at, i.position
-		LIMIT 1`))
+		LIMIT 1`)
+
+	// Başlatmak için gereken her şey TEK sorguda: akış kimliği ve görev metni
+	// ayrı bir çağrıyla okunsaydı kuyruk her öğede iki gidiş-dönüş yapardı.
+	err := row.Scan(&p.ID, &p.BatchID, &p.ProjectID, &p.ProjectName,
+		&p.Position, &p.Status, &p.WorkflowRunID, &p.Error,
+		&p.StartedAt, &p.FinishedAt, &p.WorkflowID, &p.Task)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Item{}, false, nil
+		return Pending{}, false, nil
 	}
 	if err != nil {
-		return Item{}, false, fmt.Errorf("sıradaki öğe okunamadı: %w", err)
+		return Pending{}, false, fmt.Errorf("sıradaki öğe okunamadı: %w", err)
 	}
-	return it, true, nil
+	return p, true, nil
 }
 
-// MarkRunning, öğeyi çalışıyor işaretler ve akış çalışmasına bağlar.
-//
-// Yalnızca `pending` öğe çalışmaya geçer: aynı öğeyi iki kez başlatan bir yarış
-// ikinci çağrıda sessizce değil, `ErrNotFound` ile döner.
-func (s *Store) MarkRunning(ctx context.Context, itemID, workflowRunID uuid.UUID) error {
+/*
+Claim, öğeyi SAHİPLENİR: `pending` → `running`.
+
+Akış çalışması başlatılmadan ÖNCE yazılır. Ters sırada, iki çağrı arasında düşen
+bir süreç öğeyi `pending` bırakırdı ve açılışta aynı iş ikinci kez başlatılırdı —
+yan etkisi (branch'e gönderilmiş bir değişiklik) habersizce tekrarlanmış olurdu.
+
+Yalnızca `pending` öğe sahiplenilir: aynı öğeyi iki kez başlatan bir yarış
+ikinci çağrıda sessizce değil, `ErrNotFound` ile döner.
+*/
+func (s *Store) Claim(ctx context.Context, itemID uuid.UUID) error {
 	return s.withBatch(ctx, itemID, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `
 			UPDATE run_batch_items
-			SET status = 'running', workflow_run_id = $2, started_at = now(),
-			    error = ''
-			WHERE id = $1 AND status = 'pending'`, itemID, workflowRunID)
+			SET status = 'running', started_at = now(), error = '',
+			    workflow_run_id = NULL, finished_at = NULL
+			WHERE id = $1 AND status = 'pending'`, itemID)
 		if err != nil {
-			return fmt.Errorf("öğe çalışıyor işaretlenemedi: %w", err)
+			return fmt.Errorf("öğe sahiplenilemedi: %w", err)
 		}
 		if tag.RowsAffected() == 0 {
 			return ErrNotFound
 		}
 		return nil
 	})
+}
+
+// Attach, sahiplenilmiş öğeyi akış çalışmasına bağlar.
+//
+// Ayrı çağrı olmasının sebebi `Claim`'in sırası: çalışma kimliği ancak başlatma
+// döndükten sonra biliniyor.
+func (s *Store) Attach(ctx context.Context, itemID, workflowRunID uuid.UUID) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE run_batch_items SET workflow_run_id = $2
+		WHERE id = $1 AND status = 'running'`, itemID, workflowRunID)
+	if err != nil {
+		return fmt.Errorf("öğe çalışmaya bağlanamadı: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+/*
+Requeue, öğeyi kuyruğa geri koyar: `running` → `pending`.
+
+SINIR HATASININ karşılığı. Eşzamanlılık sınırı dolduğu için düşen bir öğe
+BAŞARISIZ SAYILMAZ — o iş hiç çalışmadı, yalnızca zamanı değildi. Aksi hâlde
+kuyruk kendini yerdi: sınırın dolu olduğu her an bir öğe "başarısız" diye
+işaretlenir ve otuz projenin çoğu hiç çalışmadan başarısız görünürdü.
+
+Çalışma kimliği SİLİNİR: o kayıt hiç iş yapmadan düştü, öğeye bağlı kalması
+kullanıcıya bakacak bir şey varmış gibi gösterirdi.
+*/
+func (s *Store) Requeue(ctx context.Context, itemID uuid.UUID) error {
+	return s.withBatch(ctx, itemID, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE run_batch_items
+			SET status = 'pending', workflow_run_id = NULL, error = '',
+			    started_at = NULL, finished_at = NULL
+			WHERE id = $1 AND status = 'running'`, itemID)
+		if err != nil {
+			return fmt.Errorf("öğe kuyruğa geri konamadı: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+}
+
+// RunningItems, o an çalışan TÜM öğeleri döner (toplu iş farkı gözetmeden).
+//
+// Zamanlayıcının iki sorusunun da cevabı burada: kaç öğe çalışıyor (sınır) ve
+// hangileri bitti mi (sonuç toplama).
+func (s *Store) RunningItems(ctx context.Context) ([]Item, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+itemColumns+`
+		FROM run_batch_items i JOIN projects p ON p.id = i.project_id
+		WHERE i.status = 'running'
+		ORDER BY i.started_at`)
+	if err != nil {
+		return nil, fmt.Errorf("çalışan öğeler okunamadı: %w", err)
+	}
+	defer rows.Close()
+
+	out := []Item{}
+	for rows.Next() {
+		it, err := scanItem(rows)
+		if err != nil {
+			return nil, fmt.Errorf("öğe taranamadı: %w", err)
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
 }
 
 /*

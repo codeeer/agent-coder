@@ -23,18 +23,22 @@ Kuyruğun kendini yemesi sessiz bir arıza — otuz projenin çoğu hiç çalı�
 
 ## Blok 2 — Zamanlayıcı (riskli)
 
-- [ ] T10 Boş slot varken sıradaki başlar → sahte başlatıcıyla ölçülür
-- [ ] T11 **Aynı anda çalışan sayısı sınırı AŞMAZ** → sınır 2, beş öğe;
-      tepe eşzamanlılık ölçülür
-- [ ] T12 **`ErrTooManyRuns` alan öğe `pending` KALIR** → başarısız
-      işaretlenmez; kuyruğun kendini yemediğinin kanıtı
-- [ ] T13 Bir öğe düşünce kuyruk DEVAM eder → sonraki öğe başlar
-- [ ] T14 `Wake` bloklamaz ve sinyal kaybolmaz → tamponlu kanal, art arda
+- [x] T10 Boş slot varken sıradaki başlar → sahte başlatıcıyla ölçülür
+- [x] T11 **Aynı anda çalışan sayısı sınırı AŞMAZ** → sınır 2, beş öğe;
+      tepe eşzamanlılık ölçülür (ölçülen tepe: 2)
+- [x] T12 **`ErrTooManyRuns` alan öğe `pending` KALIR** → başarısız
+      işaretlenmez; kuyruğun kendini yemediğinin kanıtı. İki yol da ölçüldü:
+      başlatmada dönen hata ve veritabanından METİN olarak gelen hata
+- [x] T12a Slotları kuyruk dışı çalıştırmalar tutuyorsa hiç öğe başlatılmaz —
+      planın düzeltmesiyle gelen ikinci koşul
+- [x] T13 Bir öğe düşünce kuyruk DEVAM eder → sonraki öğe başlar
+- [x] T14 `Wake` bloklamaz ve sinyal kaybolmaz → tamponlu kanal, art arda
       çağrıda birikmez
-- [ ] T15 Slot boşalınca uyandırma gelir → `runs.Limits.OnSlotFree` bağlanır
-- [ ] T16 Emniyet turu kuyruğu ilerletir → uyandırma hiç gelmese de
+- [x] T15 Slot boşalınca uyandırma gelir → `runs.Limits.OnSlotFree` bağlandı
+      (`main.go`) ve kancanın çağrıldığı `runs` paketinde ölçüldü
+- [x] T16 Emniyet turu kuyruğu ilerletir → uyandırma hiç gelmese de
       bekleyen başlar
-- [ ] T17 Toplu iş bitince durumu `done` olur
+- [x] T17 Toplu iş bitince durumu `done` olur
 
 ## Blok 3 — Uzlaştırma, iptal, devam
 
@@ -81,6 +85,25 @@ görüldü: `runs.Manager.release()` → `cond.Broadcast()`. Var olan bilgiyi yo
 sayıp aynı soruyu saniyede bir sormak yerine olay güdümlü tasarıma geçildi.
 Dakikalık tur mekanizma değil, kaçan bir uyandırmaya karşı sigorta olarak
 kaldı.
+
+**Planın `ErrTooManyRuns` tuzağı yanlış yerdeydi (Blok 2'de düzeltildi).**
+Kod okununca görüldü: `workflow.Launcher.Launch` sınıra hiç bakmıyor, sınır
+adım seviyesinde uygulanıyor ve dolduğunda akış çalışmasının TAMAMI `failed`
+oluyor — yani hata senkron bir dönüş değil, dakikalar sonra veritabanına düşen
+bir sonuç. Ayrıca paralel dallı bir akış aynı anda birden fazla slot tutuyor;
+"bir öğe = bir slot" da doğru değildi.
+
+Karşılık iki parçaya bölündü: zamanlayıcı hem *çalışan öğe sayısını* hem de
+*yöneticideki boş slotu* kontrol ediyor; buna rağmen sınır hatasıyla düşen öğe
+`failed` değil `pending` oluyor. Ayrıntı ve elenen alternatif (adım beklesin)
+[plan.md](plan.md) → Tuzak bölümünde; spec'in Problem bölümüne de ölçüm
+düzeltmesi eklendi.
+
+**Öğe önce sahiplenilir, sonra başlatılır.** `MarkRunning` ikiye ayrıldı:
+`Claim` (pending → running) akış çalışması başlatılmadan önce yazılıyor,
+`Attach` çalışma kimliğini sonra ekliyor. Ters sırada, iki çağrı arasında düşen
+bir süreç öğeyi `pending` bırakır ve açılışta aynı iş ikinci kez başlatılırdı —
+branch'e gönderilmiş bir değişiklik habersizce tekrarlanmış olurdu.
 
 **Durum alanları TEXT değil ENUM (Blok 1'de plandan sapıldı).** Plan iki durum
 sütununu da `TEXT` yazıyordu; proje konvansiyonu (`AGENTS.md` → Go, db-migrations

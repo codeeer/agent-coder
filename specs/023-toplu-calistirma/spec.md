@@ -25,6 +25,14 @@ alınıyor: bir hata mesajına çevriliyor. Hiçbir şey yeniden denemiyor, hiç
 Somut sonucu: sınır 3 iken otuz iş başlatılırsa **üçü çalışır, yirmi yedisi
 anında düşer** ve o yirmi yedisinin kaydı bile oluşmaz.
 
+> **Ölçüm düzeltmesi (Blok 2, 2026-08-15).** Yukarıdaki cümle tek çalıştırma
+> ucu için doğru; **akış çalışmaları için değil.** Kod okundu: `Launcher.Launch`
+> sınıra hiç bakmıyor, kaydı oluşturuyor. Sınır adım seviyesinde uygulanıyor ve
+> dolu olduğunda akış çalışmasının tamamı `failed` oluyor. Yani otuz akış
+> başlatılırsa otuz KAYIT oluşur, yirmi yedisi "sınır dolu" diye başarısız
+> görünür — kullanıcı için sonuç aynı derecede kötü, ama arızanın biçimi farklı
+> ve kuyruğun karşılığı da farklı (bkz. [plan.md](plan.md) → Tuzak).
+
 Sınırı yükseltmek çözüm değil: iş başına iki çekirdek ve dört GB ayrılıyor,
 otuz eşzamanlı iş altmış çekirdek ve yüz yirmi GB demek. Sınır keyfi değil,
 makinenin gerçeği.

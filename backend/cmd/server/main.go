@@ -35,6 +35,7 @@ import (
 	"github.com/agent-coder/backend/internal/netgate"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
+	"github.com/agent-coder/backend/internal/runbatch"
 	"github.com/agent-coder/backend/internal/runbuild"
 	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runner/opencode"
@@ -188,6 +189,18 @@ func run() error {
 	bus := events.New()
 	runStore := runs.NewStore(database.Pool)
 
+	/*
+	 * Toplu çalıştırma kuyruğu (spec 023) slot boşalınca uyandırılır.
+	 *
+	 * Kuyruk yöneticiden SONRA kuruluyor ama sinyali ondan alıyor; bu yüzden
+	 * kanca bir değişkenin üzerinden geçiyor. Bağımlılık yönü korunuyor:
+	 * `runs` paketi kuyruğu tanımıyor, bağ burada kuruluyor.
+	 *
+	 * Atama HTTP sunucusu açılmadan önce yapılır; ilk çalıştırma ancak ondan
+	 * sonra başlayabildiği için kancanın nil görmesi mümkün değil.
+	 */
+	var batchScheduler *runbatch.Scheduler
+
 	// Sınırlar fonksiyon olarak geçilir: ayar değişikliği sunucu yeniden
 	// başlatılmadan geçerli olsun diye her kullanımda yeniden okunurlar.
 	runManager := runs.NewManager(runStore, agentRunner, bus, runs.Limits{
@@ -198,6 +211,14 @@ func run() error {
 		CPUCores:   func() int { return settingsSvc.Int(settings.KeyRunnerCPULimit) },
 		MemoryGB:   func() int { return settingsSvc.Int(settings.KeyRunnerMemoryLimitG) },
 		CloneDepth: func() int { return settingsSvc.Int(settings.KeyCloneDepth) },
+
+		// Slot boşalınca kuyruk uyandırılır — yoklama yok. Sinyal zaten
+		// üretiliyordu; kuyruk ona bağlanıyor.
+		OnSlotFree: func() {
+			if batchScheduler != nil {
+				batchScheduler.Wake()
+			}
+		},
 
 		// Motor logları: saklama, boyut sınırı ve yaşam süresi.
 		EngineLogPersist: func() bool { return settingsSvc.Bool(settings.KeyEngineLogPersist) },
@@ -307,6 +328,22 @@ func run() error {
 
 	workflowLauncher := workflow.NewLauncher(workflowStore, workflowExec)
 
+	// ── Toplu çalıştırma kuyruğu ────────────────────────────────────────────
+
+	batchStore := runbatch.NewStore(database.Pool)
+	batchBridge := runbatch.NewBridge(workflowLauncher, workflowStore)
+	batchScheduler = runbatch.NewScheduler(batchStore, batchBridge, batchBridge, runbatch.Slots{
+		// Sınır SORULUR, kopyalanmaz: kuyruğun kendi paralellik ayarı yok.
+		Max:    func() int { return settingsSvc.Int(settings.KeyMaxConcurrentRuns) },
+		Active: runManager.Active,
+	})
+
+	// Backend kapandığında 'running' kalan öğeler var; container'ları gitti.
+	// Kendiliğinden denenmezler — kullanıcı "kaldığı yerden devam et" der.
+	if err := batchScheduler.Reconcile(ctx); err != nil {
+		slog.WarnContext(ctx, "yarım kalmış toplu iş öğeleri uzlaştırılamadı", "error", err)
+	}
+
 	// Agent Coder'ın kendisi bir MCP sunucusu: dışarıdaki istemciler akışları
 	// listeleyip başlatabilir. Başlatma mevcut Launcher'dan geçer.
 	mcpAccess := mcpserver.NewAccess(database.Pool)
@@ -386,6 +423,13 @@ func run() error {
 		// Jira taraması da açılışı engellemez: erişim tanımlı değilse veya
 		// hiç Jira tetikleyicisi yoksa sessizce boşta durur.
 		jiraTrigger.Run(ctx)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// Toplu çalıştırma kuyruğu: olay güdümlü çalışır, boşta maliyeti yok.
+		batchScheduler.Run(ctx)
 	}()
 
 	// ── HTTP sunucusu ───────────────────────────────────────────────────────

@@ -139,7 +139,7 @@ func TestNextPending_CalisanOgeyiTekrarVermez(t *testing.T) {
 	ilk, ok, err := f.store.NextPending(ctx)
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.NoError(t, f.store.MarkRunning(ctx, ilk.ID, f.workflowRun(t, ilk.ProjectID)))
+	f.baslat(t, ilk.ID, ilk.ProjectID)
 
 	ikinci, ok, err := f.store.NextPending(ctx)
 	require.NoError(t, err)
@@ -204,12 +204,12 @@ func TestSayilar_HerDurumKendiKovasinda(t *testing.T) {
 	require.NoError(t, err)
 
 	// 0: çalışıyor · 1: tamamlandı · 2: başarısız · 3: kesildi · 4: bekliyor
-	require.NoError(t, f.store.MarkRunning(ctx, items[0].ID, f.workflowRun(t, items[0].ProjectID)))
-	require.NoError(t, f.store.MarkRunning(ctx, items[1].ID, f.workflowRun(t, items[1].ProjectID)))
+	f.baslat(t, items[0].ID, items[0].ProjectID)
+	f.baslat(t, items[1].ID, items[1].ProjectID)
 	require.NoError(t, f.store.MarkFinished(ctx, items[1].ID, runbatch.ItemSucceeded, ""))
-	require.NoError(t, f.store.MarkRunning(ctx, items[2].ID, f.workflowRun(t, items[2].ProjectID)))
+	f.baslat(t, items[2].ID, items[2].ProjectID)
 	require.NoError(t, f.store.MarkFinished(ctx, items[2].ID, runbatch.ItemFailed, "derleme hatası"))
-	require.NoError(t, f.store.MarkRunning(ctx, items[3].ID, f.workflowRun(t, items[3].ProjectID)))
+	f.baslat(t, items[3].ID, items[3].ProjectID)
 	require.NoError(t, f.store.MarkFinished(ctx, items[3].ID, runbatch.ItemInterrupted, "kesildi"))
 
 	got, _, err := f.store.Get(ctx, b.ID)
@@ -240,28 +240,47 @@ func TestList_SayilarlaBirlikte(t *testing.T) {
 	require.Equal(t, 1, list[1].Counts.Total)
 }
 
-// workflowRun, öğenin bağlanacağı bir akış çalışması üretir.
+// baslat, öğeyi sahiplenip bir akış çalışmasına bağlar — zamanlayıcının
+// başlatma sırasının aynısı.
+func (f fixture) baslat(t *testing.T, itemID, projectID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	require.NoError(t, f.store.Claim(ctx, itemID))
+	require.NoError(t, f.store.Attach(ctx, itemID, f.workflowRun(t, projectID)))
+}
+
+// yeniCalisma, öğenin bağlanacağı bir akış çalışması üretir.
 //
 // Gerçek bir kayıt gerekiyor: `workflow_run_id` yabancı anahtar ve uydurma bir
 // UUID yazmak veritabanı tarafından reddedilir — testin de bunu bilmesi iyi.
-func (f fixture) workflowRun(t *testing.T, projectID uuid.UUID) uuid.UUID {
-	t.Helper()
-	ctx := context.Background()
-
+//
+// `*testing.T` almıyor: sahte başlatıcı bunu zamanlayıcının goroutine'inden de
+// çağırıyor ve oradan `FailNow` çağırmak yasak.
+func (f fixture) yeniCalisma(ctx context.Context, projectID uuid.UUID) (uuid.UUID, error) {
 	var versionID uuid.UUID
 	err := f.pool.QueryRow(ctx, `
 		SELECT id FROM workflow_versions WHERE workflow_id = $1 ORDER BY version DESC LIMIT 1`,
 		f.workflowID).Scan(&versionID)
 	if err != nil {
-		require.NoError(t, f.pool.QueryRow(ctx, `
+		if err := f.pool.QueryRow(ctx, `
 			INSERT INTO workflow_versions (workflow_id, version, graph)
-			VALUES ($1, 1, '{}'::jsonb) RETURNING id`, f.workflowID).Scan(&versionID))
+			VALUES ($1, 1, '{}'::jsonb) RETURNING id`,
+			f.workflowID).Scan(&versionID); err != nil {
+			return uuid.Nil, err
+		}
 	}
 
 	var runID uuid.UUID
-	require.NoError(t, f.pool.QueryRow(ctx, `
+	err = f.pool.QueryRow(ctx, `
 		INSERT INTO workflow_runs (workflow_id, project_id, version_id, version, trigger_kind)
 		VALUES ($1, $2, $3, 1, 'manual') RETURNING id`,
-		f.workflowID, projectID, versionID).Scan(&runID))
-	return runID
+		f.workflowID, projectID, versionID).Scan(&runID)
+	return runID, err
+}
+
+func (f fixture) workflowRun(t *testing.T, projectID uuid.UUID) uuid.UUID {
+	t.Helper()
+	id, err := f.yeniCalisma(context.Background(), projectID)
+	require.NoError(t, err)
+	return id
 }

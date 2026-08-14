@@ -102,3 +102,14 @@ type Item struct {
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 }
+
+// Pending, sıradaki öğe ve onu BAŞLATMAK için gereken toplu iş bilgisi.
+//
+// Ayrı tip olmasının sebebi: akış kimliği ve görev metni öğenin değil toplu
+// işin alanları. `Item`'a eklenselerdi her öğe listesinde otuz kez tekrarlanan
+// aynı iki değer taşınırdı.
+type Pending struct {
+	Item
+	WorkflowID uuid.UUID
+	Task       string
+}

@@ -342,3 +342,47 @@ func TestRecoverInterrupted(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, n)
 }
+
+/*
+TestManager_SlotBosalinca_KancaCagrilir — spec 023'ün kuyruğu bu sinyale bağlı.
+
+Kuyruk "acaba boşaldı mı" diye yoklamıyor; slot bırakılırken haber alıyor.
+Kanca sessizce çağrılmaz hale gelirse kuyruk yalnızca dakikalık emniyet turuyla
+ilerler — yani sessizce yavaşlar, ve bu hiçbir yerde hata olarak görünmez.
+*/
+func TestManager_SlotBosalinca_KancaCagrilir(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+
+	stub := &stubRunner{block: make(chan struct{})}
+	// Tamponlu: kanca BLOKLAMAMALI — dinleyici yavaşsa yönetici beklememeli.
+	sinyal := make(chan struct{}, 4)
+
+	m := runs.NewManager(f.store, stub, events.New(), runs.Limits{
+		MaxConcurrent: func() int { return 1 },
+		Timeout:       func() time.Duration { return time.Minute },
+		CPUCores:      func() int { return 1 },
+		MemoryGB:      func() int { return 1 },
+		CloneDepth:    func() int { return 1 },
+		OnSlotFree:    func() { sinyal <- struct{}{} },
+	})
+	defer m.Shutdown()
+
+	_, err := m.Start(ctx, startInput(f, "birinci"))
+	require.NoError(t, err)
+	waitFor(t, "iş motora ulaşmalı", func() bool { return stub.started.Load() == 1 })
+
+	select {
+	case <-sinyal:
+		t.Fatal("iş sürerken slot boşalma sinyali gelmemeli")
+	default:
+	}
+
+	close(stub.block)
+
+	select {
+	case <-sinyal:
+	case <-time.After(5 * time.Second):
+		t.Fatal("iş bitince slot boşalma sinyali gelmeli")
+	}
+}
