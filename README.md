@@ -474,6 +474,35 @@ Sistem kaydetmeden önce depoya **gerçekten erişebildiğini** doğrular.
 - **Bitbucket:** kullanıcı adı + app password
 - **Genel Git:** kullanıcı adı + parola/token
 
+### Kurumsal Bitbucket: gruptan toplu ekleme
+
+Kurumsal Bitbucket'ta repository'ler gruplar altında duruyor ve bir grup
+onlarca repository taşıyabiliyor. Hepsini tek tek girmemek için:
+
+**Projeler → Gruptan içe aktar** → grubun adresini yapıştırın:
+
+```
+https://bitbucket.sirket.com/projects/ODEME
+```
+
+Sunucu bir alt yolda kuruluysa (`https://sirket.com/bitbucket/projects/ODEME`)
+o da çalışır; kişisel alanlar (`.../users/ahmet`) da desteklenir.
+
+Grubun altındaki repository'ler listelenir, yeni olanlar seçili gelir ve
+onayladıklarınız tek işlemde proje olur. Her projenin varsayılan branch'i
+**deponun kendisinden** okunur, varsayılmaz. Aynı grubu sonra tekrar içe
+aktarabilirsiniz: zaten kayıtlı olanlar atlanır, yalnızca yenileri eklenir.
+
+> **Yalnızca kurumsal (kendi sunucunuzda çalışan) Bitbucket için.** Bitbucket
+> Cloud'un şeması farklı; bulut adresi verilirse ürün bunu söyler ve devam
+> etmez.
+>
+> Bu özellik, elimizde deneme lisansı olmadığı için **gerçek bir kurumsal
+> sunucuya karşı ölçülmedi**; doğrulama Atlassian belgelerine dayanıyor ve
+> yerel bir taklit sunucuyla yapıldı (`scripts/sahte-bitbucket/`). Sunucu
+> sürümünüzde beklenmedik bir yanıt çıkarsa hata mesajı ham yanıtı gösterir —
+> o metinle issue açın.
+
 ## 3️⃣ Akışı kurun
 
 **Akışlar → Akış oluştur** → ad verin ve projeyi seçin.

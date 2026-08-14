@@ -25,17 +25,17 @@ func TestNormalizeRepoURL_SondakiGitVeEgikCizgiAtilir(t *testing.T) {
 		"https://bb.sirket.com/scm/ODEME/api.git/",
 	}
 
-	ilk := normalizeRepoURL(esitler[0])
+	ilk := NormalizeRepoURL(esitler[0])
 	for _, a := range esitler[1:] {
-		if got := normalizeRepoURL(a); got != ilk {
+		if got := NormalizeRepoURL(a); got != ilk {
 			t.Errorf("%q → %q, beklenen %q", a, got, ilk)
 		}
 	}
 }
 
 func TestNormalizeRepoURL_HarfBuyuklugu(t *testing.T) {
-	a := normalizeRepoURL("https://BB.Sirket.COM/scm/ODEME/api.git")
-	b := normalizeRepoURL("https://bb.sirket.com/scm/odeme/api")
+	a := NormalizeRepoURL("https://BB.Sirket.COM/scm/ODEME/api.git")
+	b := NormalizeRepoURL("https://bb.sirket.com/scm/odeme/api")
 
 	if a != b {
 		t.Errorf("harf büyüklüğü farkı aynı anahtara düşmeli: %q vs %q", a, b)
@@ -53,7 +53,7 @@ func TestNormalizeRepoURL_FarkliDepolarAyriKalir(t *testing.T) {
 
 	gorulen := map[string]string{}
 	for _, a := range farklilar {
-		k := normalizeRepoURL(a)
+		k := NormalizeRepoURL(a)
 		if onceki, varsa := gorulen[k]; varsa {
 			t.Errorf("%q ve %q aynı anahtara düştü: %q", onceki, a, k)
 		}
@@ -63,7 +63,7 @@ func TestNormalizeRepoURL_FarkliDepolarAyriKalir(t *testing.T) {
 
 // Ayrıştırılamayan adres kaybolmaz: kendi metni anahtar olur.
 func TestNormalizeRepoURL_AyristirilamayanKorunur(t *testing.T) {
-	if normalizeRepoURL("bu bir adres değil") == "" {
+	if NormalizeRepoURL("bu bir adres değil") == "" {
 		t.Error("ayrıştırılamayan adres boş anahtara düşmemeli")
 	}
 }

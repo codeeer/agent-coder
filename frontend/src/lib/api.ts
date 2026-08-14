@@ -28,6 +28,9 @@ import type {
   ModelList,
   Paged,
   ModelQuery,
+  ImportLine,
+  ImportPreview,
+  ImportRepo,
   Project,
   ProjectRequest,
   ReportQuery,
@@ -55,6 +58,69 @@ import type {
   UpdateLLMProviderRequest,
 } from "./types";
 import { apiBase } from "./runtime-config";
+
+/**
+ * NDJSON akışı okur: her satır ayrı bir JSON nesnesi.
+ *
+ * `apiFetch` kullanılamıyor — o gövdenin tamamını okuyup çözüyor, oysa buradaki
+ * değerin tamamı işin SONUNDA geliyor. Hata biçimi yine ortak: başarısız yanıt
+ * `ApiError` olarak fırlatılır.
+ *
+ * ZAMAN AŞIMI YOK. İş yüz repository sürebilir ve sabit bir sınır, tam da uzun
+ * süren doğru işi keserdi. Kullanıcı vazgeçmek isterse `signal` ile keser.
+ */
+async function streamNDJSON(
+  path: string,
+  body: unknown,
+  onLine: (line: never) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch {
+    throw new ApiError(0, "network_error", "Backend'e ulaşılamadı");
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    const parsed: unknown = text ? JSON.parse(text) : null;
+    if (isErrorBody(parsed)) {
+      throw new ApiError(res.status, parsed.error.code, parsed.error.message);
+    }
+    throw new ApiError(res.status, "unexpected_error", `HTTP ${res.status}`);
+  }
+  if (!res.body) {
+    throw new ApiError(0, "unexpected_error", "Yanıt akışı okunamadı");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let kalan = "";
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    // Bir okuma satır ORTASINDA bitebilir; yarım satır bir sonraki parçanın
+    // başına eklenir. Aksi halde uzun kayıtlar bölünüp ayrıştırılamazdı.
+    kalan += decoder.decode(value, { stream: true });
+    const satirlar = kalan.split("\n");
+    kalan = satirlar.pop() ?? "";
+
+    for (const satir of satirlar) {
+      if (satir.trim() === "") continue;
+      onLine(JSON.parse(satir) as never);
+    }
+  }
+
+  if (kalan.trim() !== "") onLine(JSON.parse(kalan) as never);
+}
 
 /*
  * API kök adresi ÇAĞRI BAŞINA çözülür (`apiBase`), modül seviyesinde sabit
@@ -362,6 +428,30 @@ export const api = {
 
     remove: (id: string) =>
       apiFetch<null>(`/api/projects/${id}`, { method: "DELETE" }),
+
+    /**
+     * Grup adresindeki repository'leri listeler. Yan etkisi YOK — hiçbir şey
+     * kaydedilmez, kullanıcı listeyi görüp seçer.
+     */
+    importPreview: (body: { groupUrl: string; gitProviderId: string }) =>
+      apiFetch<ImportPreview>("/api/projects/import/preview", {
+        method: "POST",
+        body,
+        timeoutMs: 60_000,
+      }),
+
+    /**
+     * Seçilenleri içe aktarır ve sonuçları SATIR SATIR verir.
+     *
+     * Yanıt beklenmiyor, akış okunuyor: yüz repository'nin her biri için ayrı
+     * bir erişim sınaması koşuyor ve kullanıcı hangisinin bittiğini anında
+     * görmeli. Tek parça yanıt beklenseydi ekran dakikalarca sessiz kalırdı.
+     */
+    importRun: (
+      body: { gitProviderId: string; repos: ImportRepo[] },
+      onLine: (line: ImportLine) => void,
+      signal?: AbortSignal,
+    ) => streamNDJSON("/api/projects/import", body, onLine, signal),
   },
 
   agents: {

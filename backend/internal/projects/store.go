@@ -116,13 +116,13 @@ func (s *Store) ExistingRepoURLs(ctx context.Context) (map[string]uuid.UUID, err
 		if err := rows.Scan(&id, &url); err != nil {
 			return nil, fmt.Errorf("proje adresi taranamadı: %w", err)
 		}
-		out[normalizeRepoURL(url)] = id
+		out[NormalizeRepoURL(url)] = id
 	}
 	return out, rows.Err()
 }
 
 /*
-normalizeRepoURL, mükerrer denetimi için adresi karşılaştırılabilir hale
+NormalizeRepoURL, mükerrer denetimi için adresi karşılaştırılabilir hale
 getirir: sondaki `.git` ve eğik çizgi atılır, tamamı küçük harfe çevrilir.
 
 KÜÇÜK HARFE ÇEVİRME BİLİNÇLİ BİR ÖDÜNÇ. Gerçek senaryo: kullanıcı bir
@@ -134,7 +134,7 @@ farklı repository ise pratikte yok.
 Ayrıştırılamayan adres KAYBOLMAZ: kendi metni anahtar olur. Boş anahtara
 düşseydi bozuk adresli iki proje aynı sayılırdı.
 */
-func normalizeRepoURL(raw string) string {
+func NormalizeRepoURL(raw string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
 	s = strings.TrimSuffix(s, "/")
 	s = strings.TrimSuffix(s, ".git")

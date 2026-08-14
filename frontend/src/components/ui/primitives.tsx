@@ -611,11 +611,20 @@ export function Label({
 
 export function Checkbox({
   label,
+  labelHidden = false,
   checked,
   onChange,
   disabled,
 }: {
   label: string;
+  /**
+   * Etiketi GÖRSEL olarak gizler ama kaldırmaz.
+   *
+   * Satırın kimliği başka bir sütunda yazılıyken etiketi ikinci kez basmak
+   * gürültü olur. Etiket yine de DOM'da durur: kaldırılsaydı ekran okuyucu
+   * kullanan biri için kutucuk adsız kalırdı.
+   */
+  labelHidden?: boolean;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
@@ -633,7 +642,7 @@ export function Checkbox({
         onChange={(e) => onChange(e.target.checked)}
         className="size-3.5 accent-accent"
       />
-      {label}
+      <span className={labelHidden ? "sr-only" : undefined}>{label}</span>
     </label>
   );
 }

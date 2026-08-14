@@ -20,6 +20,7 @@ import type {
   Workflow,
 } from "@/lib/types";
 import { repoLabel } from "@/components/projects/repo-url";
+import { ImportGroupPanel } from "@/components/projects/ImportGroupPanel";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import {
   formatCount,
@@ -103,6 +104,7 @@ type FilterId = (typeof FILTERS)[number]["id"];
 
 export default function ProjectsPage() {
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
 
@@ -184,17 +186,34 @@ export default function ProjectsPage() {
         title="Projeler"
         description="Agent'ların üzerinde çalışacağı kod depoları. Bir kez tanımlanır, her çalıştırmada listeden seçilir."
         actions={
-          !adding && (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setAdding(true);
-                setEditingId(null);
-              }}
-              icon={<IconPlus className="size-4" />}
-            >
-              Proje ekle
-            </Button>
+          !adding &&
+          !importing && (
+            <div className="flex items-center gap-2">
+              {/* İkincil eylem KENARLIKLI: bir düğme olduğu kenarlığından
+                  anlaşılır. Ekranda tek dolu düğme var, o da asıl eylem
+                  (ui.md → Eylem hiyerarşisi). */}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setImporting(true);
+                  setAdding(false);
+                  setEditingId(null);
+                }}
+              >
+                Gruptan içe aktar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setAdding(true);
+                  setImporting(false);
+                  setEditingId(null);
+                }}
+                icon={<IconPlus className="size-4" />}
+              >
+                Proje ekle
+              </Button>
+            </div>
           )
         }
       />
@@ -207,6 +226,15 @@ export default function ProjectsPage() {
       {/* Ekleme formu ızgaranın ÜSTÜNDE: yeni bir kaydın ızgarada yeri
           yok ve bir hücreye sıkıştırılınca doğrulama hataları için yer
           kalmıyordu. */}
+      {importing && (
+        <div className="mb-4">
+          <ImportGroupPanel
+            gitProviders={gitProviders.data ?? []}
+            onDone={() => setImporting(false)}
+          />
+        </div>
+      )}
+
       {adding && (
         <div className="mb-4">
           <ProjectForm

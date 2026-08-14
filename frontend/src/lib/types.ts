@@ -901,3 +901,30 @@ export interface CANormalizeResult {
   pem: string;
   certificates: CertificateInfo[];
 }
+
+// ─── Gruptan toplu proje ekleme (spec 021) ──────────────────────────────────
+
+/** Bir Bitbucket grubunda bulunan repository. */
+export interface ImportRepo {
+  slug: string;
+  name: string;
+  cloneUrl: string;
+  archived: boolean;
+  /** Yalnızca önizlemede dolu. */
+  status?: "new" | "already_registered";
+}
+
+export interface ImportPreview {
+  group: { baseUrl: string; key: string };
+  repos: ImportRepo[];
+}
+
+/** İçe aktarma akışının tek satırı: ya bir sonuç ya da sondaki özet. */
+export interface ImportLine {
+  slug?: string;
+  name?: string;
+  result?: "created" | "skipped" | "failed";
+  projectId?: string;
+  reason?: string;
+  summary?: { created: number; skipped: number; failed: number };
+}

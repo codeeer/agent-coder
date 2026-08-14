@@ -2,7 +2,7 @@
 
 - **Spec no:** 021
 - **Tarih:** 2026-08-14
-- **Durum:** Taslak
+- **Durum:** Uygulandı
 
 ---
 
@@ -65,15 +65,15 @@ ekleyeceğime ancak listeyi görünce karar verebilirim.**
 
 Kabul kriterleri:
 
-- [ ] Verili tanımlı bir kurumsal Bitbucket erişimi, kullanıcı bir grup adresi
+- [x] Verili tanımlı bir kurumsal Bitbucket erişimi, kullanıcı bir grup adresi
       verdiğinde, o grubun altındaki repository'lerin adları listelenir
-- [ ] Grup yirmi beşten fazla repository içeriyorsa **hepsi** listelenir; liste
+- [x] Grup yirmi beşten fazla repository içeriyorsa **hepsi** listelenir; liste
       ilk sayfayla sınırlı kalmaz
-- [ ] Adresin ucundaki eğik çizgi, sondaki ek yol parçaları veya adres
+- [x] Adresin ucundaki eğik çizgi, sondaki ek yol parçaları veya adres
       çubuğundan gelen artıklar listelemeyi engellemez
-- [ ] Ürünün kök dizinde değil bir alt yolda kurulu olduğu sunucularda da
+- [x] Ürünün kök dizinde değil bir alt yolda kurulu olduğu sunucularda da
       liste gelir
-- [ ] Liste gelirken kullanıcı beklediğini görür; ekran donmuş gibi durmaz
+- [x] Liste gelirken kullanıcı beklediğini görür; ekran donmuş gibi durmaz
 
 ### H2 — Seçtiklerini tek işlemde ekleme
 
@@ -82,21 +82,21 @@ proje olarak eklemek** istiyorum, çünkü **asıl derdim tek tek form doldurmam
 
 Kabul kriterleri:
 
-- [ ] Liste geldiğinde repository'ler seçili gelir; kullanıcı istemediklerini
+- [x] Liste geldiğinde repository'ler seçili gelir; kullanıcı istemediklerini
       çıkarabilir
-- [ ] Kaynak bir repository'nin arşivlenmiş olduğunu bildiriyorsa o
+- [x] Kaynak bir repository'nin arşivlenmiş olduğunu bildiriyorsa o
       repository listede **görünür ama seçili gelmez**; kullanıcı isterse
       elle seçebilir
-- [ ] Onaydan sonra seçilen her repository ayrı bir proje olarak eklenir
-- [ ] Eklenen her proje, o repository'nin **kendi** adını, **kendi** klonlama
+- [x] Onaydan sonra seçilen her repository ayrı bir proje olarak eklenir
+- [x] Eklenen her proje, o repository'nin **kendi** adını, **kendi** klonlama
       adresini ve **kendi** varsayılan branch'ini taşır; ad kaynaktan gelir,
       ürün tarafından türetilmez
-- [ ] Eklenen projeler, listelemede kullanılan erişim tanımına bağlanır —
+- [x] Eklenen projeler, listelemede kullanılan erişim tanımına bağlanır —
       kullanıcı ayrıca kimlik seçmez
-- [ ] Ekleme sırasında kullanıcı işin ilerlediğini görür; ekran sessizce
+- [x] Ekleme sırasında kullanıcı işin ilerlediğini görür; ekran sessizce
       beklemez
-- [ ] İşlem bitince kaç projenin eklendiği sayıyla yazılır
-- [ ] Eklenen projeler proje listesinde, elle eklenmişlerden ayırt edilmeye
+- [x] İşlem bitince kaç projenin eklendiği sayıyla yazılır
+- [x] Eklenen projeler proje listesinde, elle eklenmişlerden ayırt edilmeye
       gerek kalmadan görünür
 
 ### H2a — Eklemeden önce erişimin sınanması
@@ -107,11 +107,11 @@ tetikleyip başarısız olunca fark etmek geç.**
 
 Kabul kriterleri:
 
-- [ ] Seçilen her repository, kaydedilmeden önce erişim açısından sınanır
-- [ ] Sınamayı geçemeyen repository **eklenmez**; adı ve sebebi yazılır
-- [ ] Sınama, seçim yüz repository'ye kadar çıktığında da makul sürede biter;
+- [x] Seçilen her repository, kaydedilmeden önce erişim açısından sınanır
+- [x] Sınamayı geçemeyen repository **eklenmez**; adı ve sebebi yazılır
+- [x] Sınama, seçim yüz repository'ye kadar çıktığında da makul sürede biter;
       kullanıcı dakikalarca bekletilmez
-- [ ] Bir repository'nin sınaması uzun sürerse tüm işlem onun yüzünden
+- [x] Bir repository'nin sınaması uzun sürerse tüm işlem onun yüzünden
       durmaz
 
 ### H3 — Aynı grubu yeniden içe aktarma
@@ -122,13 +122,13 @@ projelerimi bozmadan yenilerini almak istiyorum.**
 
 Kabul kriterleri:
 
-- [ ] Zaten kayıtlı olan bir repository ikinci kez eklenmez
-- [ ] Zaten kayıtlı olanlar listede **görünür** ve durumu yazar; gizlenmez
-- [ ] Bir repository başka bir erişim tanımıyla kayıtlıysa da atlanır;
+- [x] Zaten kayıtlı olan bir repository ikinci kez eklenmez
+- [x] Zaten kayıtlı olanlar listede **görünür** ve durumu yazar; gizlenmez
+- [x] Bir repository başka bir erişim tanımıyla kayıtlıysa da atlanır;
       mevcut kaydın erişimi değiştirilmez
-- [ ] Sonuç, eklenen ile atlananı ayrı ayrı söyler: "9 eklendi, 51 zaten
+- [x] Sonuç, eklenen ile atlananı ayrı ayrı söyler: "9 eklendi, 51 zaten
       kayıtlıydı"
-- [ ] Hiç yeni repository yoksa bu bir hata değildir; öyle söylenir
+- [x] Hiç yeni repository yoksa bu bir hata değildir; öyle söylenir
 
 ### H4 — Kurumsal ile bulut karışıklığının önlenmesi
 
@@ -138,10 +138,10 @@ benziyor.**
 
 Kabul kriterleri:
 
-- [ ] Bulut adresi verildiğinde ürün bunu **fark eder** ve bu yolun yalnızca
+- [x] Bulut adresi verildiğinde ürün bunu **fark eder** ve bu yolun yalnızca
       kurumsal kurulumlar için olduğunu söyler
-- [ ] Mesaj kullanıcıyı suçlamaz; ne yapacağını söyler
-- [ ] Bulut adresi, kurumsal uca gönderilip anlamsız bir hata üretmez
+- [x] Mesaj kullanıcıyı suçlamaz; ne yapacağını söyler
+- [x] Bulut adresi, kurumsal uca gönderilip anlamsız bir hata üretmez
 
 ---
 

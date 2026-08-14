@@ -92,30 +92,30 @@ yanıtı saklamayan hata mesajları ise sahadan gelecek bildirimi işe yarar kı
 
 ## Blok 6 — Arayüz
 
-- [ ] T50 Projeler ekranında "Gruptan içe aktar" eylemi → tıklanınca grup
+- [x] T50 Projeler ekranında "Gruptan içe aktar" eylemi → tıklanınca grup
       adresi ve erişim seçimi istenir
-- [ ] T51 Önizleme listesi: ad, adres, durum etiketi → zaten kayıtlı olanlar
+- [x] T51 Önizleme listesi: ad, adres, durum etiketi → zaten kayıtlı olanlar
       **görünür** ve işaretli, seçilemez
-- [ ] T52 Seçim varsayılanı: yeni olanlar seçili, arşivli olanlar seçimsiz →
+- [x] T52 Seçim varsayılanı: yeni olanlar seçili, arşivli olanlar seçimsiz →
       kullanıcı arşivliyi elle seçebilir
-- [ ] T53 Seçim sayacı ve toplu seç/bırak → saf mantık kendi modülünde,
+- [x] T53 Seçim sayacı ve toplu seç/bırak → saf mantık kendi modülünde,
       `npm test` ile
-- [ ] T54 İçe aktarma sırasında ilerleme: tamamlanan / toplam → akıştan gelen
+- [x] T54 İçe aktarma sırasında ilerleme: tamamlanan / toplam → akıştan gelen
       satırlarla güncellenir
-- [ ] T55 Sonuç özeti: eklenen, atlanan, başarısız ayrı ayrı; başarısızlar adı
+- [x] T55 Sonuç özeti: eklenen, atlanan, başarısız ayrı ayrı; başarısızlar adı
       ve sebebiyle listelenir
-- [ ] T56 Boş sonuçlar hata gibi gösterilmez → "grupta repository yok" ve
+- [x] T56 Boş sonuçlar hata gibi gösterilmez → "grupta repository yok" ve
       "hepsi zaten kayıtlı" ayrı ve sakin mesajlar
-- [ ] T57 `ui.md` doğrulaması: açık ve koyu tema, geniş ve dar masaüstü,
+- [x] T57 `ui.md` doğrulaması: açık ve koyu tema, geniş ve dar masaüstü,
       yükleniyor / boş / hata durumları → tarayıcıda ölçülür
 
 ## Blok 7 — Kapanış
 
-- [ ] T60 `README` ve `docs/`: kurumsal Bitbucket'tan toplu ekleme anlatılır;
+- [x] T60 `README` ve `docs/`: kurumsal Bitbucket'tan toplu ekleme anlatılır;
       bulut için geçerli olmadığı ve gerçek sunucuda ölçülmediği yazılır
-- [ ] T61 Kapı temiz → `make test` · `npx tsc --noEmit` · `npx eslint .` ·
+- [x] T61 Kapı temiz → `make test` · `npx tsc --noEmit` · `npx eslint .` ·
       `make lint-backend`
-- [ ] T62 Spec kabul kriterleri tek tek elle doğrulanır; `spec.md` durumu
+- [x] T62 Spec kabul kriterleri tek tek elle doğrulanır; `spec.md` durumu
       "Uygulandı" olur
 
 ---
@@ -169,3 +169,44 @@ HTTP üzerine kurulu). Testler artık `git http-backend`'i CGI olarak koşturan
 gerçek bir akıllı HTTP git sunucusu ayağa kaldırıyor; böylece zincirin tamamı
 — liste, adres seçimi, erişim sınaması, branch okuma, kayıt — gerçekten
 koşuyor.
+
+**T57 — tarayıcı doğrulaması gerçek bir akışla yapıldı.** `scripts/sahte-bitbucket/`
+altında, hem Bitbucket'ın liste ucunu hem gerçek git'i (smart HTTP) sunan bir
+sunucu yazıldı. Ölçülenler: dört repository'nin İKİ SAYFADAN toplanması,
+arşivli kaydın seçili gelmemesi, üç projenin eklenmesi ve her birinin
+varsayılan branch'inin depodan gelmesi (`develop`, `main`, `release/2026` —
+hepsi farklı, yani değer uydurulmuyor), gömülü kullanıcı adının ayıklanması,
+tekrar çalıştırmada üçünün de "zaten kayıtlı" görünmesi, üç hata mesajı
+(bulut adresi, grup adresi değil, grup yok), açık ve koyu tema, konsolda JS
+hatası olmaması.
+
+**Bulunan ama BU SPEC'TE düzeltilmeyen sorun:** projeler ekranı 1089 piksel
+genişlikte yatay kayıyor (`scrollWidth` 1129). Ölçüldü ve kaynağı mevcut proje
+TABLOSU (`min-w-240`) — içe aktarma paneli açıkken de kapalıyken de aynı değer
+çıkıyor, yani bu spec'in getirdiği bir şey değil. Spec 019'un alanı; sessizce
+düzeltmek kapsam kayması olurdu.
+
+**`Checkbox` bileşenine `labelHidden` eklendi.** Satırın kimliği başka bir
+sütunda yazılıyken etiketi ikinci kez basmak gürültü olurdu; etiketi tamamen
+kaldırmak ise ekran okuyucu kullanan biri için kutucuğu adsız bırakırdı. Kalıp
+ekranın içine değil `primitives.tsx`'e eklendi (ui.md).
+
+**Test verileri temizlendi:** doğrulama sırasında eklenen üç proje ve sahte
+git erişimi silindi, sahte sunucu durduruldu.
+
+**Yük ölçümü yapıldı — kullanıcı kararı buna dayanıyordu.** Sahte sunucu 100
+repository ile ayağa kaldırıldı (sayfa boyutu 25, yani dört sayfa):
+
+| Ne | Değer |
+| --- | --- |
+| Listelenen repository | 100 (dört sayfa birleşti) |
+| İçe aktarma süresi | **0,3 sn** |
+| Sonuç | 100 eklendi, 0 atlandı, 0 başarısız |
+| Akış satırı | 101 (100 sonuç + 1 özet) |
+| Gömülü kimlik taşıyan adres | 0 |
+
+ÖLÇÜMÜN SINIRI: sunucu aynı makinede. Gerçek bir kurumsal sunucuda `ls-remote`
+başına gecikme çok daha yüksek olur; sekiz paralel ile 100 repository, el ile
+300 ms'lik bir gecikme varsayıldığında ~4 saniyeye çıkar. Yani ölçülen şey
+"ürünün eklediği maliyet"; ağın maliyeti değil. Kriter yine de karşılanıyor —
+kullanıcı dakikalarca bekletilmiyor.
