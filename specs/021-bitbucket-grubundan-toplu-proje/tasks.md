@@ -62,30 +62,30 @@ yanıtı saklamayan hata mesajları ise sahadan gelecek bildirimi işe yarar kı
 
 ## Blok 4 — Önizleme ucu
 
-- [ ] T30 `POST /api/projects/import/preview` grup listesini durum etiketiyle
+- [x] T30 `POST /api/projects/import/preview` grup listesini durum etiketiyle
       döner → sahte sunucuya karşı `status: new` ve `already_registered`
       birlikte görülür
-- [ ] T31 Arşivli repository `archived: true` ile işaretlenir → arayüz onu
+- [x] T31 Arşivli repository `archived: true` ile işaretlenir → arayüz onu
       seçimsiz gösterebilsin diye
-- [ ] T32 Erişim tanımı yoksa veya seçilmediyse 4xx ve **ne yapılacağını**
+- [x] T32 Erişim tanımı yoksa veya seçilmediyse 4xx ve **ne yapılacağını**
       söyleyen mesaj → "Ayarlar → Git repository'ler" yolu yazılı
-- [ ] T33 Hata durumlarının tamamı spec tablosuna uyar → grup yok, yetki yok,
+- [x] T33 Hata durumlarının tamamı spec tablosuna uyar → grup yok, yetki yok,
       ulaşılamıyor, bulut adresi, grup adresi değil: beşi için ayrı test
 
 ## Blok 5 — İçe aktarma ucu
 
-- [ ] T40 `POST /api/projects/import` seçilenleri kaydeder → 3 repository
+- [x] T40 `POST /api/projects/import` seçilenleri kaydeder → 3 repository
       gönderilir, 3 proje oluşur, her biri kendi adı/adresi/branch'iyle
 - [ ] T41 Erişim bilgisi **bir kez** çözülür, N repository'de kullanılır →
       sağlayıcı deposundan tek okuma yapıldığı testle kilitlenir
-- [ ] T42 Sınama paralel koşar, sınırı 8 → eşzamanlı çağrı sayısı ölçülür ve
+- [x] T42 Sınama paralel koşar, sınırı 8 → eşzamanlı çağrı sayısı ölçülür ve
       8'i aşmaz
-- [ ] T43 Sınamayı geçemeyen repository **eklenmez**, sebebi yazılır →
+- [x] T43 Sınamayı geçemeyen repository **eklenmez**, sebebi yazılır →
       erişimi reddedilen bir repository için `result: failed` satırı
-- [ ] T44 Kısmi başarı geri alınmaz → biri düşerken diğerleri kaydedilmiş kalır
-- [ ] T45 Zaten kayıtlı olan atlanır; başka bir erişimle kayıtlı olan da
+- [x] T44 Kısmi başarı geri alınmaz → biri düşerken diğerleri kaydedilmiş kalır
+- [x] T45 Zaten kayıtlı olan atlanır; başka bir erişimle kayıtlı olan da
       atlanır ve mevcut kaydın erişimi **değişmez**
-- [ ] T46 Yanıt NDJSON akışı → her repository için bir satır, sonda özet satırı;
+- [x] T46 Yanıt NDJSON akışı → her repository için bir satır, sonda özet satırı;
       ilk satır işlem bitmeden gönderilir
 - [ ] T47 Bir repository'nin takılması diğerlerini durdurmaz → repository başına
       kendi süre sınırı; sahte sunucuda biri yavaşlatılır
@@ -147,3 +147,25 @@ eklenen bir bayrak diğerine eklenmeyebilir ve fark ancak üretimde asılı kala
 bir süreçle görülürdü. `Verify`'ın testi YOKTU; refactor'dan önce dört koruma
 testi yazıldı (erişilebilen depo, var olan branch, olmayan branch, ulaşılamayan
 depo) — testsiz refactor çalıştığını iddia edip kanıtlayamaz.
+
+**T41 ve T47 işaretlenmedi — test edilmediler.** T41 (kimliğin bir kez
+çözülmesi) kodun yapısından okunuyor: çözüm döngünün DIŞINDA. Ama okunabilir
+olmak test edilmiş olmak değil; sayan bir depo enjekte etmeden kilitlenemez ve
+bunun için `GitProviders` bir arayüze çevrilmeliydi. T47 (repository başına
+süre sınırı) `lsRemote` içindeki `verifyTimeout` ile sağlanıyor; testi yirmi
+saniye bekleyen bir test olurdu. İkisi de doğru çalışıyor ama KANITLANMADI —
+işaretlemek yanlış olurdu.
+
+**Genel 60 sn'lik istek zaman aşımı akış ucunu keserdi.** `skipForSSE` yalnızca
+`/events` ile biten yolları muaf tutuyordu. Yüz repository'lik bir içe aktarma
+altmış saniyeyi aşabilir ve akış işin ortasında kesilirdi — üstelik o ana kadar
+eklenenler veritabanında kalacağı için kullanıcı neyin eklendiğini göremezdi.
+`/projects/import` muafiyete eklendi; `/import/preview` EKLENMEDİ, o yalnızca
+liste çağrısı yapıyor ve sürerse gerçekten sorun var demektir.
+
+**Test düzeneği: gerçek git, HTTP üzerinden.** İlk deneme `file://` adresi
+kullanıyordu ve `Input.Normalize` onu haklı olarak reddetti (kimlik akışımız
+HTTP üzerine kurulu). Testler artık `git http-backend`'i CGI olarak koşturan
+gerçek bir akıllı HTTP git sunucusu ayağa kaldırıyor; böylece zincirin tamamı
+— liste, adres seçimi, erişim sınaması, branch okuma, kayıt — gerçekten
+koşuyor.

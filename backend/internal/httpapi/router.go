@@ -216,6 +216,11 @@ func (h *Handler) Routes() http.Handler {
 		r.Route("/projects", func(r chi.Router) {
 			r.Get("/", h.listProjects)
 			r.Post("/", h.createProject)
+			// Gruptan toplu ekleme (spec 021). Önizleme ve içe aktarma AYRI:
+			// biri hızlı ve yan etkisiz, diğeri yavaş ve kalıcı.
+			// `/{id}` yollarından ÖNCE tanımlı ki "import" bir kimlik sanılmasın.
+			r.Post("/import/preview", h.importPreview)
+			r.Post("/import", h.importRun)
 			r.Put("/{id}", h.updateProject)
 			r.Delete("/{id}", h.deleteProject)
 		})
@@ -300,13 +305,32 @@ func skipForSSE(mw func(http.Handler) http.Handler) func(http.Handler) http.Hand
 	return func(next http.Handler) http.Handler {
 		wrapped := mw(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasSuffix(r.URL.Path, "/events") {
+			if uzunSurenYol(r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}
 			wrapped.ServeHTTP(w, r)
 		})
 	}
+}
+
+/*
+uzunSurenYol, genel zaman aşımından muaf tutulacak yollar.
+
+`/events` canlı olay akışı — dakikalarca açık kalır.
+
+`/projects/import` toplu içe aktarma: yüz repository'nin her biri için ayrı bir
+`ls-remote` koşuyor ve yanıt satır satır akıyor. Altmış saniyelik genel sınır,
+akışı işin ortasında keser ve kullanıcı hangi projelerin eklendiğini
+göremezdi — üstelik eklenmiş olanlar veritabanında kalırdı. Kesilen bir akış,
+yarım kalmış bir işten daha kötüdür: yarım kalan işi görebilirsiniz.
+
+`/import/preview` MUAF DEĞİL: o yalnızca sayfalı liste çağrısı yapıyor ve
+sürerse gerçekten bir sorun var demektir.
+*/
+func uzunSurenYol(yol string) bool {
+	return strings.HasSuffix(yol, "/events") ||
+		strings.HasSuffix(yol, "/projects/import")
 }
 
 // requestLogger her isteği yapılandırılmış biçimde loglar.
