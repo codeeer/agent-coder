@@ -634,6 +634,57 @@ export function Checkbox({
   );
 }
 
+/**
+ * Açık/kapalı denetimi.
+ *
+ * `Checkbox` DEĞİL, ve bu bilinçli: onay kutusu kendi etiketini yanına alır ve
+ * `size-3.5` ile çizilir. Ayar satırında etiket zaten solda duruyor, denetimler
+ * sağda kendi sütununda hizalanıyor — oraya konan bir onay kutusu ikinci bir
+ * etiket taşır ve sütunun hizasını kırardı.
+ *
+ * AÇIK/KAPALI YALNIZCA RENKLE AYRILMAZ: topuz iki durumda farklı yerde durur,
+ * yani renk körlüğünde ve siyah-beyaz çıktıda da okunur. Durumu bildiren metin
+ * bu bileşenin DIŞINDA, çağıran satırın kendi sütununda durur; burada yalnızca
+ * ekran okuyucu için `role="switch"` + `aria-checked` var.
+ *
+ * Sınır her iki durumda da `control-line`: denetimin nerede olduğu, açık mı
+ * kapalı mı olduğundan bağımsız bir bilgi. Dolgu değişince sınırın da
+ * değişmesi, kapalı durumda denetimi kaybediyordu.
+ */
+export function Switch({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  /** Ekran okuyucu için; satırda görünen etiket ayarın adıdır. */
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-control-line transition-colors duration-150 disabled:opacity-50 ${
+        checked ? "bg-accent" : "bg-raised"
+      } ${disabled ? "" : "cursor-pointer"}`}
+    >
+      <span
+        aria-hidden
+        className={`size-3.5 rounded-full transition-transform duration-150 ${
+          checked ? "translate-x-4.5 bg-accent-ink" : "translate-x-0.5 bg-ink-2"
+        }`}
+      />
+    </button>
+  );
+}
+
 // ─── Bilgi kutuları ─────────────────────────────────────────────────────────
 
 const noticeTones: Record<"neutral" | "info" | "warning" | "error", string> = {
