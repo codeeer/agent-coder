@@ -7,7 +7,6 @@
 
 import type React from "react";
 import { IconAlert, IconSearch } from "@/components/ui/icons";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ─── Yüzey ──────────────────────────────────────────────────────────────────
 
@@ -222,13 +221,10 @@ export function PageHeader({
       {/* `flex-wrap`: dar ekranda beş düğmelik bir sıra tek satıra sığmıyor ve
           `shrink-0` yüzünden sondakiler ekranın dışına taşıyordu — akış
           ekranında "Kaydet" düğmesi telefonda hiç görünmüyordu. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {actions}
-        {/* Ayraç yalnızca sayfanın kendi eylemi varsa: tek başına duran tema
-            anahtarının soluna çizgi çekmek, olmayan bir grubu ima ederdi. */}
-        {actions && <span className="mx-0.5 hidden h-6 w-px bg-line sm:block" />}
-        <ThemeToggle />
-      </div>
+      {/* Yalnızca sayfanın KENDİ eylemleri. Tema anahtarı buradan alındı ve
+          kenar çubuğunun dibine taşındı: genel bir tercih, sayfanın birincil
+          eylemiyle aynı yerde durunca onunla ağırlık yarışına giriyordu. */}
+      <div className="flex flex-wrap items-center gap-2">{actions}</div>
     </header>
   );
 }

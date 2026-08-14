@@ -9,7 +9,6 @@ import { describeError } from "@/lib/errors";
 import { useRunEvents } from "@/lib/use-run-events";
 import type { Run } from "@/lib/types";
 import { Markdown } from "@/components/markdown/Markdown";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { EngineLogs } from "@/components/runs/EngineLogs";
 import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
 import {
@@ -171,11 +170,7 @@ export default function RunDetailPage() {
             >
               Tüm çalıştırmalar
             </Link>
-            {/* Tema anahtarı burada AYRICA çiziliyor: bu ekran `PageHeader`
-                kullanmıyor (künye kartı onun yerine geçti) ve anahtar orada
-                duruyor. Ölçüldü — yeniden tasarımdan sonra bu tek sayfada
-                tema değiştirilemiyordu (spec 006 kabul kriteri). */}
-            <ThemeToggle />
+
           </div>
         </div>
 

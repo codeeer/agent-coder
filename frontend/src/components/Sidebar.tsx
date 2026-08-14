@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SystemStatus } from "@/components/SystemStatus";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   IconLogo,
   IconAgent,
@@ -140,13 +141,25 @@ export function Sidebar({
       </nav>
 
       {/*
-        Dipte tema anahtarı DEĞİL sistem durumu duruyor.
+        Dipte tema anahtarı ve sistem durumu birlikte duruyor.
 
-        Tema, arayüzün her ekranda aynı yerde bulunması gereken bir ayarı ve
-        yeri sayfa başlığının sağ ucu (bkz. `PageHeader`). Kenar çubuğunun
-        dibi ise referans tasarımda sistemin sağlığına ayrılmış — ve orası
-        onun doğru yeri: sürekli görünür, hiçbir işi bölmez.
+        ÖNCEKİ KARAR TERSİYDİ ve yeri sayfa başlığının sağ ucuydu. Sebep
+        şuydu: tema her ekranda aynı yerde bulunmalı. O şart burada da
+        sağlanıyor — kenar çubuğu her sayfada duruyor.
+
+        Değişimin sebebi EYLEM HİYERARŞİSİ: başlığın sağ ucu, o sayfanın
+        KENDİ birincil eylemine ait ("Sağlayıcı ekle", "Yeni akış"). Nadiren
+        dokunulan genel bir tercih orada kalıcı durunca, her sayfada o eylemle
+        görsel ağırlık yarışına giriyordu.
+
+        Burası ise uygulama kabuğu: tema da sistem durumu da hiçbir sayfaya
+        ait değil. İkisi aynı yere ait.
+
+        Ölçü: anahtar 98px, kenar çubuğu 216px — taşmıyor.
       */}
+      <div className="space-y-2.5 border-t border-line px-3 py-3">
+        <ThemeToggle />
+      </div>
       <div className="border-t border-line">
         <SystemStatus />
       </div>
