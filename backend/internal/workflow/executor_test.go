@@ -318,3 +318,94 @@ type fakeAction struct{ url string }
 func (f fakeAction) Execute(context.Context, workflow.ExecInput) (workflow.StepOutcome, error) {
 	return workflow.StepOutcome{Output: "PR #1 açıldı", URL: f.url}, nil
 }
+
+/*
+KANCA, SON DURUM YAZILDIKTAN SONRA ÇAĞRILIR.
+
+Toplu çalıştırma kuyruğu (spec 023) bu sinyalle uyanıp öğeyi kapatıyor. Sıra
+ters olsaydı kuyruk uyanır, çalışmayı hâlâ `running` görür ve bitişi ancak
+dakikalık emniyet turunda fark ederdi — yani biten iş bir dakikaya kadar
+kuyrukta yer tutar, sıradaki o kadar geç başlardı. Tam olarak bu oldu ve bu
+test onu geri gelmekten korur.
+
+Kanca durumu KENDİ İÇİNDE okuyor: "sonradan bakınca terminal" yetmez, çağrının
+YAPILDIĞI ANDA terminal olmalı.
+*/
+func TestExecutor_KancaSonDurumYazildiktanSonraCagrilir(t *testing.T) {
+	f := setup(t)
+	fake := newFake(func() uuid.UUID { return f.insertRun(t, 0.01, 10, 5) })
+
+	ctx := context.Background()
+	w := f.newWorkflow(t)
+	v, err := f.store.SaveVersion(ctx, w.ID, f.graph())
+	require.NoError(t, err)
+
+	run, err := f.store.CreateRun(ctx, workflow.CreateRunInput{
+		Workflow: w, Version: v, Trigger: workflow.TriggerManual, Input: "x",
+	})
+	require.NoError(t, err)
+
+	ex := workflow.NewExecutor(f.store, workflow.Handlers{
+		workflow.KindAgent: workflow.NewAgentHandler(fake),
+	}, nil)
+	defer ex.Shutdown()
+
+	kancaDurumu := make(chan workflow.RunStatus, 1)
+	ex.SetOnRunFinished(func(runID uuid.UUID) {
+		r, err := f.store.GetRun(context.Background(), runID)
+		if err != nil {
+			return
+		}
+		kancaDurumu <- r.Status
+	})
+
+	ex.Start(run, v.Graph)
+
+	select {
+	case durum := <-kancaDurumu:
+		require.Equal(t, workflow.RunSucceeded, durum,
+			"kanca çağrıldığı ANDA çalışma bitmiş olmalı — yoksa kuyruk bitişi göremez")
+	case <-time.After(10 * time.Second):
+		t.Fatal("çalışma bitti ama kanca hiç çağrılmadı")
+	}
+}
+
+// Hata yolu da kancayı çağırmalı: düşen bir öğe kuyrukta sonsuza kadar
+// "çalışıyor" kalmamalı.
+func TestExecutor_KancaHataYolundaDaCagrilir(t *testing.T) {
+	f := setup(t)
+	fake := newFake(func() uuid.UUID { return f.insertRun(t, 0, 0, 0) })
+	fake.failOn = "a1"
+
+	ctx := context.Background()
+	w := f.newWorkflow(t)
+	v, err := f.store.SaveVersion(ctx, w.ID, f.graph())
+	require.NoError(t, err)
+	run, err := f.store.CreateRun(ctx, workflow.CreateRunInput{
+		Workflow: w, Version: v, Trigger: workflow.TriggerManual, Input: "x",
+	})
+	require.NoError(t, err)
+
+	ex := workflow.NewExecutor(f.store, workflow.Handlers{
+		workflow.KindAgent: workflow.NewAgentHandler(fake),
+	}, nil)
+	defer ex.Shutdown()
+
+	kancaDurumu := make(chan workflow.RunStatus, 1)
+	ex.SetOnRunFinished(func(runID uuid.UUID) {
+		r, err := f.store.GetRun(context.Background(), runID)
+		if err != nil {
+			return
+		}
+		kancaDurumu <- r.Status
+	})
+
+	ex.Start(run, v.Graph)
+
+	select {
+	case durum := <-kancaDurumu:
+		require.Equal(t, workflow.RunFailed, durum)
+	case <-time.After(10 * time.Second):
+		t.Fatal("akış düştü ama kanca hiç çağrılmadı")
+	}
+}

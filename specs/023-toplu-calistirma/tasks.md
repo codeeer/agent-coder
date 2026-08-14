@@ -165,6 +165,19 @@ kadar "çalışıyor" gösterirdi. Tek istisna iptal: iptal edilmiş bir iş, so
 durumu bilerek diriltir; `done` ya da `cancelled` kalsaydı `NextPending` sıraya
 alınan öğeleri hiç görmez ve kuyruk sessizce donardı.
 
+**Kapanışta bir kusur bulundu (kullanıcı sorusuyla): "bitti mi" diye dakikada
+bir bakıyorduk.** `OnSlotFree` sinyali doğru olay değilmiş — slotu bırakan
+`defer finish()`, motorun `FinishRun`'ından ÖNCE koşuyor. O sinyalle uyanan
+kuyruk çalışmayı hâlâ `running` görüyor ve öğeyi ancak dakikalık emniyet
+turunda kapatıyordu. Planın "yoklama yazmayın" dediği şey, sigorta sanılan
+turun üzerinden geri gelmişti; bedeli otuz projede yarım saate kadar boşta
+makine ve ekranda bir dakika geç güncellenen durum.
+
+Karşılığı `workflow.Executor.OnRunFinished`: son durum YAZILDIKTAN sonra
+çağrılan ikinci bir kanca (üç kapanış yolunun hepsinden). İki test sırayı
+kilitliyor ve boş olmadıkları ölçüldü — kanca `FinishRun`'dan öne alınınca test
+`running` görüp kırmızıya döndü.
+
 **Arayüzde üç şey ölçümle değişti.** (1) Bitmiş bir toplu işte "0 bekliyor ·
 0 çalışıyor" yazıyordu; sıfır kovalar artık yalnızca iş SÜRERKEN duruyor —
 orada kuyruğun boşalışını izlemek haber, bittikten sonra gürültü. (2) "Backend

@@ -436,6 +436,15 @@ bağ `main.go`'da kuruluyor — `runs` paketi kuyruğu tanımaz. Boş slot için
 yoklama YAZMAYIN: var olan bir bilgiyi yok sayıp aynı soruyu saniyede bir
 sormak olur. Kanca bloklamamalıdır.
 
+**"Slot boşaldı" ile "iş bitti" AYNI AN DEĞİLDİR.** `defer finish()` slotu
+bırakır (ve `OnSlotFree`'yi tetikler), motor çalışmanın son durumunu ancak
+BUNDAN SONRA yazar. Slot sinyaliyle uyanıp çalışmanın bittiğini anlamaya
+çalışan kod, onu hâlâ `running` görür. Bitişi dinlemek için
+`workflow.Executor.SetOnRunFinished` kullanılır — `FinishRun`'dan sonra, üç
+kapanış yolunun (başarı, hata, iptal) hepsinden çağrılır. Bu ayrım bir kez
+gözden kaçtı ve toplu çalıştırma kuyruğu bitişi dakikalık emniyet turunda fark
+eder hale geldi (spec 023).
+
 **Sandbox güvenliği:** Backend'e `/var/run/docker.sock` mount edilir (sibling-container deseni).
 Runner container'ları izole network'te çalışır, dışarıya port açmaz, CPU/RAM limitlidir ve
 iş bitince container + volume silinir. Git token'ı sadece env ile geçer, loglardan maskelenir.

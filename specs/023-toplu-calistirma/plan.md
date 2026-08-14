@@ -135,6 +135,18 @@ o an meşgulse sinyal kaybolmaz, birikmez de — "bak" demek bir kez yeter.
 Zamanlayıcı ayrıca toplu iş oluşturulduğunda ve "kaldığı yerden devam"
 denildiğinde uyandırılır.
 
+**İKİ SİNYAL GEREKİYOR, biri yetmiyor** (Blok 6'da ölçülerek eklendi).
+`OnSlotFree` "kapasite açıldı" der ama "iş bitti" DEMEZ: slotu bırakan
+`defer finish()`, motorun `FinishRun`'ından ÖNCE koşuyor. O sinyalle uyanan
+kuyruk çalışmayı hâlâ `running` görür, öğeyi kapatamaz — ve bitişi yalnızca
+dakikalık emniyet turunda fark ederdi. Yani sigorta, mekanizmanın yerine
+geçerdi: biten iş bir dakikaya kadar kuyrukta yer tutar, sıradaki o kadar geç
+başlardı.
+
+Bu yüzden `workflow.Executor`'a ikinci bir kanca eklendi — `OnRunFinished`,
+son durum YAZILDIKTAN sonra çağrılır (üç kapanış yolunun hepsinden: başarı,
+hata, iptal). Bağımlılık yönü yine korunuyor; bağ `main.go`'da.
+
 **Bir de dakikalık emniyet turu var.** Bu MEKANİZMA DEĞİL, sigorta: bir
 uyandırma her nasılsa kaçarsa kuyruk sonsuza kadar durmasın diye. Dakikada bir
 tur, sistemin fark etmeyeceği bir maliyet; sessizce donmuş bir kuyruk ise

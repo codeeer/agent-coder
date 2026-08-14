@@ -55,8 +55,39 @@ type Executor struct {
 	cancels map[uuid.UUID]context.CancelFunc
 	wg      sync.WaitGroup
 
+	/*
+		onFinished, bir akış çalışması SON DURUMUNA yazıldıktan sonra çağrılır.
+		nil olabilir.
+
+		Toplu çalıştırma kuyruğu (spec 023) için var ve sırası hayati: kuyruk
+		"slot boşaldı" sinyalini zaten alıyor ama o sinyal buradan ÖNCE geliyor
+		(slotu bırakan `defer finish()`, `FinishRun`'dan önce koşuyor). O anda
+		çalışma hâlâ `running` göründüğü için kuyruk bitişi göremiyor ve öğeyi
+		ancak dakikalık emniyet turunda kapatıyordu — yani sigorta, mekanizmanın
+		yerine geçmişti.
+
+		Bağımlılık yönü korunuyor: `workflow` paketi kuyruğu tanımıyor, bağ
+		`main.go`'da kuruluyor. BLOKLAMAMALI.
+	*/
+	onFinished func(runID uuid.UUID)
+
 	shutdownCtx context.Context
 	shutdown    context.CancelFunc
+}
+
+// SetOnRunFinished, çalışma bittiğinde çağrılacak kancayı bağlar.
+//
+// `Start` çağrılmadan ÖNCE, kurulum sırasında bir kez ayarlanır.
+func (e *Executor) SetOnRunFinished(fn func(runID uuid.UUID)) { e.onFinished = fn }
+
+// finished, son durum YAZILDIKTAN SONRA kancayı çağırır.
+//
+// Üç kapanış yolunun (başarı, hata, iptal) hepsinden geçer; biri unutulursa
+// kuyruk o çalışmanın bittiğini yalnızca emniyet turunda öğrenir.
+func (e *Executor) finished(runID uuid.UUID) {
+	if e.onFinished != nil {
+		e.onFinished(runID)
+	}
 }
 
 // NewExecutor yeni motor üretir.
@@ -197,6 +228,7 @@ func (e *Executor) execute(ctx context.Context, run Run, graph Graph) {
 		slog.ErrorContext(ctx, "akış sonuçlandırılamadı", "error", err)
 	}
 	e.emit(run.ID, "info", "akış tamamlandı")
+	e.finished(run.ID)
 }
 
 // runStep, tek bir adımı çalıştırır ve sonucunu kaydeder.
@@ -272,6 +304,7 @@ func (e *Executor) fail(ctx context.Context, runID uuid.UUID, cause error) {
 		e.emit(runID, "warn", fmt.Sprintf("%d adım atlandı", n))
 	}
 	e.emit(runID, "error", "akış durdu: "+cause.Error())
+	e.finished(runID)
 }
 
 // stopped, iptal edilmiş bir akışı kapatır.
@@ -294,6 +327,7 @@ func (e *Executor) stopped(ctx context.Context, runID uuid.UUID) {
 		slog.ErrorContext(ctx, "akış sonuçlandırılamadı", "error", err)
 	}
 	e.emit(runID, "warn", note)
+	e.finished(runID)
 }
 
 // Cancel, çalışan bir akışı durdurur.

@@ -320,6 +320,21 @@ func run() error {
 	)
 	defer workflowExec.Shutdown()
 
+	/*
+	 * Akış çalışması bitince kuyruk uyandırılır (spec 023).
+	 *
+	 * "Slot boşaldı" sinyali YETMEZ: slotu bırakan `defer finish()`, motorun
+	 * son durumu yazmasından ÖNCE koşuyor. O anda uyanan kuyruk çalışmayı hâlâ
+	 * `running` görür ve öğeyi ancak dakikalık emniyet turunda kapatırdı —
+	 * yani biten iş bir dakikaya kadar kuyrukta yer tutar, sıradaki o kadar geç
+	 * başlardı.
+	 */
+	workflowExec.SetOnRunFinished(func(uuid.UUID) {
+		if batchScheduler != nil {
+			batchScheduler.Wake()
+		}
+	})
+
 	if n, err := workflowStore.RecoverInterrupted(ctx); err != nil {
 		slog.WarnContext(ctx, "yarım akışlar kapatılamadı", "error", err)
 	} else if n > 0 {
