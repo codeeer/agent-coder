@@ -29,3 +29,45 @@ export function RunStatusBadge({ status }: { status: RunStatus }) {
 export function isActive(status: RunStatus): boolean {
   return status === "pending" || status === "running";
 }
+
+const STRIP: Record<Tone, string> = {
+  accent: "border-accent",
+  success: "border-ok",
+  danger: "border-danger",
+  warning: "border-warn",
+  info: "border-info",
+  neutral: "border-line",
+};
+
+/**
+ * Satır başındaki durum şeridinin rengi.
+ *
+ * Liste ekranında durum, kendi sütununda duran bir rozet DEĞİL: satırın sol
+ * kenarındaki ince bir şerit ve yanındaki kısa etiket. Rozet 144px'lik bir
+ * sütun tutuyordu ve o genişliğin tek işi tek bir kelimeyi ortalamaktı.
+ *
+ * ŞERİT TEK KANAL DEĞİL: yanında her zaman durum metni duruyor. Renk körlüğü
+ * ve siyah-beyaz çıktıda okunan tek kanal etikettir (ui.md → Anlamlı renk).
+ */
+export function statusStrip(status: RunStatus): string {
+  return STRIP[STATUS[status].tone];
+}
+
+const TEXT: Record<Tone, string> = {
+  accent: "text-accent",
+  success: "text-ok",
+  danger: "text-danger",
+  warning: "text-warn",
+  info: "text-info",
+  neutral: "text-ink-3",
+};
+
+/** Durum etiketinin rengi — şeritle aynı ton, üstveri satırında kullanılıyor. */
+export function statusText(status: RunStatus): string {
+  return TEXT[STATUS[status].tone];
+}
+
+/** Durumun kısa etiketi — şeridin yanında yazılan metin. */
+export function statusLabel(status: RunStatus): string {
+  return STATUS[status].label;
+}

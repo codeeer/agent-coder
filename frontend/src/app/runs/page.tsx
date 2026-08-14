@@ -7,7 +7,12 @@ import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
 import { readableFailure } from "@/lib/failure";
-import { RunStatusBadge, isActive } from "@/components/runs/RunStatusBadge";
+import {
+  isActive,
+  statusLabel,
+  statusStrip,
+  statusText,
+} from "@/components/runs/RunStatusBadge";
 import {
   formatCompact,
   formatCount,
@@ -29,7 +34,6 @@ import {
   Skeleton,
   StatusDot,
   Toolbar,
-  formatRelative,
 } from "@/components/ui/primitives";
 import type { Run } from "@/lib/types";
 
@@ -323,168 +327,68 @@ function RunTable({ items }: { items: Run[] }) {
     { cost: 0, tokens: 0 },
   );
 
+  const gruplar = gunlereBol(items);
+
   return (
     <Card padded={false} className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-240 text-sm">
+        <table className="w-full min-w-180 text-sm">
           <thead>
             <tr className="border-b border-line bg-raised/60 text-left text-2xs tracking-wide text-ink-3 uppercase">
-              <th className="w-36 py-2.5 pl-4 font-medium">Durum</th>
-              <th className="py-2.5 font-medium">Görev / Proje</th>
-              <th className="w-56 py-2.5 font-medium">Agent / Model</th>
-              <th className="w-20 py-2.5 text-right font-medium">Süre</th>
-              <th className="w-20 py-2.5 text-right font-medium">Token</th>
-              <th className="w-24 py-2.5 text-right font-medium">Maliyet</th>
-              <th className="w-28 py-2.5 text-right font-medium">Başlatıldı</th>
-              {/* Başlıksız sütun: "Eylem" yazmak her satırda tek bir ikon
-                  duran bir sütuna gereksiz bir kademe eklerdi. */}
-              <th className="w-14 py-2.5 pr-4">
+              {/* Durum ARTIK SÜTUN DEĞİL: şerit satırın sol kenarında,
+                  etiket görevin üstünde. Başlık da bu yüzden yok. */}
+              <th className="py-2.5 pl-4 font-medium">Görev</th>
+              <th className="w-44 py-2.5 pr-4 text-right font-medium">
+                Süre · token · maliyet
+              </th>
+              <th className="w-12 py-2.5 pr-4">
                 <span className="sr-only">Eylemler</span>
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-line">
-            {items.map((run) => {
-              const live = isActive(run.status);
-              const tokens = run.promptTokens + run.completionTokens;
+          {gruplar.map(({ gun, satirlar }) => (
+            <tbody key={gun} className="divide-y divide-line">
+              {/*
+                GÜN AYRACI.
 
-              return (
-                <tr
-                  key={run.id}
-                  /* Süren iş, kronolojik listede kaybolmasın diye kendi
-                     zeminini taşıyor: bu ekranın en zamana duyarlı satırı. */
-                  className={`group transition-colors ${
-                    live ? "bg-accent-soft/40 hover:bg-accent-soft" : "hover:bg-raised"
-                  }`}
+                Öncesinde her satırda "5 saat önce" yazıyordu ve dört satır
+                arka arkaya aynı şeyi tekrar ediyordu. Göreli zaman satırda
+                bir bilgi taşımıyor — hangi güne ait olduğu taşıyor. Ayraç o
+                bilgiyi bir kez söylüyor, satır da saati yazıyor.
+              */}
+              <tr>
+                <td
+                  colSpan={3}
+                  className="border-b border-line bg-raised/40 px-4 py-1.5 text-2xs tracking-wide text-ink-3 uppercase"
                 >
-                  <td className="py-2.5 pl-4 align-top">
-                    <RunStatusBadge status={run.status} />
-                  </td>
-
-                  <td className="max-w-0 py-2.5 pr-4 align-top">
-                    {/*
-                      Bağlantı SATIRIN TAMAMI değil ilk hücrede: `<tr>` bir
-                      bağlantı olamaz ve her hücreye ayrı `<a>` koymak ekran
-                      okuyucuya aynı hedefi yedi kez okutur.
-                    */}
-                    <Link
-                      href={`/runs/${run.id}`}
-                      className="block truncate font-medium group-hover:text-accent"
-                      title={run.task}
-                    >
-                      {run.task}
-                    </Link>
-
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-ink-3">
-                      {/* Akış adımıysa hangi akışın parçası olduğu görünmeli;
-                          aksi halde tek başına çalıştırılmış gibi okunur. */}
-                      {run.workflowName && (
-                        <Badge tone="accent">
-                          {run.workflowName} · {run.stepName}
-                        </Badge>
-                      )}
-                      <span className="truncate">{run.projectName}</span>
-                      <FileSummary run={run} />
-                      {run.pushedBranch && (
-                        <Badge tone="info">→ {run.pushedBranch}</Badge>
-                      )}
-                    </div>
-
-                    {/*
-                      HATA SATIRDA.
-
-                      Liste yanıtı hata metnini zaten taşıyordu ve ekran onu
-                      hiç göstermiyordu: "başarısız" yazan bir satırın sebebini
-                      öğrenmek için kaydı açmak gerekiyordu. Bu ekranın işi
-                      teşhis; teşhisin ilk adımı burada olmalı.
-                    */}
-                    {run.error && (
-                      <p
-                        className="mt-1 flex items-start gap-1.5 text-2xs text-danger"
-                        title={run.error}
-                      >
-                        <IconAlert className="mt-px size-3.5 shrink-0" />
-                        <span className="truncate">{readableFailure(run.error)}</span>
-                      </p>
-                    )}
-                  </td>
-
-                  <td className="max-w-0 py-2.5 pr-4 align-top">
-                    <div className="truncate font-mono text-xs">{run.agentSlug}</div>
-                    <div className="mt-0.5 truncate font-mono text-2xs text-ink-3">
-                      {run.modelId}
-                    </div>
-                  </td>
-
-                  <td className="py-2.5 pr-4 text-right align-top text-xs tabular-nums text-ink-2">
-                    {durationOf(run)}
-                  </td>
-
-                  <td className="py-2.5 pr-4 text-right align-top text-xs tabular-nums text-ink-2">
-                    {tokens > 0 ? formatCompact(tokens) : "—"}
-                  </td>
-
-                  <td className="py-2.5 pr-4 text-right align-top font-mono text-xs tabular-nums">
-                    {run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
-                  </td>
-
-                  <td className="py-2.5 text-right align-top text-xs text-ink-3">
-                    {formatRelative(run.createdAt)}
-                  </td>
-
-                  <td className="py-2.5 pr-4 align-top">
-                    <DeleteRunButton run={run} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+                  {gun}
+                </td>
+              </tr>
+              {satirlar.map((run) => (
+                <RunRow key={run.id} run={run} />
+              ))}
+            </tbody>
+          ))}
 
           {/*
-            Toplam satırı SÜTUNLARIN ALTINDA.
+            Toplam satırı, ölçü sütununun ALTINDA.
 
-            Sayfada on iş görünüyor ama neye mal olduğu görünmüyordu.
-            Toplamı kenara bir cümle olarak yazmak da olurdu; sütunun altına
-            koymak hangi rakamın neyin toplamı olduğunu ayrıca söylemeyi
-            gereksiz kılıyor.
-          */}
-          {/*
-            Şerit YAPIŞKAN: tablo kayan bölgenin içinde ve toplam satırı
-            listenin sonunda kalsaydı ancak sona kadar kaydıranlar görürdü —
-            sayfalamayı listenin ardına koymakla aynı hata.
-
-            Zemin YARI SAYDAM DEĞİL (`bg-raised`, `/60` değil): yapışkan bir
-            şeridin altından satırların geçtiği görünürse rakamlar okunmaz.
-          */}
-          {/*
-            Toplam satırı SÜTUNLARIN ALTINDA.
-
-            Sayfada on iş görünüyor ama neye mal olduğu görünmüyordu.
-            Toplamı kenara bir cümle olarak yazmak da olurdu; sütunun altına
-            koymak hangi rakamın neyin toplamı olduğunu ayrıca söylemeyi
-            gereksiz kılıyor.
-
-            YAPIŞKAN YAPILMADI ve bu ölçülerek karara bağlandı: `sticky`'nin
-            kapsayıcısı en yakın kaydırma kabıdır, burada da tablonun
-            `overflow-x-auto` sarmalayıcısı. O kabın yüksekliği içeriği
-            kadar olduğu için `bottom-0`ın tutunacağı bir dip yok — şerit
-            hem `<tfoot>`a hem hücrelere verildiğinde denendi, ikisi de
-            kıpırdamadı. Tablonun sonundaki toplam satırı zaten alışılmış
-            yerinde duruyor.
+            Sayfada on iş görünüyor ama neye mal olduğu görünmüyordu. Kenara
+            bir cümle olarak yazmak da olurdu; sütunun altına koymak hangi
+            rakamın neyin toplamı olduğunu ayrıca söylemeyi gereksiz kılıyor.
           */}
           <tfoot>
             <tr className="border-t border-line bg-raised/60 text-2xs">
-              <td className="py-2 pl-4 text-ink-3 uppercase" colSpan={4}>
+              <td className="py-2 pl-4 text-ink-3 uppercase">
                 Bu sayfada {formatCount(items.length)} iş
               </td>
               <td className="py-2 pr-4 text-right font-medium tabular-nums">
                 {totals.tokens > 0 ? formatCompact(totals.tokens) : "—"}
+                {totals.cost > 0 && (
+                  <span className="ml-2 font-mono">{formatMoney(totals.cost)}</span>
+                )}
               </td>
-              <td className="py-2 pr-4 text-right font-mono font-medium tabular-nums">
-                {totals.cost > 0 ? formatMoney(totals.cost) : "—"}
-              </td>
-              <td className="py-2" />
               <td className="py-2 pr-4" />
             </tr>
           </tfoot>
@@ -492,6 +396,157 @@ function RunTable({ items }: { items: Run[] }) {
       </div>
     </Card>
   );
+}
+
+/**
+ * Tek bir çalıştırma satırı.
+ *
+ * ÜÇ KADEME: durum + görev (birincil), üstveri (ikincil), ölçüler (sağda).
+ * Öncesinde sekiz sütun vardı ve üçü (süre, token, maliyet) aynı soruya
+ * cevap veriyordu — "bu koşu neye mal oldu". Artık tek bir grup.
+ *
+ * GÖREV İKİ SATIRA KADAR AÇILIYOR. Tek satıra kırpıldığında satırın kimliği
+ * kullanılamaz hale geliyordu: görevler paragraf uzunluğunda ve dört satır
+ * arka arkaya aynı proje adıyla başlıyordu, hangisinin hangisi olduğu
+ * ayırt edilemiyordu.
+ */
+function RunRow({ run }: { run: Run }) {
+  const live = isActive(run.status);
+  const tokens = run.promptTokens + run.completionTokens;
+
+  return (
+    <tr
+      /* Süren iş kendi zeminini taşıyor: bu ekranın en zamana duyarlı satırı. */
+      className={`group transition-colors ${
+        live ? "bg-accent-soft/40 hover:bg-accent-soft" : "hover:bg-raised"
+      }`}
+    >
+      <td
+        className={`border-l-2 py-2.5 pl-3.5 align-top ${statusStrip(run.status)}`}
+      >
+        {/*
+          Bağlantı SATIRIN TAMAMI değil ilk hücrede: `<tr>` bir bağlantı
+          olamaz ve her hücreye ayrı `<a>` koymak ekran okuyucuya aynı hedefi
+          üç kez okutur.
+        */}
+        <Link
+          href={`/runs/${run.id}`}
+          className="block font-medium group-hover:text-accent"
+          title={run.task}
+        >
+          <span className="line-clamp-2">{run.task}</span>
+        </Link>
+
+        {/*
+          Durum etiketi ÜSTVERİ SATIRINDA, kendi satırında değil.
+          Ayrı satırdayken her satır dört kademe oluyordu ve ekranda yalnızca
+          yedi kayıt görünüyordu (ölçüldü; öncesi on birdi). Karşılaştırma
+          yapılamayan bir liste, okunaklı tek satırdan kötü.
+        */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-ink-3">
+          <span className={`font-medium ${statusText(run.status)}`}>
+            {statusLabel(run.status)}
+          </span>
+          <span aria-hidden>·</span>
+          <span className="tabular-nums">{saatOf(run.createdAt)}</span>
+          <span aria-hidden>·</span>
+          <span className="truncate">{run.projectName}</span>
+          <span aria-hidden>·</span>
+          <span className="font-mono">{run.agentSlug}</span>
+          <span aria-hidden>·</span>
+          <span className="truncate font-mono">{run.modelId}</span>
+          <FileSummary run={run} />
+          {run.workflowName && (
+            <Badge tone="accent">
+              {run.workflowName} · {run.stepName}
+            </Badge>
+          )}
+          {run.pushedBranch && <Badge tone="info">→ {run.pushedBranch}</Badge>}
+        </div>
+
+        {/*
+          HATA SATIRDA. Liste yanıtı hata metnini zaten taşıyor ve ekran onu
+          göstermiyordu: "başarısız" yazan bir satırın sebebini öğrenmek için
+          kaydı açmak gerekiyordu. Bu ekranın işi teşhis.
+        */}
+        {run.error && (
+          <p
+            className="mt-1 flex items-start gap-1.5 text-2xs text-danger"
+            title={run.error}
+          >
+            <IconAlert className="mt-px size-3.5 shrink-0" />
+            <span className="truncate">{readableFailure(run.error)}</span>
+          </p>
+        )}
+      </td>
+
+      {/*
+        Üç ölçü TEK GRUP: hepsi "bu koşu neye mal oldu" sorusunun cevabı.
+        Sağa hizalı ve `tabular-nums` — karşılaştırma bunlarla yapılıyor.
+
+        İKİ SATIR, üç değil: saat üstveri satırına indi. Üçüncü satır bu
+        sütunda dururken SATIR YÜKSEKLİĞİNİ O BELİRLİYORDU — sol taraf iki
+        kademeyken sağ taraf üç kademeydi ve ekranda yalnızca sekiz kayıt
+        kalıyordu (ölçüldü).
+      */}
+      <td className="py-2.5 pr-4 text-right align-top">
+        <div className="text-xs tabular-nums text-ink-2">{durationOf(run)}</div>
+        <div className="mt-0.5 text-2xs tabular-nums text-ink-3">
+          {tokens > 0 ? formatCompact(tokens) : "—"}
+          {run.costUsd > 0 && (
+            <span className="ml-1.5 font-mono">{formatMoney(run.costUsd)}</span>
+          )}
+        </div>
+      </td>
+
+      <td className="py-2.5 pr-4 align-top">
+        <DeleteRunButton run={run} />
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Satırları güne böler.
+ *
+ * Sıra KORUNUR: liste zaten yeniden eskiye sıralı geliyor, gruplama onu
+ * yeniden sıralamaz — yalnızca aralara ayraç koyar.
+ */
+function gunlereBol(items: Run[]): Array<{ gun: string; satirlar: Run[] }> {
+  const out: Array<{ gun: string; satirlar: Run[] }> = [];
+  for (const run of items) {
+    const gun = gunEtiketi(run.createdAt);
+    const son = out[out.length - 1];
+    if (son && son.gun === gun) son.satirlar.push(run);
+    else out.push({ gun, satirlar: [run] });
+  }
+  return out;
+}
+
+/** "Bugün" / "Dün" / "14 Ağustos 2026". */
+function gunEtiketi(iso: string): string {
+  const t = new Date(iso);
+  const bugun = new Date();
+  const gunFarki = Math.floor(
+    (new Date(bugun.getFullYear(), bugun.getMonth(), bugun.getDate()).getTime() -
+      new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime()) /
+      86_400_000,
+  );
+  if (gunFarki === 0) return "Bugün";
+  if (gunFarki === 1) return "Dün";
+  return t.toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Satırdaki saat. Gün bilgisini ayraç taşıyor, satır yalnızca saati yazar. */
+function saatOf(iso: string): string {
+  return new Date(iso).toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /**

@@ -20,6 +20,8 @@ import {
 import {
   IconAgent,
   IconAlert,
+  IconBolt,
+  IconEdit,
   IconExternal,
   IconTerminal,
   IconTrash,
@@ -31,7 +33,6 @@ import {
   ConfirmStrip,
   IconTile,
   Input,
-  Metric,
   Notice,
   Panel,
   Skeleton,
@@ -46,7 +47,7 @@ export default function RunDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [sekme, setSekme] = useState<SekmeID>("cikti");
+  const [sekme, setSekme] = useState<SekmeID>("sonuc");
 
   const {
     data: run,
@@ -175,49 +176,57 @@ export default function RunDetailPage() {
         </div>
 
         {/*
-          ÖLÇÜLER.
+          ÖLÇÜLER TEK SATIR.
 
-          Öncesinde sağda 260px'lik bir sütunda sekiz eşit ağırlıklı `Field`
-          satırı vardı ve o sütun yüzünden bu ekranın asıl içeriği — diff ve
-          olay akışı — dar kalıyordu. Dördü buraya çıktı, kalanı üstteki
-          üstveri satırına indi.
+          Öncesinde dört eşit blok vardı (Süre · Token · Maliyet · Değişiklik),
+          her biri 308px — dört sayı için 1232px yatay alan. `ui.md`'nin adıyla
+          saydığı kalıp: "az bilgiyi büyük kartlara yayan generic SaaS
+          dashboard düzeni". Sayılar aynı, kapladıkları yer bir satır.
 
-          SÜRE İLK KEZ GÖRÜNÜYOR: eskiden yalnızca "başladı" ve "bitti"
-          damgaları vardı ve farkı kullanıcının kendisi hesaplıyordu.
+          HER SAYI BİRİMİYLE yazılıyor: "25,4 B" tek başına neyin sayısı
+          olduğunu söylemiyordu, blok başlığı söylüyordu. Başlık kalkınca
+          birim satırın içine girdi.
         */}
-        <dl className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
-          <Metric
-            label="Süre"
-            value={durationOf(run)}
-            note={run.finishedAt ? formatDate(run.finishedAt) : "sürüyor"}
+        <dl className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-line pt-3 text-xs">
+          <Olcu
+            etiket="süre"
+            deger={durationOf(run)}
+            baslik={run.finishedAt ? `bitti: ${formatDate(run.finishedAt)}` : "sürüyor"}
           />
-          <Metric
-            label="Token"
-            value={tokens > 0 ? formatCompact(tokens) : "—"}
-            note={
+          <Olcu
+            etiket="token"
+            deger={tokens > 0 ? formatCompact(tokens) : "—"}
+            baslik={
               tokens > 0
                 ? `${formatCount(run.promptTokens)} girdi · ${formatCount(run.completionTokens)} çıktı`
                 : undefined
             }
           />
-          <Metric
-            label="Maliyet"
-            value={run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
-            note={run.providerSlug || undefined}
+          <Olcu
+            etiket="maliyet"
+            deger={run.costUsd > 0 ? formatMoney(run.costUsd) : "—"}
+            baslik={run.providerSlug || undefined}
+            mono
           />
-          <Metric
-            label="Değişiklik"
-            value={
+          <Olcu
+            etiket="değişiklik"
+            deger={
               run.files.length > 0
                 ? `${formatCount(run.files.length)} dosya`
-                : "—"
-            }
-            note={
-              run.files.length > 0
-                ? `+${formatCount(adds)} −${formatCount(dels)} satır`
                 : "kod değişmedi"
             }
+            baslik={
+              run.files.length > 0
+                ? `+${formatCount(adds)} −${formatCount(dels)} satır`
+                : undefined
+            }
           />
+          {run.files.length > 0 && (
+            <span className="text-2xs tabular-nums">
+              <span className="text-ok">+{formatCompact(adds)}</span>{" "}
+              <span className="text-danger">−{formatCompact(dels)}</span>
+            </span>
+          )}
         </dl>
 
         {/* Hata künyenin İÇİNDE: ayrı bir kutuya alınsaydı çalıştırmanın
@@ -277,37 +286,69 @@ export default function RunDetailPage() {
 
       {/* Kayan bölge: künye ve sekmeler sabit kalırken içerik kayıyor. */}
       <div className="-mx-1 min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-1">
-        {sekme === "motor" ? (
-          <EngineLogs runId={id} live={active} />
-        ) : (
-          <>
-            <Panel
-              title="İlerleme"
-              action={
-                active ? (
-                  <span className="flex items-center gap-1.5 text-2xs text-ink-3">
-                    <StatusDot tone={connected ? "accent" : "neutral"} pulse />
-                    {connected ? "canlı" : "bağlanıyor…"}
-                  </span>
-                ) : undefined
-              }
-              padded={false}
-            >
-              <EventLog runId={id} live={events} active={active} />
-            </Panel>
+        {sekme === "motor" && <EngineLogs runId={id} live={active} />}
 
-            {run.output && <AgentOutput output={run.output} />}
-
-            {run.diff && <Changes run={run} />}
-          </>
+        {sekme === "ilerleme" && (
+          <Panel
+            title="İlerleme"
+            action={
+              active ? (
+                <span className="flex items-center gap-1.5 text-2xs text-ink-3">
+                  <StatusDot tone={connected ? "accent" : "neutral"} pulse />
+                  {connected ? "canlı" : "bağlanıyor…"}
+                </span>
+              ) : undefined
+            }
+            padded={false}
+          >
+            <EventLog runId={id} live={events} active={active} />
+          </Panel>
         )}
+
+        {sekme === "sonuc" &&
+          (run.output ? (
+            <AgentOutput output={run.output} />
+          ) : (
+            /* Boşluk BİR CEVAPTIR: süren bir koşuda henüz çıktı yok ve
+               nereye bakılacağını söylemek, boş bir kutu göstermekten
+               iyidir. */
+            <Notice>
+              {active
+                ? "Çalıştırma sürüyor — sonuç bittiğinde burada görünecek. İlerleme sekmesinden canlı takip edebilirsiniz."
+                : "Bu çalıştırma bir çıktı üretmedi."}
+            </Notice>
+          ))}
+
+        {sekme === "degisiklik" &&
+          (run.diff ? (
+            <Changes run={run} />
+          ) : (
+            <Notice>
+              {active
+                ? "Çalıştırma sürüyor — değişen dosyalar bittiğinde burada görünecek."
+                : "Bu çalıştırma hiçbir dosyayı değiştirmedi."}
+            </Notice>
+          ))}
       </div>
     </div>
   );
 }
 
+/*
+ * Sekme sırası KULLANICININ SORU SIRASI.
+ *
+ * Öncesinde tek bir "Çalıştırma" sekmesi vardı ve içinde sırayla ilerleme,
+ * çıktı ve diff yığılıydı: kullanıcının ilk sorusu "sonuç ne" ama önce olay
+ * akışı geliyordu, kod değişikliği 995px aşağıdaydı (ölçüldü). Artık her biri
+ * kendi sekmesinde ve sıra sonuç → değişiklikler → ilerleme → loglar.
+ *
+ * İlerleme ARKADA ama kaybolmadı: süren bir koşuda varsayılan sekme o oluyor,
+ * çünkü henüz sonuç yok.
+ */
 const SEKMELER = [
-  { id: "cikti", label: "Çalıştırma", Icon: IconAgent },
+  { id: "sonuc", label: "Sonuç", Icon: IconAgent },
+  { id: "degisiklik", label: "Değişiklikler", Icon: IconEdit },
+  { id: "ilerleme", label: "İlerleme", Icon: IconBolt },
   { id: "motor", label: "Engine logları", Icon: IconTerminal },
 ] as const;
 
@@ -352,6 +393,39 @@ function RunTabs({
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * Künye satırındaki tek bir ölçü.
+ *
+ * Değer ÖNCE, etiket sonra ve sönük: okuyan önce sayıyı görüyor, ne olduğunu
+ * hemen yanında. Ters sırada dört etiket üst üste okunuyor, sayılar aralarında
+ * kayboluyordu.
+ */
+function Olcu({
+  etiket,
+  deger,
+  baslik,
+  mono,
+}: {
+  etiket: string;
+  deger: string;
+  baslik?: string;
+  mono?: boolean;
+}) {
+  return (
+    /*
+     * `div` içinde `dt`+`dd`: HTML5'te geçerli ve gruplamayı korur. Etiket
+     * kaynakta ÖNCE (dt, dd sırası zorunlu) ama ekranda SONRA (`order`) —
+     * böylece ekran okuyucu "süre, 55 sn" derken göz "55 sn süre" görüyor.
+     */
+    <div className="flex items-baseline gap-1" title={baslik}>
+      <dt className="order-2 text-2xs text-ink-3">{etiket}</dt>
+      <dd className={`order-1 font-medium tabular-nums ${mono ? "font-mono" : ""}`}>
+        {deger}
+      </dd>
+    </div>
   );
 }
 
