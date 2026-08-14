@@ -3,13 +3,11 @@ package netgate
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"runtime"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -27,24 +25,28 @@ import (
  * açar, ham CONNECT satırı yazar ve dönen durum satırını okur.
  */
 
-// kapiAc, test için kapı açar ve kapanışını t'ye bağlar.
-func kapiAc(t *testing.T) *Gate {
+// oturumAc, test için bir çalıştırma oturumu açar ve kapanışını t'ye bağlar.
+func oturumAc(t *testing.T, r Run) *Session {
 	t.Helper()
-	g, err := New("127.0.0.1:0")
+	s, err := New("127.0.0.1").Open(r)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+	return s
+}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	go func() { _ = g.Serve(ctx) }()
-
-	return g
+// adres, oturumun dinlediği host:port.
+func adres(t *testing.T, s *Session) string {
+	t.Helper()
+	u, err := url.Parse(s.ProxyURL())
+	require.NoError(t, err)
+	return u.Host
 }
 
 // connectRaw, kapıya ham CONNECT yollar; bağlantıyı ve durum kodunu döner.
 // Bağlantı açık bırakılır ki tünelden veri akışı da sınanabilsin.
-func connectRaw(t *testing.T, g *Gate, hedef string) (net.Conn, *bufio.Reader, int) {
+func connectRaw(t *testing.T, s *Session, hedef string) (net.Conn, *bufio.Reader, int) {
 	t.Helper()
-	c, err := net.Dial("tcp", g.Addr())
+	c, err := net.Dial("tcp", adres(t, s))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = c.Close() })
 
@@ -58,9 +60,9 @@ func connectRaw(t *testing.T, g *Gate, hedef string) (net.Conn, *bufio.Reader, i
 	return c, br, resp.StatusCode
 }
 
-func connect(t *testing.T, g *Gate, hedef string) int {
+func connect(t *testing.T, s *Session, hedef string) int {
 	t.Helper()
-	_, _, kod := connectRaw(t, g, hedef)
+	_, _, kod := connectRaw(t, s, hedef)
 	return kod
 }
 
@@ -113,39 +115,46 @@ func sahteUpstream(t *testing.T) (adres string, gorulen *[]string) {
 	return l.Addr().String(), &hedefler
 }
 
-func TestGate_DinleyiciAcilirVeAdresVerir(t *testing.T) {
-	g := kapiAc(t)
+func TestGate_OturumAcilirVeAdresVerir(t *testing.T) {
+	s := oturumAc(t, Run{ID: "k1"})
 
-	require.NotEmpty(t, g.Addr())
-	c, err := net.Dial("tcp", g.Addr())
+	require.Contains(t, s.ProxyURL(), "http://127.0.0.1:")
+	c, err := net.Dial("tcp", adres(t, s))
 	require.NoError(t, err)
 	_ = c.Close()
 }
 
 /*
- * Kayıtsız kaynaktan gelen istek REDDEDİLİR.
+ * Kapatılan oturum artık bağlantı KABUL ETMEZ.
  *
- * Bu, "ayar boşken kapı fiilen kapalıdır" kuralının testi. Kapı backend ile
- * birlikte hep açık duruyor; onu kapalı tutan şey, hiçbir çalıştırmanın kayıtlı
- * olmaması. Varsayılan "geçir" olsaydı, denetim kapalıyken kapıyı bulan herkes
- * onu açık bir proxy olarak kullanabilirdi.
+ * "Ayar boşken kapı kapalıdır" kuralının testi: denetim kapalı olan bir
+ * çalıştırma için hiç oturum açılmıyor, dolayısıyla ortada dinlenen bir port
+ * da olmuyor. Oturum kapandıktan sonra da aynısı geçerli — açık kalan bir
+ * dinleyici, çalıştırma bittikten sonra kullanılabilir bir çıkış bırakırdı.
  */
-func TestGate_KayitsizKaynakReddedilir(t *testing.T) {
-	g := kapiAc(t)
+func TestGate_KapatilanOturumBaglantiKabulEtmez(t *testing.T) {
+	s, err := New("127.0.0.1").Open(Run{ID: "k1"})
+	require.NoError(t, err)
+	hedef := adres(t, s)
 
-	require.Equal(t, http.StatusForbidden, connect(t, g, "ornek.com:443"))
+	require.NoError(t, s.Close())
+
+	c, err := net.Dial("tcp", hedef)
+	if err == nil {
+		_ = c.Close()
+		t.Fatal("kapatılmış oturum hâlâ bağlantı kabul ediyor")
+	}
 }
 
 // İzinli host upstream'e devredilir VE tünelden veri akar. Yalnızca "200 döndü"
 // demek yetmez — 200 dönüp tüneli bağlamayan bir kapı da o testi geçerdi.
 func TestGate_IzinliHostUpstreameDevredilirVeVeriAkar(t *testing.T) {
 	upstream, gorulen := sahteUpstream(t)
-	g := kapiAc(t)
 	desenler, err := hostlist.Parse("ornek.com")
 	require.NoError(t, err)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: upstream, Allow: desenler})
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Allow: desenler})
 
-	c, br, kod := connectRaw(t, g, "ornek.com:443")
+	c, br, kod := connectRaw(t, s, "ornek.com:443")
 	require.Equal(t, http.StatusOK, kod)
 
 	_, err = c.Write([]byte("merhaba\n"))
@@ -160,17 +169,16 @@ func TestGate_IzinliHostUpstreameDevredilirVeVeriAkar(t *testing.T) {
 // İzinsiz host reddedilir, upstream'e HİÇ ulaşılmaz ve OnDeny bir kez çağrılır.
 func TestGate_IzinsizHostReddedilir(t *testing.T) {
 	upstream, gorulen := sahteUpstream(t)
-	g := kapiAc(t)
 	desenler, err := hostlist.Parse("ornek.com")
 	require.NoError(t, err)
 
 	var reddedilen []string
-	g.Register("127.0.0.1", Run{
+	s := oturumAc(t, Run{
 		ID: "k1", Upstream: upstream, Allow: desenler,
 		OnDeny: func(host string) { reddedilen = append(reddedilen, host) },
 	})
 
-	require.Equal(t, http.StatusForbidden, connect(t, g, "yasak.com:443"))
+	require.Equal(t, http.StatusForbidden, connect(t, s, "yasak.com:443"))
 	require.Equal(t, []string{"yasak.com"}, reddedilen)
 	require.Empty(t, *gorulen, "reddedilen istek upstream'e ulaşmamalı")
 }
@@ -178,23 +186,9 @@ func TestGate_IzinsizHostReddedilir(t *testing.T) {
 // Boş Allow her host'u geçirir — spec 020: boş whitelist kısıtsızlıktır.
 func TestGate_BosWhitelistHerHostuGecirir(t *testing.T) {
 	upstream, _ := sahteUpstream(t)
-	g := kapiAc(t)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: upstream})
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream})
 
-	require.Equal(t, http.StatusOK, connect(t, g, "herhangi.com:443"))
-}
-
-// Unregister sonrası aynı kaynak yeniden reddedilir. Container silinince IP
-// yeniden kullanılabiliyor; kayıt kapanmazsa sonraki container önceki
-// çalıştırmanın izinleriyle çıkardı.
-func TestGate_UnregisterSonrasiReddedilir(t *testing.T) {
-	upstream, _ := sahteUpstream(t)
-	g := kapiAc(t)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: upstream})
-	require.Equal(t, http.StatusOK, connect(t, g, "herhangi.com:443"))
-
-	g.Unregister("127.0.0.1")
-	require.Equal(t, http.StatusForbidden, connect(t, g, "herhangi.com:443"))
+	require.Equal(t, http.StatusOK, connect(t, s, "herhangi.com:443"))
 }
 
 /*
@@ -207,13 +201,12 @@ func TestGate_UnregisterSonrasiReddedilir(t *testing.T) {
  */
 func TestGate_DuzHTTPAyniKarariAlir(t *testing.T) {
 	upstream, gorulen := sahteUpstream(t)
-	g := kapiAc(t)
 	desenler, err := hostlist.Parse("izinli.com")
 	require.NoError(t, err)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: upstream, Allow: desenler})
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Allow: desenler})
 
 	istemci := &http.Client{Transport: &http.Transport{
-		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse("http://" + g.Addr()) },
+		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse(s.ProxyURL()) },
 	}}
 	resp, err := istemci.Get("http://izinli.com/paket")
 	require.NoError(t, err)
@@ -227,13 +220,12 @@ func TestGate_DuzHTTPAyniKarariAlir(t *testing.T) {
 }
 
 func TestGate_DuzHTTPIzinsizHostReddedilir(t *testing.T) {
-	g := kapiAc(t)
 	desenler, err := hostlist.Parse("izinli.com")
 	require.NoError(t, err)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: "127.0.0.1:1", Allow: desenler})
+	s := oturumAc(t, Run{ID: "k1", Upstream: "127.0.0.1:1", Allow: desenler})
 
 	istemci := &http.Client{Transport: &http.Transport{
-		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse("http://" + g.Addr()) },
+		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse(s.ProxyURL()) },
 	}}
 	resp, err := istemci.Get("http://yasak.com/")
 	require.NoError(t, err)
@@ -241,18 +233,26 @@ func TestGate_DuzHTTPIzinsizHostReddedilir(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
-// Kayıt/silme eşzamanlı çağrılarda güvenli olmalı: her çalıştırma kendi
-// goroutine'inde başlıyor ve kapı aynı anda istek karşılıyor.
-func TestGate_EszamanliKayitGuvenli(t *testing.T) {
-	g := kapiAc(t)
+// Eşzamanlı oturumlar birbirinin kurallarını GÖRMEZ: her çalıştırma kendi
+// dinleyicisinde, kendi izin listesiyle.
+func TestGate_EszamanliOturumlarIzoledir(t *testing.T) {
+	upstream, _ := sahteUpstream(t)
+	g := New("127.0.0.1")
 
-	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
-		wg.Add(2)
-		go func(i int) { defer wg.Done(); g.Register("10.0.0."+strconv.Itoa(i), Run{ID: "k"}) }(i)
-		go func(i int) { defer wg.Done(); g.Unregister("10.0.0." + strconv.Itoa(i)) }(i)
-	}
-	wg.Wait()
+	dar, err := hostlist.Parse("izinli.com")
+	require.NoError(t, err)
+
+	s1, err := g.Open(Run{ID: "k1", Upstream: upstream, Allow: dar})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s1.Close() })
+
+	s2, err := g.Open(Run{ID: "k2", Upstream: upstream}) // kısıtsız
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s2.Close() })
+
+	require.NotEqual(t, s1.ProxyURL(), s2.ProxyURL(), "her oturum kendi portunda")
+	require.Equal(t, http.StatusForbidden, connect(t, s1, "baska.com:443"))
+	require.Equal(t, http.StatusOK, connect(t, s2, "baska.com:443"))
 }
 
 /*
@@ -264,10 +264,9 @@ func TestGate_EszamanliKayitGuvenli(t *testing.T) {
  */
 func TestGate_BuyukGovdeTamponlanmaz(t *testing.T) {
 	upstream, _ := sahteUpstream(t)
-	g := kapiAc(t)
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: upstream})
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream})
 
-	c, br, kod := connectRaw(t, g, "ornek.com:443")
+	c, br, kod := connectRaw(t, s, "ornek.com:443")
 	require.Equal(t, http.StatusOK, kod)
 
 	const boyut = 8 << 20 // 8 MB
@@ -294,9 +293,7 @@ func TestGate_BuyukGovdeTamponlanmaz(t *testing.T) {
 
 // Upstream ölüyken anlaşılır hata dönmeli — "bilinmeyen hata" değil.
 func TestGate_UpstreamUlasilamazkenAnlasilirHata(t *testing.T) {
-	g := kapiAc(t)
-	// Kapalı bir port: bağlantı reddedilecek.
-	g.Register("127.0.0.1", Run{ID: "k1", Upstream: "127.0.0.1:1"})
+	s := oturumAc(t, Run{ID: "k1", Upstream: "127.0.0.1:1"})
 
-	require.Equal(t, http.StatusBadGateway, connect(t, g, "ornek.com:443"))
+	require.Equal(t, http.StatusBadGateway, connect(t, s, "ornek.com:443"))
 }

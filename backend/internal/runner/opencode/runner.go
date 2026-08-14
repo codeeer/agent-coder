@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agent-coder/backend/internal/netgate"
 	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runner/sandbox"
 )
@@ -22,23 +23,41 @@ type Runner struct {
 	sandbox *sandbox.Manager
 	image   string
 	network string
-	// proxy, denetim vekili — bkz. config.RunnerConfig.HTTPProxy.
-	// Sertifikanın aksine kurucuda: vekil bir dağıtım ayarı, çalışma anında
-	// değişmiyor.
-	proxy string
+	/*
+	 * restrictedNetwork, çıkış denetimi AÇIKKEN kullanılan network (spec 020).
+	 *
+	 * İnternete rotası yoktur. Denetimin zorlayıcı olması buradan geliyor:
+	 * kapıyı yok sayan bir istemci başka yol bulamaz, bağlantısı düşer.
+	 */
+	restrictedNetwork string
+	// gate, çalıştırma başına çıkış oturumu açar.
+	gate *netgate.Gate
+}
+
+// Config, runner'ın dağıtım ayarları.
+//
+// Struct olarak taşınıyor: pozisyonel parametreler dörde çıkınca hangi string'in
+// hangisi olduğu çağrı yerinde okunamaz hâle geldi.
+type Config struct {
+	Sandbox           *sandbox.Manager
+	Image             string
+	Network           string
+	RestrictedNetwork string
+	Gate              *netgate.Gate
 }
 
 // New yeni runner üretir.
 //
-// Kurumsal sertifika BURADA DEĞİL, her isteğin içinde taşınır
-// (runner.Request.CACert): ayar çalışma anında değişebiliyor ve
+// Kurumsal sertifika ve çıkış ayarları BURADA DEĞİL, her isteğin içinde taşınır
+// (runner.Request.CACert, .Egress): ayarlar çalışma anında değişebiliyor ve
 // yapılandırmanın kurucuya bağlanması yeniden başlatma gerektirirdi.
-func New(mgr *sandbox.Manager, image, network, proxy string) *Runner {
+func New(cfg Config) *Runner {
 	return &Runner{
-		sandbox: mgr,
-		image:   image,
-		network: network,
-		proxy:   proxy,
+		sandbox:           cfg.Sandbox,
+		image:             cfg.Image,
+		network:           cfg.Network,
+		restrictedNetwork: cfg.RestrictedNetwork,
+		gate:              cfg.Gate,
 	}
 }
 
@@ -98,11 +117,35 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 		return nil, classify(err, runCtx, ctx)
 	}
 
+	/*
+	 * Çıkış denetimi — container YARATILMADAN ÖNCE kurulur.
+	 *
+	 * Sıra kritik: oturumun adresi container'a HTTP_PROXY olarak veriliyor ve
+	 * container başlar başlamaz depoyu klonluyor. Oturum sonradan açılsaydı
+	 * ilk isteklerin gideceği bir kapı olmazdı.
+	 */
+	network := r.network
+	kapiURL := ""
+	if req.Egress.Enabled() {
+		oturum, err := r.egressOturumuAc(req, emit)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", runner.ErrSandbox, err)
+		}
+		// HER YOLDA kapanır: açık kalan oturum, çalıştırma bittikten sonra da
+		// kullanılabilir bir çıkış bırakırdı.
+		defer func() { _ = oturum.Close() }()
+
+		network = r.restrictedNetwork
+		kapiURL = oturum.ProxyURL()
+		emit(runner.Event{Level: runner.LevelInfo,
+			Message: "çıkış denetimi açık — dışarıya yalnızca izinli adreslere, proxy üzerinden"})
+	}
+
 	ct, err := r.sandbox.Create(runCtx, sandbox.Spec{
 		RunID:    req.RunID.String(),
 		Image:    image,
-		Network:  r.network,
-		Env:      buildEnv(req, r.proxy),
+		Network:  network,
+		Env:      buildEnv(req, kapiURL),
 		CPUCores: req.Limits.CPUCores,
 		MemoryGB: req.Limits.MemoryGB,
 		Files:    toSandboxFiles(configFiles),

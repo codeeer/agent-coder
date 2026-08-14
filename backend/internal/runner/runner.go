@@ -8,6 +8,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -68,6 +69,9 @@ type Request struct {
 	 */
 	CACert string
 
+	// Egress, sandbox çıkış denetimi (spec 020).
+	Egress EgressSpec
+
 	// NodeVersion, sandbox'ın koşacağı Node sürümü. Boşsa taban imaj kullanılır.
 	//
 	// Sürüm KOŞU ANINDA İNDİRİLMEZ: her desteklenen sürümün imajı derleme
@@ -87,6 +91,42 @@ type Request struct {
 	// Limits, container kaynak sınırları. Ayarlardan gelir.
 	Limits Limits
 }
+
+/*
+ * EgressSpec, çıkış denetiminin bir çalıştırmadaki hâli (spec 020).
+ *
+ * Değerler ÇALIŞTIRMA BAŞINDA dondurulur, canlı okunmaz: ayar iş sürerken
+ * değişirse çalıştırma başladığı kurallarla bitmeli. Yarı yolda kural değişmesi
+ * "neden düştü" sorusunu cevaplanamaz yapardı.
+ */
+type EgressSpec struct {
+	/*
+	 * ProxyURL, ANA ANAHTAR. Boşsa denetim tamamen kapalıdır: runner bugünkü
+	 * ağda doğar, hiçbir proxy değişkeni yazılmaz, whitelist yok sayılır.
+	 */
+	ProxyURL string
+
+	/*
+	 * AllowedHosts, kullanıcının whitelist'i — HAM METİN, satır başına bir
+	 * domain.
+	 *
+	 * BOŞ OLMASI KISIT YOKLUĞUDUR. Bu yüzden zorunlu adresler buraya
+	 * körlemesine EKLENEMEZ: boş bir listeye ekleme yapmak listeyi boş
+	 * olmaktan çıkarır ve kısıtsız olması gereken bir çalıştırmayı yalnızca
+	 * o adreslerle sınırlardı.
+	 */
+	AllowedHosts string
+
+	/*
+	 * Required, ürünün çalışması için her hâlükârda gereken adresler:
+	 * LLM provider, git repository, tanımlıysa registry'ler. Yalnızca
+	 * AllowedHosts DOLUYKEN listeye eklenir.
+	 */
+	Required []string
+}
+
+// Enabled, çıkış denetiminin bu çalıştırmada açık olup olmadığı.
+func (e EgressSpec) Enabled() bool { return strings.TrimSpace(e.ProxyURL) != "" }
 
 /*
  * PackageRegistry, agent'ın bağımlılıkları nereden çekeceği.

@@ -97,6 +97,26 @@ type RunnerConfig struct {
 	 * "tüm çıkış denetleniyor" garantisi sanmayın.
 	 */
 	HTTPProxy string
+	/*
+	 * RestrictedNetwork, çıkış denetimi açıkken runner'ın doğduğu ağ (spec 020).
+	 *
+	 * Bu ağın internete ROTASI YOKTUR (`internal: true`). Denetimin zorlayıcı
+	 * olması buradan geliyor: kapıyı yok sayan bir istemci başka bir yol
+	 * bulamaz, bağlantısı düşer. Ölçüldü — doğrudan IP'ye bağlantı 0 ms'de
+	 * "Could not connect" veriyor.
+	 */
+	RestrictedNetwork string
+	/*
+	 * GateHost, runner'ların çıkış kapısına ulaşmak için kullandığı ad.
+	 *
+	 * PORT YOK: her çalıştırma kendi portunda kendi oturumunu açıyor. Tek
+	 * dinleyici + kaynak IP tasarımı ölçülerek elendi — Docker IP'yi yalnızca
+	 * başlatmada atıyor, container ise başlar başlamaz klonluyor; kayıt
+	 * yetişmediğinde klonlama sessizce reddedilirdi.
+	 *
+	 * Varsayılan `backend`, compose'daki servis adı (Docker ağının takma adı).
+	 */
+	GateHost string
 }
 
 // Load ortam değişkenlerini okur ve doğrular.
@@ -124,11 +144,13 @@ func Load() (*Config, error) {
 		},
 
 		Runner: RunnerConfig{
-			Image:          getString("RUNNER_IMAGE", "agent-coder/opencode-runner:latest"),
-			Network:        getString("RUNNER_NETWORK", "agent-coder_internal"),
-			ServerPassword: getString("OPENCODE_SERVER_PASSWORD", ""),
-			ExtraCACert:    getString("RUNNER_EXTRA_CA_CERT", ""),
-			HTTPProxy:      getString("RUNNER_HTTP_PROXY", ""),
+			Image:             getString("RUNNER_IMAGE", "agent-coder/opencode-runner:latest"),
+			Network:           getString("RUNNER_NETWORK", "agent-coder_internal"),
+			ServerPassword:    getString("OPENCODE_SERVER_PASSWORD", ""),
+			ExtraCACert:       getString("RUNNER_EXTRA_CA_CERT", ""),
+			HTTPProxy:         getString("RUNNER_HTTP_PROXY", ""),
+			RestrictedNetwork: getString("RUNNER_RESTRICTED_NETWORK", "agent-coder_restricted"),
+			GateHost:          getString("EGRESS_GATE_HOST", "backend"),
 		},
 
 		OpenRouterAPIKey:    getString("OPENROUTER_API_KEY", ""),

@@ -32,6 +32,7 @@ import (
 	"github.com/agent-coder/backend/internal/llm"
 	"github.com/agent-coder/backend/internal/mcp"
 	"github.com/agent-coder/backend/internal/mcpserver"
+	"github.com/agent-coder/backend/internal/netgate"
 	"github.com/agent-coder/backend/internal/projects"
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbuild"
@@ -156,15 +157,22 @@ func run() error {
 	}
 	defer sandboxMgr.Close()
 
-	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network, cfg.Runner.HTTPProxy)
-	if cfg.Runner.HTTPProxy != "" {
-		// Sessiz kalmamalı: vekil, çalıştırmanın TÜM dış trafiğini üçüncü bir
-		// sürece yönlendiriyor ve o süreç TLS'i açabiliyorsa sağlayıcı
-		// anahtarını da görür. Denetim bitip ayar kaldırılmadığında bunu
-		// loglardan görmek gerekir.
-		slog.WarnContext(ctx, "runner trafiği denetim vekiline yönlendiriliyor",
-			"proxy", cfg.Runner.HTTPProxy)
-	}
+	/*
+	 * Çıkış kapısı (spec 020). Dinleyici AÇILMAZ — her çalıştırma kendi
+	 * oturumunu, kendi portunda açar. Tek dinleyici + kaynak IP tasarımı
+	 * ölçülerek elendi: Docker container'ın IP'sini yalnızca BAŞLATMADA
+	 * atıyor, oysa container başlar başlamaz depoyu klonluyor; kaydın
+	 * yetişmediği her seferde klonlama sessizce reddedilirdi.
+	 */
+	gate := netgate.New(cfg.Runner.GateHost)
+
+	agentRunner := opencode.New(opencode.Config{
+		Sandbox:           sandboxMgr,
+		Image:             cfg.Runner.Image,
+		Network:           cfg.Runner.Network,
+		RestrictedNetwork: cfg.Runner.RestrictedNetwork,
+		Gate:              gate,
+	})
 
 	// Docker ve runner imajı hazır mı? Eksikse çalıştırma denenene kadar
 	// fark edilmez; açılışta uyarmak kullanıcıyı erken bilgilendirir.
@@ -231,6 +239,19 @@ func run() error {
 		// dosyadan. Her koşuda okunur — arayüzden değiştirilince yeniden
 		// başlatma beklenmez.
 		CACert: caResolver.PEM,
+
+		// Çıkış denetimi: proxy ANA ANAHTAR, boşsa denetim tamamen kapalı.
+		// Sertifikada olduğu gibi ayar kazanır, ortam değişkeni yedekte kalır.
+		Egress: func() runner.EgressSpec {
+			proxy := settingsSvc.Text(settings.KeyEgressProxy)
+			if proxy == "" {
+				proxy = cfg.Runner.HTTPProxy
+			}
+			return runner.EgressSpec{
+				ProxyURL:     proxy,
+				AllowedHosts: settingsSvc.Text(settings.KeyAllowedHosts),
+			}
+		},
 	})
 	defer runManager.Shutdown()
 

@@ -43,8 +43,9 @@ func smokeSetup(t *testing.T) (*opencode.Runner, string) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = mgr.Close() })
 
-	// Vekil boş: duman testi ürünün kendi yolunu ölçer, sızıntı düzeneğini değil.
-	r := opencode.New(mgr, image, network, "")
+	// Çıkış denetimi kapalı: duman testi ürünün kendi yolunu ölçer. Denetim
+	// açık olsaydı testin ayrıca bir proxy'ye ihtiyacı olurdu.
+	r := opencode.New(opencode.Config{Sandbox: mgr, Image: image, Network: network})
 	require.NoError(t, r.Ping(context.Background()), "docker ve runner imajı hazır olmalı")
 
 	return r, key

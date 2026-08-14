@@ -66,10 +66,17 @@ services:
       # dosyanın Docker host'unda bulunmasını gerektiriyordu ve uzak Docker
       # host kurulumunda çalışmıyordu.
       RUNNER_EXTRA_CA_CERT: ${RUNNER_EXTRA_CA_CERT:-}
-      # Denetim vekili — runner'ın çıkış trafiğini açılabilir bir vekilden
-      # geçirir. Boşsa hiçbir etkisi yok. Kullanımı ve bulguları:
-      # docs/veri-sizintisi-analizi.md
+      # Çıkış proxy'si — ASIL YOL ARAYÜZ (Ayarlar → Kurumsal ağ, spec 020).
+      # Bu değişken, ayar gelmeden önce kurulmuş sistemler bozulmasın diye
+      # YEDEK olarak duruyor; ayar doluysa o kazanır.
       RUNNER_HTTP_PROXY: ${RUNNER_HTTP_PROXY:-}
+      # Denetim açıkken runner'ların doğduğu ağ ve çıkış kapısının adresi.
+      # Runner bu adresi HTTP_PROXY olarak görür; `backend` adı compose'un
+      # ağ takma adıdır.
+      RUNNER_RESTRICTED_NETWORK: agent-coder_restricted
+      # Runner'ların çıkış kapısına ulaşmak için kullandığı ad. Port yok:
+      # her çalıştırma kendi portunda kendi oturumunu açıyor.
+      EGRESS_GATE_HOST: backend
       # Süre sınırı, eşzamanlılık, CPU ve bellek burada DEĞİL: davranış
       # parametreleri arayüzden yönetilir ve veritabanında tutulur.
     ports:
@@ -89,8 +96,13 @@ services:
     # soketin grup iznine erişebilir.
     group_add:
       - "0"
+    # İKİ AĞDA BİRDEN. `internal` internete çıkışı sağlar (imaj çekme, model
+    # kataloğu); `restricted` ise denetim açıkken runner'ların doğduğu ağ —
+    # backend hem onlara HTTP ile ulaşabilmeli hem de çıkış kapısını orada
+    # dinletebilmeli. Kapı bu iki ağın arasındaki tek geçit.
     networks:
       - internal
+      - restricted
 
   frontend:
     build:
@@ -131,6 +143,21 @@ networks:
     # RUNNER_NETWORK olarak geçilir.
     name: agent-coder_internal
     driver: bridge
+
+  # ─── Çıkış denetimi ağı (spec 020) ──────────────────────────────────────
+  #
+  # `internal: true` bu ağda NAT olmadığı anlamına gelir: buraya bağlı bir
+  # container internete HİÇ çıkamaz. Ölçüldü — DNS "Could not resolve host"
+  # ile, doğrudan IP'ye bağlantı ise 0 ms'de "Could not connect" ile düşüyor.
+  # Aynı ağdaki komşuya erişim çalışıyor (200), yani kapı erişilebilir kalıyor.
+  #
+  # ZORLAMA BURADAN GELİYOR, kapıdan değil. Çıkış proxy'si tanımlıyken runner
+  # bu ağda doğar ve dışarıya tek yol backend'in içindeki kapı olur. Proxy
+  # ayarını okumayan bir istemci (ölçümde JVM) artık atlayamaz — düşer.
+  restricted:
+    name: agent-coder_restricted
+    driver: bridge
+    internal: true
 
 volumes:
   postgres-data:

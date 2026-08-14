@@ -11,11 +11,19 @@
 // sağlayıcı anahtarını görebilen bir ara nokta oluşmuyor. Bunun bedeli, izin
 // kararının yalnızca host'a dayanması — izinli bir host üzerinden sızdırma
 // kapının kapatabileceği bir şey değil (spec 020, kapsam dışı).
+//
+// ÇALIŞTIRMA BAŞINA AYRI DİNLEYİCİ — ölçülerek seçildi. Tasarım önce "tek
+// dinleyici + kaynak IP ile kimlik" idi; ama Docker container'ın IP'sini
+// YALNIZCA BAŞLATMADA atıyor (ölçüldü: başlatmadan önce `invalid IP`, sonra
+// `172.27.0.2`). Kayıt ancak başlatmadan sonra yapılabilirdi ve container
+// başlar başlamaz depoyu klonluyor: kaydın yetişmediği her seferde klonlama
+// sessizce reddedilirdi. Port ise container yaratılmadan ÖNCE biliniyor, yani
+// yarış hiç oluşmuyor. Kimlik doğrulamalı proxy de bu yüzden seçilmedi: JVM'in
+// CONNECT üzerinde Basic auth'u varsayılan olarak kapalı.
 package netgate
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -32,20 +40,23 @@ import (
 // çalıştırmanın dakikalarca asılı kalmaması için kısa tutuluyor.
 const upstreamTimeout = 10 * time.Second
 
-// Gate, çıkış kapısı.
+// Gate, çıkış oturumları açar.
 type Gate struct {
-	dinleyici net.Listener
-
-	mu     sync.RWMutex
-	kayit  map[string]Run // kaynak IP → çalıştırma
-	sunucu *http.Server
+	// host, runner container'larının kapıya ulaşmak için kullandığı ad.
+	// Docker ağında bu backend servisinin takma adıdır.
+	host string
 }
 
-// Run, kapıya kayıtlı tek bir çalıştırma.
-//
-// Upstream ve Allow KAYIT ANINDA DONDURULUR, canlı okunmaz: ayar çalıştırma
-// sürerken değiştirilirse süren iş başladığı kurallarla bitmeli. Aksi halde
-// yarı yolda kural değişir ve çalıştırmanın neden düştüğü açıklanamaz olurdu.
+// New, kapıyı üretir. Dinleyici AÇILMAZ — her çalıştırma kendi oturumunu açar.
+func New(host string) *Gate { return &Gate{host: host} }
+
+/*
+ * Run, tek bir çalıştırmanın çıkış kuralları.
+ *
+ * Upstream ve Allow OTURUM AÇILIRKEN dondurulur, canlı okunmaz: ayar çalıştırma
+ * sürerken değiştirilirse süren iş başladığı kurallarla bitmeli. Aksi halde
+ * yarı yolda kural değişir ve çalıştırmanın neden düştüğü açıklanamaz olurdu.
+ */
 type Run struct {
 	ID string
 	// Upstream, kurumsal proxy adresi (host:port).
@@ -58,81 +69,87 @@ type Run struct {
 	OnDeny func(host string)
 }
 
-// Register, bir çalıştırmayı kaynak IP'sine bağlar.
-func (g *Gate) Register(ip string, r Run) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.kayit[ip] = r
+// Session, tek bir çalıştırmaya ait dinleyici.
+type Session struct {
+	run      Run
+	dinleyci net.Listener
+	sunucu   *http.Server
+	proxyURL string
 }
 
-// Unregister, kaydı kapatır.
-//
-// HER YOLDA çağrılmalı: container silinince IP havuza dönüyor ve yeniden
-// kullanılabiliyor. Kayıt açık kalsaydı sonraki container, önceki çalıştırmanın
-// izinleriyle dışarı çıkardı.
-func (g *Gate) Unregister(ip string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.kayit, ip)
-}
-
-// New, dinleyiciyi HEMEN açar.
-//
-// Bind burada yapılıyor ki hata AÇILIŞTA görünsün. Dinleyici ayara bağlı
-// başlatılsaydı, ayar çalışma anında girildiği için "ayar kaydedildi ama kapı
-// henüz ayakta değil" gibi bir aralık oluşurdu.
-func New(listen string) (*Gate, error) {
-	l, err := net.Listen("tcp", listen)
+/*
+ * Open, çalıştırma için dinleyici açar.
+ *
+ * Container YARATILMADAN ÖNCE çağrılır: dönen adres ona HTTP_PROXY olarak
+ * verilecek. Böylece container'ın ilk paketi bile hazır bir kapı buluyor.
+ */
+func (g *Gate) Open(r Run) (*Session, error) {
+	l, err := net.Listen("tcp", ":0")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("çıkış kapısı açılamadı: %w", err)
 	}
 
-	g := &Gate{dinleyici: l, kayit: map[string]Run{}}
-	g.sunucu = &http.Server{Handler: g}
-	return g, nil
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	if err != nil {
+		_ = l.Close()
+		return nil, fmt.Errorf("kapı portu okunamadı: %w", err)
+	}
+
+	s := &Session{
+		run:      r,
+		dinleyci: l,
+		proxyURL: "http://" + net.JoinHostPort(g.host, port),
+	}
+	s.sunucu = &http.Server{Handler: s}
+
+	go func() { _ = s.sunucu.Serve(l) }()
+	return s, nil
 }
 
-// Addr, dinlenen gerçek adres. Port 0 verildiğinde işletim sisteminin seçtiği
-// portu öğrenmenin tek yolu budur.
-func (g *Gate) Addr() string { return g.dinleyici.Addr().String() }
+// ProxyURL, runner'a HTTP_PROXY olarak verilecek adres.
+func (s *Session) ProxyURL() string { return s.proxyURL }
 
-// Serve, kapıyı çalıştırır ve ctx iptal edilene kadar bloklar.
-func (g *Gate) Serve(ctx context.Context) error {
-	go func() {
-		<-ctx.Done()
-		_ = g.sunucu.Close()
-	}()
+// Close, dinleyiciyi kapatır. HER YOLDA çağrılmalı — açık kalan bir oturum,
+// çalıştırma bittikten sonra da kullanılabilir bir çıkış bırakırdı.
+func (s *Session) Close() error {
+	err := s.sunucu.Close()
 
-	err := g.sunucu.Serve(g.dinleyici)
+	/*
+	 * Dinleyici AYRICA kapatılır — testle yakalanmış bir yarış.
+	 *
+	 * `http.Server.Close` yalnızca KENDİ İZLEDİĞİ dinleyicileri kapatıyor ve
+	 * bir dinleyiciyi ancak `Serve` çağrıldığında izlemeye alıyor. Serve ayrı
+	 * bir goroutine'de başlıyor; oturum açılır açılmaz kapatılırsa Close,
+	 * Serve'den önce çalışıp dinleyiciyi hiç görmeyebiliyor. Sonuç: çalıştırma
+	 * bittiği hâlde açık kalan, hâlâ kullanılabilir bir çıkış.
+	 */
+	if kapatmaHatasi := s.dinleyci.Close(); kapatmaHatasi != nil && err == nil {
+		if !errors.Is(kapatmaHatasi, net.ErrClosed) {
+			err = kapatmaHatasi
+		}
+	}
+
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
 }
 
-func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	run, tamam := g.calistirmaBul(r.RemoteAddr)
-	if !tamam {
-		// Kayıtsız kaynak: denetim kapalıyken kapı fiilen kapalı olsun diye.
-		// Varsayılan "geçir" olsaydı kapı açık bir proxy'ye dönerdi.
-		http.Error(w, "bu kaynak için kayıtlı çalıştırma yok", http.StatusForbidden)
-		return
-	}
-
+func (s *Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	host := hostAdi(r)
-	if !hostlist.Match(run.Allow, host) {
-		if run.OnDeny != nil {
-			run.OnDeny(host)
+	if !hostlist.Match(s.run.Allow, host) {
+		if s.run.OnDeny != nil {
+			s.run.OnDeny(host)
 		}
 		http.Error(w, "bu adrese çıkış izinli değil: "+host, http.StatusForbidden)
 		return
 	}
 
 	if r.Method == http.MethodConnect {
-		g.tunel(w, r, run)
+		s.tunel(w, r)
 		return
 	}
-	g.duzHTTP(w, r, run)
+	s.duzHTTP(w, r)
 }
 
 /*
@@ -147,13 +164,13 @@ func (g *Gate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
  * proxy protokolünün kendi kuralıyla. Hedefe doğrudan gitmek, kurumsal proxy'yi
  * atlamak olurdu ki bu özelliğin tam olarak engellediği şey.
  */
-func (g *Gate) duzHTTP(w http.ResponseWriter, r *http.Request, run Run) {
+func (s *Session) duzHTTP(w http.ResponseWriter, r *http.Request) {
 	dis := r.Clone(r.Context())
 	dis.RequestURI = ""
 
 	tasiyici := &http.Transport{
 		Proxy: func(*http.Request) (*url.URL, error) {
-			return &url.URL{Scheme: "http", Host: run.Upstream}, nil
+			return &url.URL{Scheme: "http", Host: s.run.Upstream}, nil
 		},
 	}
 	defer tasiyici.CloseIdleConnections()
@@ -199,8 +216,8 @@ func hostAdi(r *http.Request) string {
  * birbirine bağlar ve aradan çekilir. Gövde TAMPONLANMAZ — Koşu B'de agent
  * 190 MB'lık bir JDK indirmişti; tamponlansaydı kapı o boyutu belleğe alırdı.
  */
-func (g *Gate) tunel(w http.ResponseWriter, r *http.Request, run Run) {
-	ust, err := net.DialTimeout("tcp", run.Upstream, upstreamTimeout)
+func (s *Session) tunel(w http.ResponseWriter, r *http.Request) {
+	ust, err := net.DialTimeout("tcp", s.run.Upstream, upstreamTimeout)
 	if err != nil {
 		// Anlaşılır hata: "bilinmeyen hata" yerine sebebi yazılır.
 		http.Error(w, "kurumsal proxy'ye bağlanılamadı: "+err.Error(), http.StatusBadGateway)
@@ -245,16 +262,4 @@ func ustCONNECT(ust net.Conn, hedef string) error {
 		return fmt.Errorf("durum %d", resp.StatusCode)
 	}
 	return nil
-}
-
-func (g *Gate) calistirmaBul(remoteAddr string) (Run, bool) {
-	ip, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		ip = remoteAddr
-	}
-
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	r, tamam := g.kayit[ip]
-	return r, tamam
 }

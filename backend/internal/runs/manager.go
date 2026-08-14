@@ -45,6 +45,15 @@ type Limits struct {
 	// sertifika arayüzden değiştirilebiliyor ve değişiklik yeniden başlatma
 	// beklemeden sonraki koşuda geçerli olmalı (spec 017 H1).
 	CACert func() string
+
+	// Egress, sandbox çıkış denetimi (spec 020). Diğerleri gibi FONKSİYON:
+	// proxy ve whitelist arayüzden değiştirilebiliyor ve değişiklik yeniden
+	// başlatma beklemeden sonraki çalıştırmada geçerli olmalı.
+	//
+	// Yalnızca ayarları taşır; her çalıştırmanın kendi zorunlu adresleri
+	// (provider, repository, registry, MCP) burada DEĞİL, çalıştırma
+	// kurulurken eklenir — onlar ayardan değil o koşudan geliyor.
+	Egress func() runner.EgressSpec
 }
 
 // Manager, çalıştırmaları yürütür ve eşzamanlılığı sınırlar.
@@ -198,11 +207,18 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 
 	in.Repo.CloneDepth = m.limits.CloneDepth()
 
+	paketler := m.packages()
+
+	// Çıkış denetimi: ayarlar + bu çalıştırmanın kendi zorunlu adresleri.
+	egress := m.egress()
+	egress.Required = zorunluHostlar(in.Provider, in.Repo, paketler, in.Agent.MCPServers)
+
 	req := runner.Request{
 		RunID:       run.ID,
 		NodeVersion: in.NodeVersion,
-		Packages:    m.packages(),
+		Packages:    paketler,
 		CACert:      m.caCert(),
+		Egress:      egress,
 		Repo:        in.Repo,
 		Agent:       in.Agent,
 		Provider:    in.Provider,
@@ -452,6 +468,17 @@ func (m *Manager) caCert() string {
 		return ""
 	}
 	return m.limits.CACert()
+}
+
+// egress, çıkış denetimi ayarlarını okur.
+//
+// nil olması denetimin KAPALI olması demektir — testlerde ve ayar servisi
+// olmayan kurulumlarda bugünkü davranış sürer.
+func (m *Manager) egress() runner.EgressSpec {
+	if m.limits.Egress == nil {
+		return runner.EgressSpec{}
+	}
+	return m.limits.Egress()
 }
 
 /*

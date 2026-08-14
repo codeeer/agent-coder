@@ -281,6 +281,31 @@ func (m *Manager) CleanupOrphans(ctx context.Context) (int, error) {
 // HER YOLDA çağrılmalı: başarı, hata, panik, iptal ve zaman aşımı.
 // İptal edilmiş context ile silme çalışmayacağı için çağıran
 // context.WithoutCancel kullanmalıdır.
+/*
+ * IPAddress, container'ın verilen ağdaki adresi.
+ *
+ * NEDEN GEREKLİ: çıkış kapısı hangi çalıştırmanın konuştuğunu KAYNAK IP ile
+ * biliyor (spec 020). Container geçici — iş biter bitmez siliniyor — bu yüzden
+ * IP koşu SIRASINDA öğrenilmek zorunda; sonradan sorulamıyor.
+ *
+ * Container BAŞLATILDIKTAN sonra çağrılmalı: ağ adresi başlatma anında
+ * atanıyor, oluşturma anında değil.
+ */
+func (c *Container) IPAddress(ctx context.Context, network string) (string, error) {
+	bilgi, err := c.docker.ContainerInspect(ctx, c.ID)
+	if err != nil {
+		return "", fmt.Errorf("container incelenemedi: %w", err)
+	}
+	if bilgi.NetworkSettings == nil {
+		return "", errors.New("container'ın ağ bilgisi yok")
+	}
+	uc, tamam := bilgi.NetworkSettings.Networks[network]
+	if !tamam || uc == nil || uc.IPAddress == "" {
+		return "", fmt.Errorf("container %q ağında adres almamış", network)
+	}
+	return uc.IPAddress, nil
+}
+
 func (c *Container) Remove(ctx context.Context) {
 	if c == nil || c.docker == nil {
 		return
