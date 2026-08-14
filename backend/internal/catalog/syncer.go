@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,13 +19,15 @@ const SyncInterval = 24 * time.Hour
 
 // Syncer, sağlayıcıların model kataloglarını indirip veritabanına yazar.
 type Syncer struct {
+	// rt, sağlayıcı çağrılarının taşıyıcısı (kurumsal sertifika için).
+	rt        http.RoundTripper
 	pool      *pgxpool.Pool
 	providers *llm.Store
 }
 
 // NewSyncer yeni senkronlayıcı üretir.
-func NewSyncer(pool *pgxpool.Pool, providers *llm.Store) *Syncer {
-	return &Syncer{pool: pool, providers: providers}
+func NewSyncer(pool *pgxpool.Pool, providers *llm.Store, rt http.RoundTripper) *Syncer {
+	return &Syncer{pool: pool, providers: providers, rt: rt}
 }
 
 // Result, tek bir sağlayıcının senkron sonucu.
@@ -47,7 +50,7 @@ func (s *Syncer) SyncOne(ctx context.Context, p llm.Provider) (int, error) {
 		return 0, err
 	}
 
-	client, err := llm.NewClient(p)
+	client, err := llm.NewClient(p, s.rt)
 	if err != nil {
 		s.recordFailure(ctx, p.ID, err)
 		return 0, err

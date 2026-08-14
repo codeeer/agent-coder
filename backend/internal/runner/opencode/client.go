@@ -33,6 +33,15 @@ type client struct {
 	http *http.Client
 }
 
+/*
+ * KURUMSAL SERTİFİKA TAŞIYICISI BİLEREK YOK.
+ *
+ * Ürünün diğer bütün giden istemcileri `tlstrust` üzerinden besleniyor
+ * (spec 017 H5); bu istemci istisna çünkü hedefi internet değil, izole
+ * Docker ağındaki container ve adres `http://` — ortada doğrulanacak bir TLS
+ * zinciri yok. Buraya taşıyıcı eklemek, çözdüğü bir sorun olmadan "hepsi
+ * bağlandı" listesini uzatırdı.
+ */
 func newClient(host string) *client {
 	return &client{
 		base: fmt.Sprintf("http://%s:%d", host, Port),

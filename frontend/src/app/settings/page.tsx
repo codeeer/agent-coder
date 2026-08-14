@@ -12,6 +12,7 @@ import { GitProviderSection } from "@/components/settings/GitProviderSection";
 import { McpAccessSection } from "@/components/settings/McpAccessSection";
 import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
+import { CACertStatus } from "@/components/settings/CACertStatus";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
 import { ScriptSection } from "@/components/settings/ScriptSection";
 import {
@@ -22,9 +23,16 @@ import {
   IconPlay,
   IconPlug,
   IconReport,
+  IconShield,
   IconTerminal,
 } from "@/components/ui/icons";
-import { Notice, PageHeader, Panel } from "@/components/ui/primitives";
+import {
+  Notice,
+  PageHeader,
+  Panel,
+  SearchField,
+  Toolbar,
+} from "@/components/ui/primitives";
 
 /** Jira, spec 002'den sonra credentials ucunun ilgilendiği tek tür. */
 const JIRA_SPEC: CredentialSpec = {
@@ -43,6 +51,8 @@ const JIRA_SPEC: CredentialSpec = {
     },
     { name: "email", label: "E-posta", placeholder: "ad@sirket.com" },
   ],
+  // Token `myself` ucuna karşı gerçekten sınanıyor (credentials.Validator).
+  verifies: true,
 };
 
 /*
@@ -73,6 +83,18 @@ const NEXUS_SPEC: CredentialSpec = {
     "Kayıt defteri kimlik doğrulama istiyorsa parola veya erişim token'ı. Anonim okumaya açık depolarda gerekmez.",
   secretLabel: "Parola / token",
   placeholder: "NpmToken.abc…",
+  /*
+   * `verifies` YOK — ve bu bilinçli.
+   *
+   * Nexus kurulumları farklı kimlik doğrulama uçları sunuyor; yanlış tahmin
+   * edilen bir uç ÇALIŞAN bir token'ı reddederdi. Backend de bu yüzden
+   * doğrulamıyor (`credentials.Validator`: nexus → nil).
+   *
+   * Arayüz bunu söylemek zorunda: eskiden düğme "Doğrula ve kaydet" diyor ve
+   * yanına "kaydetmeden önce değerin gerçekten çalıştığı sınanır" yazıyordu.
+   * Hiçbiri olmuyordu — geçersiz bir token "tanımlı" rozetiyle kaydediliyor,
+   * kullanıcı doğrulanmış sanıyor, hata ancak koşuda çıkıyordu.
+   */
 };
 
 const TABS = [
@@ -84,12 +106,23 @@ const TABS = [
   { id: "packages", label: "Paket deposu", Icon: IconPackage },
   { id: "runner", label: "Çalıştırma", Icon: IconPlay },
   { id: "reports", label: "Rapor", Icon: IconReport },
+  { id: "network", label: "Kurumsal ağ", Icon: IconShield },
 ] as const;
 
 type TabID = (typeof TABS)[number]["id"];
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<TabID>("models");
+  /*
+   * Arama, bölüm sekmelerinin YERİNE GEÇEN bir görünüm.
+   *
+   * Sorgu varken içerik sütunu bölüm içeriği yerine süzülmüş ayar listesini
+   * gösterir; sorgu temizlenince seçili bölüme döner. `tab` bu sırada
+   * korunuyor, yani aramadan çıkış kullanıcıyı bıraktığı yerde buluyor —
+   * aksi halde her arama, gezinmeyi de sıfırlardı.
+   */
+  const [query, setQuery] = useState("");
+  const searching = query.trim() !== "";
 
   return (
     /*
@@ -108,12 +141,64 @@ export default function SettingsPage() {
       />
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[212px_1fr]">
-        <SettingsNav active={tab} onSelect={setTab} />
+        {/* Bölüm seçimi sorguyu TEMİZLER: aramadan çıkışın doğal jesti bir
+            bölüme gitmektir. Sorgu kalsaydı sekme seçili görünür ama içeriği
+            gösterilmezdi. */}
+        {/* Sorgu varken HİÇBİR bölüm seçili görünmez. `tab` korunuyor (arama
+            temizlenince oraya dönülecek) ama işaretlenseydi menü, ekranda
+            gösterilmeyen bir bölümü "bulunduğunuz yer" diye gösterirdi. */}
+        <SettingsNav
+          active={searching ? null : tab}
+          onSelect={(id) => {
+            setTab(id);
+            setQuery("");
+          }}
+        />
         {/* min-w-0: içerideki uzun adresler yan menüyü ezmesin. */}
-        <div className="-mx-1 min-h-0 min-w-0 overflow-y-auto px-1 pb-1">
-          <TabContent tab={tab} />
+        <div className="flex min-h-0 min-w-0 flex-col">
+          {/* Araç çubuğu kaydırma alanının DIŞINDA: uzun bir bölümde (Betikler)
+              aşağı inince arama alanı ekrandan çıkmasın. */}
+          <Toolbar className="shrink-0">
+            <SearchField
+              type="search"
+              /* `hint` verilmiyor — bağlı bir kısayol yok, yazılsaydı
+                 çalışmayan bir söz verilmiş olurdu (bkz. SearchField). */
+              aria-label="Ayarlarda ara"
+              placeholder="Ayarlarda ara…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1"
+            />
+          </Toolbar>
+          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-1">
+            {searching ? <SearchResults query={query} /> : <TabContent tab={tab} />}
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Arama görünümü.
+ *
+ * Sonuçlar bölüm başlıklarıyla gelir (`showHeadings`), çünkü "Süre sınırı"
+ * diye bir sonuç tek başına hangi süreyi anlattığını söylemiyor — ayarın
+ * anlamı ait olduğu bölümden geliyor.
+ *
+ * KAPSAM CÜMLESİ süs değil: bu ekranda ayarların yanında sağlayıcılar, MCP
+ * sunucuları, betikler ve kimlik kayıtları da var. Arama onları kapsamıyor;
+ * yazılmasaydı "GitHub" arayıp sonuç bulamayan kullanıcı aramayı bozuk
+ * sanardı.
+ */
+function SearchResults({ query }: { query: string }) {
+  return (
+    <div className="space-y-3">
+      <RuntimeSettings query={query} />
+      <p className="px-1 text-xs leading-relaxed text-ink-3">
+        Arama yalnızca ayarları kapsar. Sağlayıcılar, dış araç sunucuları,
+        betikler ve kimlik kayıtları kendi bölümlerinde durur.
+      </p>
     </div>
   );
 }
@@ -177,6 +262,31 @@ function TabContent({ tab }: { tab: TabID }) {
         </Panel>
       );
 
+    case "network":
+      return (
+        <div className="space-y-4">
+          {/* TEK PANO. Durum ve alan aynı şeyin iki yüzü; ayrı panolara
+              konduklarında "Kurumsal kök sertifika" başlığı üç kez tekrar
+              ediyordu (iki pano başlığı + satır etiketi). */}
+          <Panel
+            title="Kurumsal kök sertifika"
+            description="SSL denetimi yapan ağlarda gerekir. Tanımlanırsa hem agent'ın çalıştırdığı araçlar hem de Agent Coder'ın kendi giden çağrıları bu sertifikaya güvenir; genel sertifikalar geçerli kalmaya devam eder."
+            padded={false}
+          >
+            {/* Durum ÖNCE: kullanıcının ilk sorusu "tanımlı mı ve hangisi",
+                "ne yazayım" değil. */}
+            <div className="border-b border-line px-4 py-3.5">
+              <CACertStatus />
+            </div>
+            <RuntimeSettings groups={["network"]} showHeadings={false} />
+          </Panel>
+          <p className="text-xs leading-relaxed text-ink-3">
+            TLS doğrulamasını kapatan bir ayar yoktur ve eklenmeyecektir. Kurumsal
+            ağın çözümü kök sertifikayı tanıtmaktır.
+          </p>
+        </div>
+      );
+
     case "reports":
       return (
         <Panel
@@ -206,7 +316,8 @@ function SettingsNav({
   active,
   onSelect,
 }: {
-  active: TabID;
+  /** `null` — arama görünümündeyiz, hiçbir bölüm "bulunduğunuz yer" değil. */
+  active: TabID | null;
   onSelect: (id: TabID) => void;
 }) {
   return (

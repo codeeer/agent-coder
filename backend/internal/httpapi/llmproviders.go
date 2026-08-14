@@ -103,7 +103,7 @@ func (h *Handler) createLLMProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := llm.NewClient(llm.Provider{Type: req.Type, BaseURL: baseURL})
+	client, err := llm.NewClient(llm.Provider{Type: req.Type, BaseURL: baseURL}, h.deps.HTTPTransport)
 	if err != nil {
 		h.respondLLMError(w, r, err)
 		return
@@ -176,7 +176,7 @@ func (h *Handler) updateLLMProvider(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		client, err := llm.NewClient(llm.Provider{Type: current.Type, BaseURL: baseURL})
+		client, err := llm.NewClient(llm.Provider{Type: current.Type, BaseURL: baseURL}, h.deps.HTTPTransport)
 		if err != nil {
 			h.respondLLMError(w, r, err)
 			return

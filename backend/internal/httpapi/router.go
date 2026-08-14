@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/agent-coder/backend/internal/agentreg"
+	"github.com/agent-coder/backend/internal/cacert"
 	"github.com/agent-coder/backend/internal/catalog"
 	"github.com/agent-coder/backend/internal/config"
 	"github.com/agent-coder/backend/internal/credentials"
@@ -69,6 +70,16 @@ type Deps struct {
 	// Agent Coder'ın kendisini dışarıya MCP olarak açması (spec 011 Aşama 3)
 	MCPAccess *mcpserver.Access
 	MCPServer *mcpserver.Server
+
+	// HTTPTransport, ürünün giden çağrılarında kullanılacak taşıyıcı.
+	//
+	// Kurumsal kök sertifika tanımlıysa güven havuzunu taşır (spec 017 H5).
+	// nil olabilir — o durumda varsayılan taşıyıcı kullanılır.
+	HTTPTransport http.RoundTripper
+
+	// CACert, kurumsal kök sertifikanın çözümleyicisi (spec 017).
+	// nil olabilir — o durumda sertifika tanımsız sayılır.
+	CACert *cacert.Resolver
 
 	// Jira (spec 002'den sonra credentials paketinin ilgilendiği tek şey)
 	Credentials   *credentials.Store
@@ -206,6 +217,11 @@ func (h *Handler) Routes() http.Handler {
 		})
 
 		// Jira; LLM ve git erişimleri kendi uçlarına taşındı.
+		// Kurumsal ağ: sertifikanın durumu ve dosya çevirme (spec 017).
+		// Sertifikayı KAYDEDEN uç yok — kaydetme ayarlar ucundan yapılır.
+		r.Get("/network/ca", h.caCert)
+		r.Post("/network/ca/normalize", h.caNormalize)
+
 		r.Get("/credentials", h.listCredentials)
 		r.Put("/credentials/{kind}", h.putCredential)
 		r.Delete("/credentials/{kind}", h.deleteCredential)

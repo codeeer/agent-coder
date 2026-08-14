@@ -34,12 +34,13 @@ type Client struct {
 
 // New yeni istemci üretir. baseURL boşsa github.com kullanılır;
 // GitHub Enterprise kurulumları için değiştirilebilir.
-func New(baseURL string) *Client {
+// rt nil ise varsayılan taşıyıcı kullanılır (bkz. tlstrust).
+func New(baseURL string, rt http.RoundTripper) *Client {
 	if baseURL == "" {
 		baseURL = "https://api.github.com"
 	}
 	return &Client{
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Timeout: 30 * time.Second, Transport: rt},
 		baseURL: strings.TrimRight(baseURL, "/"),
 	}
 }

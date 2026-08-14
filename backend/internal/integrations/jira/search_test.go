@@ -33,7 +33,7 @@ func TestSearch_SayfalamaTokenIleIlerler(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issues, err := New().Search(context.Background(), SearchInput{
+	issues, err := New(nil).Search(context.Background(), SearchInput{
 		BaseURL: srv.URL, JQL: "project = A", Limit: 10,
 	})
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestSearch_SinirAsilmaz(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issues, err := New().Search(context.Background(), SearchInput{
+	issues, err := New(nil).Search(context.Background(), SearchInput{
 		BaseURL: srv.URL, JQL: "project = A", Limit: 2,
 	})
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestSearch_BosSayfaSonsuzDonguYapmaz(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issues, err := New().Search(context.Background(), SearchInput{
+	issues, err := New(nil).Search(context.Background(), SearchInput{
 		BaseURL: srv.URL, JQL: "project = A", Limit: 50,
 	})
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestSearch_GecersizJQLAnlasilirHataVerir(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := New().Search(context.Background(), SearchInput{
+	_, err := New(nil).Search(context.Background(), SearchInput{
 		BaseURL: srv.URL, JQL: "proje = A", Token: "gizli-token",
 	})
 	require.Error(t, err)
@@ -94,6 +94,6 @@ func TestSearch_GecersizJQLAnlasilirHataVerir(t *testing.T) {
 }
 
 func TestSearch_BosJQLReddedilir(t *testing.T) {
-	_, err := New().Search(context.Background(), SearchInput{BaseURL: "http://x", JQL: "  "})
+	_, err := New(nil).Search(context.Background(), SearchInput{BaseURL: "http://x", JQL: "  "})
 	require.Error(t, err)
 }

@@ -111,7 +111,7 @@ func TestValidate_BitbucketServerRestUcunuCagirir(t *testing.T) {
 }
 
 func TestValidate_BitbucketKullaniciAdiOlmadan(t *testing.T) {
-	v := NewValidator()
+	v := NewValidator(nil)
 	err := v.Validate(context.Background(), Provider{Type: TypeBitbucket}, "parola")
 	require.ErrorIs(t, err, ErrMissingUsername)
 }
@@ -119,7 +119,7 @@ func TestValidate_BitbucketKullaniciAdiOlmadan(t *testing.T) {
 func TestValidate_GenelGitDogrulanamaz(t *testing.T) {
 	// Doğrulama mümkün değil ama bu bir hata değil: kayıt yine yapılacak,
 	// kullanıcı uyarılacak.
-	v := NewValidator()
+	v := NewValidator(nil)
 	err := v.Validate(context.Background(),
 		Provider{Type: TypeGeneric, BaseURL: "https://git.sirket.local", Username: "omer"}, "token")
 	require.ErrorIs(t, err, ErrNotVerifiable)
@@ -160,7 +160,7 @@ func TestValidate_DurumKodlari(t *testing.T) {
 }
 
 func TestValidate_UlasilamazSunucu(t *testing.T) {
-	v := NewValidator()
+	v := NewValidator(nil)
 	err := v.Validate(context.Background(),
 		Provider{Type: TypeGitHub, BaseURL: "http://127.0.0.1:1"}, "token")
 	require.ErrorIs(t, err, ErrUnreachable)
@@ -283,7 +283,7 @@ func TestValidate_DigerTurlerEtkilenmedi(t *testing.T) {
 
 	t.Run("genel git doğrulanamaz akışı korunuyor", func(t *testing.T) {
 		// spec 002 H5: doğrulanamaması hata değil; kayıt yine yapılır.
-		v := NewValidator()
+		v := NewValidator(nil)
 		err := v.Validate(context.Background(),
 			Provider{Type: TypeGeneric, BaseURL: "https://git.sirket.local", Username: "omer"}, "t")
 		require.ErrorIs(t, err, ErrNotVerifiable)

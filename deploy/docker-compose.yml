@@ -55,14 +55,16 @@ services:
       OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:-}
       RUNNER_IMAGE: ${RUNNER_IMAGE:-agent-coder/opencode-runner:latest}
       RUNNER_NETWORK: agent-coder_internal
-      # Kurumsal kök sertifika (SSL denetimi yapan ağlar için).
+      # Kurumsal kök sertifika — YEDEK yol (SSL denetimi yapan ağlar için).
       #
-      # HOST üzerindeki bir PEM dosyasının yolu. Boşsa hiçbir şey değişmez;
-      # doluysa backend bu dosyayı her runner container'ına SALT OKUNUR
-      # bağlar ve NODE_EXTRA_CA_CERTS / GIT_SSL_CAINFO ile gösterir.
+      # ASIL YOL ARAYÜZ: Ayarlar → Kurumsal ağ. Bu değişken, sertifikayı
+      # arayüzden girmeden önce kurulmuş sistemlerin bozulmaması için duruyor;
+      # ayar doluysa o kazanır (spec 017).
       #
-      # Backend'in kendisi de aynı dosyayı görmek zorunda: yolu container
-      # içinde de geçerli kılmak için aşağıda bind ediliyor.
+      # Doluysa backend dosyayı AÇILIŞTA OKUR ve içeriğini her runner
+      # container'ına kopyalar. Dosya artık runner'a bağlanmıyor: bağlama,
+      # dosyanın Docker host'unda bulunmasını gerektiriyordu ve uzak Docker
+      # host kurulumunda çalışmıyordu.
       RUNNER_EXTRA_CA_CERT: ${RUNNER_EXTRA_CA_CERT:-}
       # Süre sınırı, eşzamanlılık, CPU ve bellek burada DEĞİL: davranış
       # parametreleri arayüzden yönetilir ve veritabanında tutulur.
@@ -74,8 +76,9 @@ services:
       # Docker host'a veya kısıtlı bir sokete taşınmalı.
       - /var/run/docker.sock:/var/run/docker.sock
       # Kurumsal CA — yalnızca RUNNER_EXTRA_CA_CERT tanımlıysa anlamlı.
-      # Backend bu yolu runner'a AYNEN geçiyor; dolayısıyla yol her iki
-      # tarafta da aynı olmalı. Salt okunur.
+      # Backend dosyayı OKUMAK için görmek zorunda; `.env`'e yazılan yol
+      # container içinde de geçerli olsun diye aynı yola bağlanıyor.
+      # Salt okunur: sertifikayı değiştirmek arayüzün işi, container'ın değil.
       - ${RUNNER_EXTRA_CA_CERT:-/dev/null}:${RUNNER_EXTRA_CA_CERT:-/dev/null}:ro
     # Soket container içinde root:root 660'dır. Süreci root ÇALIŞTIRMAK yerine
     # yalnızca grup üyeliği veriyoruz: uid 10001 (appuser) olarak kalır ama

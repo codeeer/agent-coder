@@ -27,7 +27,7 @@ func TestAddComment_Basarili(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	out, err := New().AddComment(context.Background(), CommentInput{
+	out, err := New(nil).AddComment(context.Background(), CommentInput{
 		BaseURL: srv.URL, Email: "a@b.test", Token: "gizli",
 		IssueKey: "ABC-12", Body: "Birinci satır\n\nİkinci satır",
 	})
@@ -52,7 +52,7 @@ func TestAddComment_BosGovdeGecerliBelgeUretir(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := New().AddComment(context.Background(), CommentInput{
+	_, err := New(nil).AddComment(context.Background(), CommentInput{
 		BaseURL: srv.URL, IssueKey: "ABC-1", Body: "   \n\n  ",
 	})
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func TestAddComment_HataDurumlari(t *testing.T) {
 			w.WriteHeader(tt.kod)
 		}))
 
-		_, err := New().AddComment(context.Background(), CommentInput{
+		_, err := New(nil).AddComment(context.Background(), CommentInput{
 			BaseURL: srv.URL, IssueKey: "ABC-1", Body: "x", Token: "gizli-token",
 		})
 		require.ErrorIs(t, err, tt.beklian, "durum %d", tt.kod)
@@ -86,7 +86,7 @@ func TestAddComment_HataDurumlari(t *testing.T) {
 }
 
 func TestAddComment_BosIssueAnahtari(t *testing.T) {
-	_, err := New().AddComment(context.Background(), CommentInput{BaseURL: "http://x", Body: "y"})
+	_, err := New(nil).AddComment(context.Background(), CommentInput{BaseURL: "http://x", Body: "y"})
 	require.Error(t, err)
 }
 
@@ -113,7 +113,7 @@ func TestGetIssue_AlanlariCozer(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issue, err := New().GetIssue(context.Background(), CommentInput{
+	issue, err := New(nil).GetIssue(context.Background(), CommentInput{
 		BaseURL: srv.URL, IssueKey: "SCRUM-1",
 	})
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestGetIssue_AciklamaDuzMetinDeOlabilir(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issue, err := New().GetIssue(context.Background(), CommentInput{BaseURL: srv.URL, IssueKey: "A-1"})
+	issue, err := New(nil).GetIssue(context.Background(), CommentInput{BaseURL: srv.URL, IssueKey: "A-1"})
 	require.NoError(t, err)
 	require.Equal(t, "düz metin", issue.Description)
 }
@@ -149,7 +149,7 @@ func TestGetIssue_AciklamaBosOlabilir(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	issue, err := New().GetIssue(context.Background(), CommentInput{BaseURL: srv.URL, IssueKey: "A-1"})
+	issue, err := New(nil).GetIssue(context.Background(), CommentInput{BaseURL: srv.URL, IssueKey: "A-1"})
 	require.NoError(t, err)
 	require.Empty(t, issue.Description)
 }
@@ -162,7 +162,7 @@ func TestGetIssue_BulunamadiVeYetkisiz(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(kod)
 		}))
-		_, err := New().GetIssue(context.Background(), CommentInput{
+		_, err := New(nil).GetIssue(context.Background(), CommentInput{
 			BaseURL: srv.URL, IssueKey: "YOK-1", Token: "gizli-token",
 		})
 		require.ErrorIs(t, err, beklian)

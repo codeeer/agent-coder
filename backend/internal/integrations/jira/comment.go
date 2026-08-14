@@ -29,8 +29,9 @@ type Client struct {
 }
 
 // New yeni istemci üretir.
-func New() *Client {
-	return &Client{http: &http.Client{Timeout: 30 * time.Second}}
+// rt nil ise varsayılan taşıyıcı kullanılır (bkz. tlstrust).
+func New(rt http.RoundTripper) *Client {
+	return &Client{http: &http.Client{Timeout: 30 * time.Second, Transport: rt}}
 }
 
 // CommentInput, yorum yazma isteği.

@@ -16,19 +16,19 @@ func testProvider(t *testing.T, typ Type, handler http.HandlerFunc) Client {
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
-	c, err := NewClient(Provider{Type: typ, BaseURL: srv.URL})
+	c, err := NewClient(Provider{Type: typ, BaseURL: srv.URL}, nil)
 	require.NoError(t, err)
 	return c
 }
 
 func TestNewClient_GecersizTur(t *testing.T) {
-	_, err := NewClient(Provider{Type: Type("uydurma")})
+	_, err := NewClient(Provider{Type: Type("uydurma")}, nil)
 	require.ErrorIs(t, err, ErrInvalidType)
 }
 
 func TestNewClient_OpenRouterAdresiEzilemez(t *testing.T) {
 	// Kullanıcı başka adres girse bile OpenRouter'ın sabit adresi kullanılır.
-	c, err := NewClient(Provider{Type: TypeOpenRouter, BaseURL: "https://kotu.test"})
+	c, err := NewClient(Provider{Type: TypeOpenRouter, BaseURL: "https://kotu.test"}, nil)
 	require.NoError(t, err)
 
 	or, ok := c.(*openRouterClient)
@@ -62,7 +62,7 @@ func TestDurumKodlariDogruHatayaEslenir(t *testing.T) {
 }
 
 func TestUlasilamazSunucu(t *testing.T) {
-	c, err := NewClient(Provider{Type: TypeOpenAICompatible, BaseURL: "http://127.0.0.1:1"})
+	c, err := NewClient(Provider{Type: TypeOpenAICompatible, BaseURL: "http://127.0.0.1:1"}, nil)
 	require.NoError(t, err)
 	require.ErrorIs(t, c.Verify(context.Background(), "anahtar"), ErrUnreachable)
 }

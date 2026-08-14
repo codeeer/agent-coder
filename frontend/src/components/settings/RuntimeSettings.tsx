@@ -1,11 +1,30 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { SettingValue } from "@/lib/types";
-import { Badge, Button, Input, Notice } from "@/components/ui/primitives";
+import { filterSettings } from "@/components/settings/setting-search";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  Notice,
+  Switch,
+  Textarea,
+} from "@/components/ui/primitives";
+import { IconSearch } from "@/components/ui/icons";
+
+/**
+ * İki durumlu ayarın metin değeri.
+ *
+ * Backend `strconv.ParseBool` kullanıyor, yani "1" ve "t" de geçerli bir
+ * "açık". Arayüz her zaman "true"/"false" yazsa da API'ye doğrudan yazılmış
+ * bir değer anahtarı sessizce KAPALI göstermemeli.
+ */
+const truthy = (v: string) => ["1", "t", "true"].includes(v.trim().toLowerCase());
 
 /**
  * Çalışma ayarları bölümü.
@@ -26,9 +45,17 @@ export function RuntimeSettings({
   groups: only,
   /** Grup başlıkları — tek gruplu bölümde başlık tekrar olur. */
   showHeadings = true,
+  /**
+   * Verilirse yalnızca eşleşen ayarlar çizilir.
+   *
+   * OPSİYONEL, ve öyle kalmalı: bileşen altı ayrı bölümden çağrılıyor ve
+   * sorgu verilmediğinde kod yolu bugünküyle birebir aynı olmalı.
+   */
+  query = "",
 }: {
   groups?: string[];
   showHeadings?: boolean;
+  query?: string;
 } = {}) {
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["settings"],
@@ -40,14 +67,32 @@ export function RuntimeSettings({
 
   // Ayarları gruplarına göre böl; sıra kayıt defterinden gelir.
   const groups = new Map<string, SettingValue[]>();
-  for (const item of data.items) {
+  for (const item of filterSettings(data.items, query)) {
     if (only && !only.includes(item.group)) continue;
     const list = groups.get(item.group) ?? [];
     list.push(item);
     groups.set(item.group, list);
   }
 
-  if (groups.size === 0) return null;
+  if (groups.size === 0) {
+    /* Süzgeç yokken boş sonuç "burada gösterilecek bir ayar yok" demektir ve
+       çağıran bölüm kendi başlığını zaten çizmiştir — araya bir kutu koymak
+       gürültü olurdu. Süzgeç varken boşluk BİR CEVAPTIR: kullanıcı bir şey
+       aradı, sonucu ne olduğu yazılmalı. */
+    if (!query.trim()) return null;
+    return (
+      <EmptyState
+        icon={<IconSearch className="size-5" />}
+        title="Eşleşme yok"
+        description={
+          <>
+            “{query.trim()}” hiçbir ayarın adında veya açıklamasında geçmiyor.
+            Başka bir kelime deneyin.
+          </>
+        }
+      />
+    );
+  }
 
   /*
    * Ayarlar AYRI KUTULAR DEĞİL, AYRAÇLI SATIRLAR.
@@ -59,7 +104,7 @@ export function RuntimeSettings({
    * koparıyor ve ekranı gereksizce uzatıyordu. Aynı karar liste
    * ekranlarında da verildi (bkz. `List`).
    */
-  return (
+  const rows = (
     <div className="divide-y divide-line">
       {[...groups.entries()].map(([group, items]) => (
         <div key={group} className="divide-y divide-line">
@@ -75,11 +120,126 @@ export function RuntimeSettings({
       ))}
     </div>
   );
+
+  /*
+   * Süzgeç görünümü KENDİ YÜZEYİNİ taşır.
+   *
+   * Bölümlerden çağrıldığında satırlar zaten bir `Panel`in içinde duruyor ve
+   * yüzey oradan geliyor. Arama sonucu ise bir bölüme ait değil — sonuçların
+   * kapsayıcısı olabilecek tek bir bölüm başlığı yok. Yüzeyi çağıran tarafa
+   * bıraksaydık "eşleşme yok" durumu, kenarlıklı bir kartın içindeki kesik
+   * kenarlıklı ikinci bir kutu olarak çıkardı.
+   */
+  if (!query.trim()) return rows;
+  return (
+    <div className="overflow-hidden rounded-card border border-line bg-surface shadow-(--shadow-card)">
+      {rows}
+    </div>
+  );
+}
+
+/**
+ * Sertifika alanı — yapıştırma ve dosya seçme.
+ *
+ * DOSYA SEÇMEK TEK BAŞINA KAYDETMEZ: seçilen dosya sunucuda PEM'e çevrilir,
+ * dönen metin alana düşer, kullanıcı ne kaydedeceğini GÖRÜR ve normal
+ * "Kaydet" akışıyla kaydeder (spec 017 H1). Aksi halde kullanıcı, içeriğini
+ * hiç görmediği bir dosyayı sisteme güven olarak tanıtmış olurdu.
+ *
+ * Çevirme sunucuda yapılıyor: ikili biçimleri (DER, PKCS#7) tarayıcıda
+ * ayrıştırmak, aynı mantığın ikinci bir kopyasını ve iki kopyanın aynı sonucu
+ * verdiğini garanti etme yükünü getirirdi.
+ */
+function CertificateField({
+  value,
+  onChange,
+  disabled,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  label: string;
+}) {
+  const dosyaRef = useRef<HTMLInputElement>(null);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const cevir = useMutation({
+    mutationFn: async (file: File) => {
+      // Baytlar base64 olarak taşınır: ikili dosyalar JSON'a doğrudan yazılamaz.
+      const b64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("dosya okunamadı"));
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.readAsDataURL(file);
+      });
+      return api.network.normalizeCA(b64);
+    },
+    onSuccess: (r) => {
+      setHata(null);
+      onChange(r.pem);
+    },
+    // Hata alanı BOZMAZ: kullanıcının yazdığı/yapıştırdığı içerik yerinde kalır.
+    onError: (e) => setHata(describeError(e).message),
+  });
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || cevir.isPending}
+        rows={value ? 8 : 4}
+        spellCheck={false}
+        placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
+        className="resize-y font-mono text-xs"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={dosyaRef}
+          type="file"
+          className="hidden"
+          // Uzantı biçimi GARANTİ ETMEZ (aynı .crt hem metin hem ikili
+          // olabilir); bu liste yalnızca dosya seçiciyi daraltır.
+          accept=".pem,.crt,.cer,.der,.p7b,.p7c,application/x-pem-file,application/pkix-cert"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) cevir.mutate(f);
+            // Aynı dosya art arda seçilebilsin.
+            e.target.value = "";
+          }}
+        />
+        <Button
+          onClick={() => dosyaRef.current?.click()}
+          disabled={disabled || cevir.isPending}
+        >
+          {cevir.isPending ? "Okunuyor…" : "Dosya seç"}
+        </Button>
+        {value && (
+          <Button onClick={() => onChange("")} disabled={disabled || cevir.isPending}>
+            Temizle
+          </Button>
+        )}
+      </div>
+      {hata && <p className="text-sm text-danger">{hata}</p>}
+    </div>
+  );
 }
 
 function SettingRow({ setting }: { setting: SettingValue }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(setting.value);
+  /*
+   * Sertifika satırı TAM GENİŞLİĞE geçer.
+   *
+   * Diğer ayarların denetimi sağdaki dar sütunda hizalanıyor (spec 016'da
+   * ölçüldü: dokuz alanın sol kenarı aynı). Çok satırlı bir sertifika o
+   * sütuna sıkıştırılamaz — sıkıştırılsaydı ya okunamayacak kadar dar
+   * kalırdı ya da sütunu genişletip diğer sekiz satırın hizasını bozardı.
+   * Bu yüzden hizaya KATILMAZ, kendi satırına iner.
+   */
+  const cokSatirli = setting.kind === "certificate";
 
   // Sunucudan gelen değer değişirse (kaydetme veya sıfırlama sonrası) taslağı eşitle.
   useEffect(() => setDraft(setting.value), [setting.value]);
@@ -103,7 +263,11 @@ function SettingRow({ setting }: { setting: SettingValue }) {
 
   return (
     <div className="px-4 py-3.5 transition-colors hover:bg-raised/50">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div
+        className={`flex flex-wrap items-start justify-between gap-4 ${
+          cokSatirli ? "flex-col" : ""
+        }`}
+      >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium">{setting.label}</span>
@@ -118,24 +282,66 @@ function SettingRow({ setting }: { setting: SettingValue }) {
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div
+          className={`flex items-center gap-2 ${
+            cokSatirli ? "w-full flex-wrap items-end" : "shrink-0"
+          }`}
+        >
           {/* Sayı 112px'e sığar, ADRES SIĞMAZ. Kayıt defteri adresi gibi metin
               ayarlarında kutu geniş: dar bir kutuda kullanıcı yazdığının
               tamamını göremiyor ve yanlışı ancak kaydettikten sonra fark
-              ediyor. `max-w-full` dar ekranda taşmayı önlüyor. */}
-          <div className={setting.kind === "int" ? "w-28" : "w-full max-w-96 sm:w-96"}>
-            <Input
-              type={setting.kind === "int" ? "number" : "text"}
-              /* Etiket ayrı bir kutuda duruyor; ekran okuyucu kutuyu tek
-                 başına okuduğunda "düzenle, 30" diyordu. */
-              aria-label={setting.unit ? `${setting.label} (${setting.unit})` : setting.label}
-              value={draft}
-              min={setting.min}
-              max={setting.max}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={busy}
-            />
+              ediyor. `max-w-full` dar ekranda taşmayı önlüyor.
+
+              İki durumlu ayar SAYI GENİŞLİĞİNİ paylaşır: anahtar 36px, ama
+              kabı sayı alanlarıyla aynı `w-28` olmasa denetim sütununun
+              hizası bu tek satırda kırılırdı. */}
+          <div
+            className={
+              cokSatirli
+                ? "w-full"
+                : setting.kind === "text"
+                  ? "w-full max-w-96 sm:w-96"
+                  : "w-28"
+            }
+          >
+            {cokSatirli ? (
+              <CertificateField
+                value={draft}
+                onChange={setDraft}
+                disabled={busy}
+                label={setting.label}
+              />
+            ) : setting.kind === "bool" ? (
+              <Switch
+                checked={truthy(draft)}
+                onChange={(v) => setDraft(String(v))}
+                disabled={busy}
+                label={setting.label}
+              />
+            ) : (
+              <Input
+                type={setting.kind === "int" ? "number" : "text"}
+                /* Etiket ayrı bir kutuda duruyor; ekran okuyucu kutuyu tek
+                   başına okuduğunda "düzenle, 30" diyordu. */
+                aria-label={
+                  setting.unit ? `${setting.label} (${setting.unit})` : setting.label
+                }
+                value={draft}
+                min={setting.min}
+                max={setting.max}
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={busy}
+              />
+            )}
           </div>
+          {/* Birim sütunu iki durumlu ayarda DURUM METNİDİR: anahtarın hangi
+              tarafta olduğu bir renk ve bir konum, "Açık" ise okunabilir tek
+              kanal. İkisi aynı sütunda durur, hiza bozulmaz. */}
+          {setting.kind === "bool" && (
+            <span className="w-16 text-sm text-ink-2">
+              {truthy(draft) ? "Açık" : "Kapalı"}
+            </span>
+          )}
           {setting.unit && (
             <span className="w-16 text-sm text-ink-2">{setting.unit}</span>
           )}
@@ -168,7 +374,14 @@ function SettingRow({ setting }: { setting: SettingValue }) {
         {setting.default === "" ? (
           <>Boş bırakılabilir</>
         ) : (
-          <>Varsayılan: {setting.default}</>
+          <>
+            Varsayılan:{" "}
+            {setting.kind === "bool"
+              ? truthy(setting.default)
+                ? "Açık"
+                : "Kapalı"
+              : setting.default}
+          </>
         )}
         {setting.min !== undefined && setting.max !== undefined && (
           <> · İzin verilen aralık: {setting.min}–{setting.max}</>

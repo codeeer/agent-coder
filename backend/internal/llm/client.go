@@ -33,13 +33,16 @@ type Client interface {
 }
 
 // NewClient, sağlayıcı türüne uygun istemciyi üretir.
-func NewClient(p Provider) (Client, error) {
+//
+// rt, giden çağrıların taşıyıcısı. nil ise varsayılan kullanılır; kurumsal
+// kök sertifika tanımlı kurulumlarda buradan geçirilir (spec 017 H5).
+func NewClient(p Provider, rt http.RoundTripper) (Client, error) {
 	base := p.BaseURL
 	if fixed := p.Type.FixedBaseURL(); fixed != "" {
 		base = fixed
 	}
 
-	http := newHTTPClient(30 * time.Second)
+	http := newHTTPClient(30*time.Second, rt)
 
 	switch p.Type {
 	case TypeOpenRouter:
@@ -53,8 +56,8 @@ func NewClient(p Provider) (Client, error) {
 	}
 }
 
-func newHTTPClient(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout}
+func newHTTPClient(timeout time.Duration, rt http.RoundTripper) *http.Client {
+	return &http.Client{Timeout: timeout, Transport: rt}
 }
 
 // maxResponseBody, bozuk veya kötü niyetli bir yanıtın belleği tüketmesini engeller.

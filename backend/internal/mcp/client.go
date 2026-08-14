@@ -23,14 +23,28 @@ const clientName = "agent-coder"
 // araçları sunduğunu kaydetmeden önce göstermek zorundayız (spec 011 K3).
 type Client struct {
 	timeout func() time.Duration
+	// rt, giden çağrıların taşıyıcısı. nil ise varsayılan (bkz. tlstrust).
+	rt http.RoundTripper
 }
 
 // NewClient yeni istemci üretir.
 //
 // Zaman aşımı fonksiyon olarak alınır: ayar değişikliği sunucuyu yeniden
 // başlatmayı gerektirmemeli (AGENTS.md, ayarlar kuralı).
-func NewClient(timeout func() time.Duration) *Client {
-	return &Client{timeout: timeout}
+// rt nil ise varsayılan taşıyıcı kullanılır (bkz. tlstrust).
+func NewClient(timeout func() time.Duration, rt http.RoundTripper) *Client {
+	return &Client{timeout: timeout, rt: rt}
+}
+
+// baseTransport, kimlik başlığını saran alt taşıyıcı.
+//
+// nil geçilemez: authTransport onu doğrudan çağırıyor ve nil bir taban
+// çalışma anında panik üretirdi.
+func (c *Client) baseTransport() http.RoundTripper {
+	if c.rt != nil {
+		return c.rt
+	}
+	return http.DefaultTransport
 }
 
 // ListTools, sunucuya bağlanır ve sunduğu araç adlarını döner.
@@ -122,7 +136,7 @@ func resultText(res *sdk.CallToolResult) string {
 func (c *Client) connect(ctx context.Context, s Server, secret string) (*sdk.ClientSession, error) {
 	httpClient := &http.Client{
 		Timeout:   c.timeout(),
-		Transport: authTransport{secret: secret, base: http.DefaultTransport},
+		Transport: authTransport{secret: secret, base: c.baseTransport()},
 	}
 
 	var transport sdk.Transport

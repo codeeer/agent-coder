@@ -199,35 +199,37 @@ unable to get local issuer certificate
 En görünür sonucu **depo klonlamanın** başarısız olmasıdır: container hazır
 olamaz ve çalıştırma "çalışma ortamı hazırlanamadı" ile biter.
 
-**Çözüm: kurumun kök sertifikasını tanıtın.**
+**Çözüm: kurumun kök sertifikasını tanıtın — arayüzden.**
 
-1. Kök sertifikayı PEM olarak edinin. Genelde BT'den istenir; tarayıcıdan da
-   çıkarılabilir. Sunucuda çoğu zaman zaten kuruludur:
+**Ayarlar → Kurumsal ağ** bölümüne gidin, sertifika dosyasını **seçin** veya
+içeriğini yapıştırın, "Kaydet"e basın. Hepsi bu; yeniden başlatma gerekmez.
 
-   ```bash
-   # Debian/Ubuntu
-   ls /usr/local/share/ca-certificates/
-   # RHEL/Rocky
-   ls /etc/pki/ca-trust/source/anchors/
-   ```
+Elinizdeki dosyanın biçimini bilmeniz gerekmez: metin (PEM), ikili (DER) ve
+zincir taşıyan (PKCS#7 / `.p7b`) dosyaların üçü de kabul edilir ve içeride tek
+biçime çevrilir. Zincirli bir dosya verirseniz kök ve ara sertifikaların ikisi
+de alınır. Kaydedilen sertifikanın sahibi, imzalayanı ve bitiş tarihi hemen
+üstünde görünür.
 
-2. Yolu `.env` dosyasına yazın:
+Sertifika tanımlıyken şunların hepsi ona güvenir: agent'ın çalıştırdığı
+**npm, git ve curl**, bir de **Agent Coder'ın kendi giden çağrıları** (model
+sağlayıcı, Jira, kod deposu doğrulaması). Güvenilen kök listesine **ekleme**
+yapılır; genel sertifikalar geçerli kalır.
 
-   ```env
-   RUNNER_EXTRA_CA_CERT=/etc/pki/ca-trust/source/anchors/kurum-kok.pem
-   ```
-
-3. `make restart`.
-
-Bundan sonra dosya her runner container'ına **salt okunur** bağlanır ve
-`NODE_EXTRA_CA_CERTS` ile `GIT_SSL_CAINFO` üzerinden gösterilir. Bu, güvenilen
-kök listesine **ekleme** yapar; genel sertifikalar geçerli kalır.
+> **Sunucudan da verilebilir.** `.env` içindeki `RUNNER_EXTRA_CA_CERT`
+> yedek olarak duruyor ve mevcut kurulumlar çalışmaya devam ediyor. Arayüzden
+> bir sertifika girilirse **o** geçerli olur; ekranda hangisinin kullanıldığı
+> yazar.
 
 > **TLS doğrulamasını kapatan bir ayar yoktur ve eklenmeyecektir.**
 > `NODE_TLS_REJECT_UNAUTHORIZED=0`, `npm config set strict-ssl false` veya
 > `git config http.sslVerify false` sorunu görünmez yapar, ortadan kaldırmaz —
 > ve bu imaj başka kurumlarda da çalışıyor. Kurumun kök sertifikası da imaja
 > **gömülmez**: imaj herkese dağıtılıyor.
+
+📄 **Kurulumu canlıya çıkmadan önce provasını yapmak, sertifikanın bugün hangi
+araçları kapsadığını görmek ve hata mesajlarını sebeplerine eşlemek için:**
+[docs/kurumsal-ag.md](docs/kurumsal-ag.md) — gerçek bir Nexus'u kendi kök
+sertifikanızla ayağa kaldıran, adım adım doğrulanabilir bir rehber.
 
 ### Kurumsal paket deposu (Nexus)
 
@@ -256,6 +258,18 @@ registry'yi değiştirmeye kalkışıyor.
 >
 > Adrese kimlik gömülmesine izin verilmez (`https://kullanici:token@…`
 > reddedilir): ayar değeri log'a yazılıyor.
+
+### Java ve Maven
+
+Runner imajı **iki JDK** taşır: `/opt/java/25` (varsayılan) ve `/opt/java/17`.
+Agent hangisini kullanacağını talimatından öğrenir; koşuda bir sürüm seçici
+yoktur.
+
+Kurumsal Maven deposu **Ayarlar → Paket deposu → Maven deposu adresi**'nden
+tanımlanır. Kimlik bilgisi npm ile ortaktır. Adres tanımlıyken projenin kendi
+`pom.xml`'inde ilan ettiği depolar da kuruma yönlendirilir.
+
+Ayrıntı ve ölçümler: [docs/kurumsal-ag.md](docs/kurumsal-ag.md#java-ve-maven).
 
 ### Node sürümü
 

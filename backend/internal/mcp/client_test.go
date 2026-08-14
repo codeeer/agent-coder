@@ -46,7 +46,7 @@ func fakeServer(t *testing.T, tools []string, wantAuth string) *httptest.Server 
 }
 
 func client() *mcp.Client {
-	return mcp.NewClient(func() time.Duration { return 10 * time.Second })
+	return mcp.NewClient(func() time.Duration { return 10 * time.Second }, nil)
 }
 
 func TestListTools_AraclarSirali(t *testing.T) {

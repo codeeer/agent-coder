@@ -5,9 +5,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/agent-coder/backend/internal/certinfo"
 	"github.com/agent-coder/backend/internal/settings"
 )
 
@@ -55,7 +57,7 @@ func (h *Handler) putSetting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.InfoContext(r.Context(), "ayar değiştirildi", "key", key, "value", req.Value)
+	slog.InfoContext(r.Context(), "ayar değiştirildi", "key", key, "value", logDegeri(key, req.Value))
 	respondJSON(w, http.StatusOK, settingsResponse{
 		Items:  h.deps.Settings.All(),
 		Groups: settings.GroupLabels,
@@ -98,4 +100,32 @@ func (h *Handler) respondSettingsError(w http.ResponseWriter, r *http.Request, k
 		slog.ErrorContext(r.Context(), "ayar işlemi başarısız", "key", key, "error", err)
 		respondError(w, http.StatusInternalServerError, "internal_error", "ayar kaydedilemedi")
 	}
+}
+
+/*
+ * logDegeri, ayar değerinin loga yazılacak hâli.
+ *
+ * Ayar değerleri BİLEREK loglanıyor: hangi ayarın ne yapıldığı, sonradan
+ * "bu neden böyle" sorusunun tek kaydı. Sertifika bunun istisnası — sır
+ * olduğu için değil (kök sertifika herkese dağıtılır), ÖLÇÜSÜ yüzünden:
+ * her kaydetmede ~2KB base64 loga düşüyor ve o satırdan sonra logu okumak
+ * imkânsızlaşıyordu. Yerine ne kaydedildiği özetle yazılır.
+ */
+func logDegeri(key, value string) string {
+	def, ok := settings.Lookup(key)
+	if !ok || def.Kind != settings.KindCertificate {
+		return value
+	}
+	if strings.TrimSpace(value) == "" {
+		return "(temizlendi)"
+	}
+	infos, err := certinfo.Parse(value)
+	if err != nil {
+		return "(sertifika, okunamadı)"
+	}
+	adlar := make([]string, 0, len(infos))
+	for _, i := range infos {
+		adlar = append(adlar, i.Subject)
+	}
+	return "sertifika: " + strings.Join(adlar, ", ")
 }

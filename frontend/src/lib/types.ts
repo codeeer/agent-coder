@@ -296,7 +296,13 @@ export interface RefreshResponse {
 
 // ─── Çalışma ayarları (spec 003 H7) ─────────────────────────────────────────
 
-export type SettingKind = "int" | "bool" | "text";
+/**
+ * Bir ayarın değer tipi.
+ *
+ * "certificate" ADI BİÇİM DEĞİL: değer normalleştirilmiş PEM olarak saklanır
+ * ama kullanıcı DER veya PKCS#7 de verebiliyor (bkz. network.normalizeCA).
+ */
+export type SettingKind = "int" | "bool" | "text" | "certificate";
 
 /**
  * Bir ayarın tanımı ve mevcut değeri.
@@ -817,4 +823,35 @@ export interface WorkflowVersion {
   version: number;
   graph: WorkflowGraph;
   createdAt: string;
+}
+
+// ─── Kurumsal ağ ────────────────────────────────────────────────────────────
+
+/** Bir sertifikanın ekranda görünen özeti — hepsi sertifikadan OKUNUR. */
+export interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  /** ISO tarih. */
+  notAfter: string;
+  expired: boolean;
+  /** Kendi kendini imzalamış — kök sertifikaların işareti. */
+  selfSigned: boolean;
+}
+
+/**
+ * Kurumsal kök sertifikanın durumu.
+ *
+ * `source` "tanımlı mı"dan fazlasını söyler: iki kaynak birden mümkün
+ * (arayüzden girilen ayar ve sunucudaki dosya), hangisinin geçerli olduğu
+ * kullanıcıya belli olmalı.
+ */
+export interface CACertStatus {
+  source: "settings" | "env" | "none";
+  certificates: CertificateInfo[];
+}
+
+/** Seçilen dosyanın PEM karşılığı — SAKLANMAZ, yalnızca çevrilir. */
+export interface CANormalizeResult {
+  pem: string;
+  certificates: CertificateInfo[];
 }

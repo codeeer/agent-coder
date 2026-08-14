@@ -43,6 +43,8 @@ import type {
   WorkflowVersion,
   StartRunRequest,
   SettingsResponse,
+  CACertStatus,
+  CANormalizeResult,
   UpdateAgentRequest,
   PutCredentialRequest,
   RefreshResponse,
@@ -301,6 +303,23 @@ export const api = {
 
     remove: (kind: CredentialKind) =>
       apiFetch<null>(`/api/credentials/${kind}`, { method: "DELETE" }),
+  },
+
+  network: {
+    /** Sertifikanın durumu ve içinden okunan bilgi. */
+    ca: () => apiFetch<CACertStatus>("/api/network/ca"),
+
+    /**
+     * Seçilen dosyayı PEM'e çevirir — KAYDETMEZ.
+     *
+     * Dönen metin ekrandaki alana düşer; kullanıcı görür ve normal "Kaydet"
+     * akışıyla kaydeder. Dosya seçmek tek başına kaydetmez (spec 017 H1).
+     */
+    normalizeCA: (data: string) =>
+      apiFetch<CANormalizeResult>("/api/network/ca/normalize", {
+        method: "POST",
+        body: { data },
+      }),
   },
 
   settings: {

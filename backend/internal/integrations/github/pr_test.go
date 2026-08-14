@@ -45,7 +45,7 @@ func TestOpen_Basarili(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	pr, err := New(srv.URL).Open(context.Background(), OpenInput{
+	pr, err := New(srv.URL, nil).Open(context.Background(), OpenInput{
 		RepoURL: "https://github.com/omer/depo.git", Token: "gizli-token",
 		Title: "Başlık", Body: "Gövde", Head: "agent-coder/x", Base: "main",
 	})
@@ -81,7 +81,7 @@ func TestOpen_422IkiFarkliSeyAnlatir(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			_, err := New(srv.URL).Open(context.Background(), OpenInput{
+			_, err := New(srv.URL, nil).Open(context.Background(), OpenInput{
 				RepoURL: "https://github.com/omer/depo", Token: "t", Head: "h", Base: "b",
 			})
 			require.ErrorIs(t, err, tt.beklian)
@@ -105,7 +105,7 @@ func TestOpen_HataDurumlari(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "Not Found"})
 		}))
 
-		_, err := New(srv.URL).Open(context.Background(), OpenInput{
+		_, err := New(srv.URL, nil).Open(context.Background(), OpenInput{
 			RepoURL: "https://github.com/omer/depo", Token: "t", Head: "h", Base: "b",
 		})
 		require.ErrorIs(t, err, tt.beklian, "durum %d", tt.kod)
@@ -121,7 +121,7 @@ func TestOpen_TokenHataMesajinaSizmaz(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := New(srv.URL).Open(context.Background(), OpenInput{
+	_, err := New(srv.URL, nil).Open(context.Background(), OpenInput{
 		RepoURL: "https://github.com/omer/depo", Token: "ghp_cokgizli12345", Head: "h", Base: "b",
 	})
 	require.Error(t, err)

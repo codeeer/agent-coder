@@ -30,8 +30,9 @@ type Validator struct {
 }
 
 // NewValidator yeni doğrulayıcı üretir.
-func NewValidator() *Validator {
-	return &Validator{http: &http.Client{Timeout: 15 * time.Second}}
+// rt nil ise varsayılan taşıyıcı kullanılır (bkz. tlstrust).
+func NewValidator(rt http.RoundTripper) *Validator {
+	return &Validator{http: &http.Client{Timeout: 15 * time.Second, Transport: rt}}
 }
 
 /*
