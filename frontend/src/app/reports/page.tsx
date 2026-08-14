@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { readableFailure } from "@/lib/failure";
+import { reportPeriods } from "@/lib/report-periods";
 import { describeError } from "@/lib/errors";
 import type {
   ReportGroup,
@@ -63,24 +64,29 @@ import {
  * kadarı tuttu?" Agent'ın nasıl çalıştırıldığı (arayüz, API, akış) fark
  * etmez; hepsi aynı çalıştırma geçmişine düştüğü için rapor eksiksizdir.
  *
- * DÖNEM SEÇENEKLERİ 7/30/90 İLE SINIRLI ve bu bilinçli. Uç yalnızca "kaç
- * gün geriye" parametresi alıyor; "geçen ay" ya da serbest tarih aralığı
- * bugünden geriye sayan bir pencereyle ifade edilemez. Eklenseydi seçilen
- * aralık ile gösterilen aralık birbirini tutmazdı. Ekranda yazan tarihler
- * seçimden türetilmiyor, yanıtın kendi `from`/`to` alanlarından okunuyor.
+ * SERBEST TARİH ARALIĞI YOK ve bu bilinçli. Uç yalnızca "kaç gün geriye"
+ * parametresi alıyor; "geçen ay" bugünden geriye sayan bir pencereyle ifade
+ * edilemez. Eklenseydi seçilen aralık ile gösterilen aralık birbirini
+ * tutmazdı. Ekranda yazan tarihler seçimden türetilmiyor, yanıtın kendi
+ * `from`/`to` alanlarından okunuyor.
+ *
+ * AÇILIŞ DÖNEMİ SAYFANIN KARARI DEĞİL. Sayfa 30'u sabit tutuyor ve her
+ * istekte açıkça gönderiyordu; backend "Varsayılan rapor dönemi" ayarını
+ * yalnızca parametre GELMEDİĞİNDE uyguladığı için ayarı 7 yapan kullanıcı
+ * yine 30 gün görüyordu. Artık ilk istek dönemi hiç göndermiyor ve etkin
+ * dönem yanıttan okunuyor — ayarın tek sahibi backend.
  */
-
-const PERIODS = [
-  { id: "7", label: "7 gün" },
-  { id: "30", label: "30 gün" },
-  { id: "90", label: "90 gün" },
-] as const;
 
 /** Son çalıştırmalar panosunun penceresi. */
 const RECENT_LIMIT = 8;
 
 export default function ReportsPage() {
-  const [days, setDays] = useState<(typeof PERIODS)[number]["id"]>("30");
+  /*
+   * `null` = "kullanıcı henüz seçmedi, ayar geçerli". Ayarın değeri buraya
+   * kopyalanmıyor: kopyalansaydı ikinci bir doğruluk kaynağı olur ve ayar
+   * değiştiğinde açık duran sayfa eskimiş değeri göstermeye devam ederdi.
+   */
+  const [days, setDays] = useState<string | null>(null);
   const [project, setProject] = useState("");
 
   const projects = useQuery({
@@ -88,11 +94,26 @@ export default function ReportsPage() {
     queryFn: () => api.projects.list({ limit: 200 }),
   });
 
+  /*
+   * Ayar, SEÇENEK LİSTESİ için okunuyor — açılış dönemi için değil, onu
+   * yanıtın kendisi söylüyor. Liste yalnızca gösterilen döneme dayansaydı
+   * kullanıcı 90'ı seçtiği anda kendi varsayılanı (örn. 14) listeden
+   * düşerdi ve geri dönemezdi. Sorgu anahtarı Ayarlar ekranınınkiyle aynı:
+   * ikisi tek önbelleği paylaşır, fazladan istek çıkmaz.
+   */
+  const settings = useQuery({
+    queryKey: ["settings"],
+    queryFn: api.settings.list,
+  });
+  const varsayilanGun = Number(
+    settings.data?.items.find((s) => s.key === "reports.default_days")?.value,
+  );
+
   const report = useQuery({
     queryKey: ["report", days, project],
     queryFn: () =>
       api.reports.summary({
-        days: Number(days),
+        days: days ? Number(days) : undefined,
         project: project || undefined,
       }),
   });
@@ -108,6 +129,16 @@ export default function ReportsPage() {
 
   const data = report.data;
 
+  /*
+   * Seçili dönem: kullanıcının seçimi varsa o, yoksa yanıtın söylediği.
+   * Efekt yok — türetiliyor. Efektle kopyalansaydı ilk boyamada yanlış
+   * segment seçili görünür, sonra yerine oturur ve zıplardı.
+   */
+  const seciliDonem = days ?? (data ? String(data.days) : null);
+  const donemler = reportPeriods(
+    Number.isFinite(varsayilanGun) ? varsayilanGun : null,
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
@@ -116,10 +147,13 @@ export default function ReportsPage() {
       />
 
       <Toolbar>
+        {/* Yanıt gelene kadar hiçbir segment seçili DEĞİL: hangi dönemin
+            geçerli olduğunu yalnızca yanıt söylüyor ve tahmin etmek, yarım
+            saniye sonra düzelecek yanlış bir vurgu göstermek olurdu. */}
         <Segmented
           label="Dönem"
-          options={PERIODS}
-          value={days}
+          options={donemler}
+          value={seciliDonem ?? ""}
           onChange={setDays}
         />
 

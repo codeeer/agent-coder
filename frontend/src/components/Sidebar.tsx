@@ -21,11 +21,11 @@ import {
  * Gezinme — düz liste değil, gruplu.
  *
  * Dokuz öğe tek bir yığın halinde duruyordu ve hepsi aynı düzeydeydi:
- * "Panel" ile "Nasıl çalışır" arasında görsel bir fark yoktu, dolayısıyla
+ * "Dashboard" ile "Nasıl çalışır" arasında görsel bir fark yoktu, dolayısıyla
  * menüde bir şey ararken dokuzunu da okumak gerekiyordu.
  *
  * Gruplar kullanıcının işine göre: ÇALIŞMA (akış kur, çalıştır, sonuca bak),
- * TANIMLAR (agent'ların üzerinde çalıştığı şeyler), SİSTEM. "Panel" bilerek
+ * TANIMLAR (agent'ların üzerinde çalıştığı şeyler), SİSTEM. "Dashboard" bilerek
  * grupsuz — giriş noktası, bir kategorinin üyesi değil.
  */
 /*
@@ -36,7 +36,7 @@ import {
  * erişimi birleşim tipinde geçerli olsun.
  */
 const NAV = [
-  { label: undefined, items: [{ href: "/", label: "Panel", Icon: IconDashboard }] },
+  { label: undefined, items: [{ href: "/", label: "Dashboard", Icon: IconDashboard }] },
   {
     label: "Çalışma",
     items: [

@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/primitives";
 
 /**
- * Panel — sistemin o anki hâli, tek ekranda.
+ * Dashboard — sistemin o anki hâli, tek ekranda.
  *
  * ÖNCEKİ HALİ BİR KARŞILAMA EKRANIYDI: dört rakam ve son beş çalışma.
  * Ekranın üçte ikisi boştu ve "şu an ne oluyor?" sorusunun cevabı yoktu —
@@ -146,7 +146,7 @@ export default function DashboardPage() {
     return (
       <div>
         <PageHeader
-          title="Panel"
+          title="Dashboard"
           description="Kod yazan agent'ları birbirine bağlayıp çalıştırın: Jira task'ından PR'a kadar."
         />
         {setupLoading ? (
@@ -169,7 +169,7 @@ export default function DashboardPage() {
        kayan bölgede, başlık ve süzgeç şeridi üstte sabit. */
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
-        title="Panel"
+        title="Dashboard"
         description={
           data
             ? `Son ${data.days} gün · ${data.timezone} saatiyle`
