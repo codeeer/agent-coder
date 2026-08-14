@@ -60,6 +60,23 @@ export default function RunDetailPage() {
   });
 
   const active = run ? isActive(run.status) : false;
+
+  /*
+   * SÜREN KOŞUDA VARSAYILAN SEKME İLERLEME.
+   *
+   * Sonuç henüz yok; kullanıcıyı boş bir sekmeye düşürüp "İlerleme'ye bakın"
+   * demek, bakması gereken yere kendisinin gitmesini istemek olurdu.
+   *
+   * BİR KEZ: `useRef` bekçisi olmadan koşu bitince (status değişince) sekme
+   * geri zıplar ve kullanıcının o an baktığı yeri elinden alırdı. Seçim
+   * kullanıcıya geçtikten sonra kod bir daha karışmıyor.
+   */
+  const sekmeAyarlandi = useRef(false);
+  useEffect(() => {
+    if (sekmeAyarlandi.current || !run) return;
+    sekmeAyarlandi.current = true;
+    if (isActive(run.status)) setSekme("ilerleme");
+  }, [run]);
   const { events, terminalStatus, connected } = useRunEvents(id, active);
 
   // Canlı akış "bitti" dediğinde kaydı yeniden çekiyoruz: çıktı, diff ve
