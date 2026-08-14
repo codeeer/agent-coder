@@ -431,10 +431,10 @@ function RunRow({ run }: { run: Run }) {
         */}
         <Link
           href={`/runs/${run.id}`}
-          className="block font-medium group-hover:text-accent"
+          className="block truncate font-medium group-hover:text-accent"
           title={run.task}
         >
-          <span className="line-clamp-2">{run.task}</span>
+          {gorevBasligi(run.task)}
         </Link>
 
         {/*
@@ -504,6 +504,37 @@ function RunRow({ run }: { run: Run }) {
       </td>
     </tr>
   );
+}
+
+
+/**
+ * Görevin listede görünen hâli: İLK CÜMLE.
+ *
+ * ÖLÇÜLDÜ: görevler 13–426 karakter arasında ve yarısı 90 karakterden uzun.
+ * İki satır göstermek listeyi metin duvarına çeviriyordu. Buna karşılık ilk
+ * cümleler 13–62 karakter ve on iki kaydın on birinde birbirinden ayırt
+ * edilebiliyor — yani ikinci satır kimlik katmıyor, yalnızca gürültü.
+ *
+ * KUYRUK DA DÜŞÜYOR: "Hiçbir dosyayı değiştirme." satırların çoğunda tekrar
+ * ediyor ve hiçbir şeyi ayırt etmiyor. İlk cümleyi almak onu kendiliğinden
+ * dışarıda bırakıyor — ada göre bir liste tutup silmeye gerek yok.
+ *
+ * Devamı olduğu "…" ile SÖYLENİYOR: sessizce kesilen bir metin, olmayan bir
+ * tamlık vaat eder. Tamamı `title`'da ve detay ekranında duruyor.
+ */
+function gorevBasligi(task: string): string {
+  const duz = task.trim().replace(/\s+/g, " ");
+
+  /*
+   * Cümle sonu ARANIYOR, ilk noktaya bakılmıyor: görevlerde `mvn -B -pl`,
+   * `~/.m2/settings.xml`, `qwen3.6` gibi nokta içeren dizgeler var ve ilk
+   * noktada kesmek onları ortadan bölerdi. Nokta ancak arkasından BOŞLUK
+   * geliyorsa cümle sonu sayılıyor.
+   */
+  const ilk = duz.match(/^(.{10,}?[.!?:])\s/)?.[1];
+  if (!ilk) return duz;
+
+  return ilk.length < duz.length ? `${ilk} …` : ilk;
 }
 
 /**
