@@ -1,0 +1,266 @@
+# Plan: Toplu çalıştırma
+
+- **Spec:** [spec.md](spec.md) · Onaylandı
+- **Tarih:** 2026-08-15
+
+---
+
+## Seçilen yaklaşım
+
+Kalıcı bir **toplu iş** kaydı ve içinde sırayla işlenen **öğeler**; boş slot
+oldukça sıradakini başlatan bir zamanlayıcı.
+
+```
+run_batches          (akış, görev metni, durum)
+  └─ run_batch_items (proje, sıra, durum, workflow_run_id, hata)
+
+zamanlayıcı ──► boş slot var mı? ──► sıradaki bekleyeni başlat
+                     ▲
+              runs.Manager'ın SINIRI (yeni ayar YOK)
+```
+
+Üç karar bu şekli belirliyor:
+
+**Kuyruk kalıcı.** Otuz projelik bir kampanya saatler sürüyor; o sürede bir
+yeniden başlatma olağan ve bellekteki kuyruk bekleyen işleri sessizce yok
+ederdi.
+
+**Sınır sorulur, kopyalanmaz.** Zamanlayıcı kendi paralellik sayısını
+tutmuyor; `runs.Manager`'a "kaç slot boş" diye soruyor. İkinci bir sayı, ayar
+değiştiğinde geride kalırdı.
+
+**Öğe bir akış çalışmasına bağlanır.** Toplu iş yeni bir çalıştırma türü
+değil; var olan `workflow.Launcher` çağrılıyor ve dönen çalışma kimliği öğeye
+yazılıyor.
+
+---
+
+## Elenen alternatifler
+
+| Alternatif | Neden elendi |
+| --- | --- |
+| Yoklamalı zamanlayıcı (2 sn'de bir bak) | Slot boşalma sinyali ZATEN var (`cond.Broadcast`); var olan bilgiyi yok sayıp aynı soruyu tekrar sormak olurdu. |
+| Bellekte kuyruk (goroutine + kanal) | Yeniden başlatma bekleyenleri yok ederdi; kullanıcı bunu "neden hiç başlamadı" diye fark ederdi. |
+| Hepsini birden başlatıp `ErrTooManyRuns` alanları yeniden denemek | Reddedilen çalıştırmanın **kaydı oluşmuyor**; kullanıcı otuz işten yirmi yedisini hiç göremezdi. Ayrıca yeniden deneme aralığı yeni bir zamanlayıcı demek — yani aynı işi daha kötü yapmak. |
+| Eşzamanlılık sınırını yükseltmek | İş başına 2 çekirdek + 4 GB; otuz iş 60 çekirdek + 120 GB. Sınır keyfi değil. |
+| Kuyruğa kendi paralellik ayarı vermek | "Aynı anda kaç iş" iki yerden yönetilir ve er geç çelişirdi. |
+| `runs.Manager`'ı kuyruklu hale getirmek | Tek çalıştırmanın davranışını da değiştirirdi: bugün "sınır dolu" diyen uç, sessizce beklemeye başlardı. Toplu iş bunu isterken tekil çağrı istemiyor. |
+
+---
+
+## Yeniden kullanılacak mevcut kod
+
+| Ne | Nerede | Nasıl |
+| --- | --- | --- |
+| Akış başlatma | `workflow.Launcher.Launch` (proje seçimiyle) | Öğe başlatma bunu çağırır; yeni bir başlatma yolu yazılmaz. |
+| **Slot boşalma sinyali** | `runs.Manager.release()` → `cond.Broadcast()` | Sinyal zaten üretiliyor; zamanlayıcı ona bağlanır, yoklama yazılmaz. |
+| Eşzamanlılık sınırı | `runs.Manager.Active()` + `limits.MaxConcurrent()` | Zamanlayıcı buradan okur. |
+| Sıraya alma kalıbı | `scripts.SetAgentFolders` (sil+ekle, tek transaction) | Öğelerin toplu yazımı. |
+| Kısmi başarı dili | spec 021 içe aktarma özeti | "9 tamamlandı, 3 başarısız" biçimi aynı. |
+| Onay şeridi | `ConfirmStrip` (soru + SONUÇ) | İptal onayı. |
+| Seçim mantığı | `components/projects/import-selection.ts` kalıbı | Proje seçimi saf modülde, testli. |
+
+---
+
+## Veri modeli
+
+`000017_toplu_calistirma.sql`
+
+```sql
+CREATE TABLE run_batches (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    -- Görev metni toplu işin kendisinde: otuz öğe aynı işi yapıyor.
+    task        TEXT NOT NULL DEFAULT '',
+    -- queued | running | done | cancelled
+    status      TEXT NOT NULL DEFAULT 'queued',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE run_batch_items (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id    UUID NOT NULL REFERENCES run_batches(id) ON DELETE CASCADE,
+    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    -- position: sıra EKLENME sırasıdır (spec). Öncelik yok.
+    position    INT  NOT NULL,
+    -- pending | running | succeeded | failed | interrupted | cancelled
+    status      TEXT NOT NULL DEFAULT 'pending',
+    -- Akış çalışması başlatıldıktan SONRA dolar; öncesinde NULL.
+    workflow_run_id UUID REFERENCES workflow_runs(id) ON DELETE SET NULL,
+    error       TEXT NOT NULL DEFAULT '',
+    started_at  TIMESTAMPTZ,
+    finished_at TIMESTAMPTZ,
+
+    -- Aynı proje aynı toplu işte iki kez yer almaz (spec → davranış kuralları).
+    UNIQUE (batch_id, project_id)
+);
+
+CREATE INDEX idx_batch_items_bekleyen
+    ON run_batch_items (batch_id, position) WHERE status = 'pending';
+```
+
+---
+
+## Zamanlayıcı
+
+`internal/runbatch` (yeni paket).
+
+```go
+func (s *Scheduler) Run(ctx context.Context)   // main.go'dan goroutine
+func (s *Scheduler) Reconcile(ctx) error       // açılışta bir kez
+```
+
+**Olay güdümlü.** Slot boşaldığında zamanlayıcı uyandırılır; iki saniyede bir
+"acaba boşaldı mı" diye sorulmaz.
+
+Sinyal ZATEN var: `runs.Manager.release()` slot'u bıraktıktan sonra
+`cond.Broadcast()` çağırıyor. Yoklama, var olan bir bilgiyi yok sayıp aynı
+soruyu saniyede bir tekrar sormak olurdu.
+
+Bağımlılık yönü ters çevrilmiyor — `runs` paketi kuyruğu TANIMIYOR. Manager'a
+isteğe bağlı bir uyandırma kancası veriliyor ve bağ `main.go`'da kuruluyor:
+
+```go
+// runs.Limits
+OnSlotFree func()   // nil olabilir; tek çalıştırma yolu bunu kullanmıyor
+
+// main.go
+limits.OnSlotFree = scheduler.Wake
+```
+
+`Wake`, tamponu 1 olan bir kanala **bloklamayan** gönderim yapar: zamanlayıcı
+o an meşgulse sinyal kaybolmaz, birikmez de — "bak" demek bir kez yeter.
+
+Zamanlayıcı ayrıca toplu iş oluşturulduğunda ve "kaldığı yerden devam"
+denildiğinde uyandırılır.
+
+**Bir de dakikalık emniyet turu var.** Bu MEKANİZMA DEĞİL, sigorta: bir
+uyandırma her nasılsa kaçarsa kuyruk sonsuza kadar durmasın diye. Dakikada bir
+tur, sistemin fark etmeyeceği bir maliyet; sessizce donmuş bir kuyruk ise
+kullanıcının ancak "neden hiç başlamadı" diye sorarak fark edeceği bir arıza.
+
+### Tuzak: `ErrTooManyRuns` alan öğe BAŞARISIZ SAYILMAZ
+
+Zamanlayıcı boş slot gördü diye başlatmayı denediğinde araya başka bir
+çalıştırma girmiş olabilir. O durumda `Launch` `ErrTooManyRuns` döner.
+
+Bu hata **öğeyi düşürmemeli** — öğe `pending` kalmalı ve bir sonraki turda
+tekrar denenmeli. Aksi hâlde kuyruk kendini yerdi: sınır dolu olduğu her an
+bir öğe "başarısız" diye işaretlenir ve otuz projenin çoğu hiç çalışmadan
+başarısız görünürdü.
+
+### Açılışta uzlaştırma (`Reconcile`)
+
+Backend kapandığında `running` kalan öğeler var. Container'lar gitti; o
+çalışmalar tamamlanamaz.
+
+Açılışta bu öğeler **`interrupted`** olarak işaretlenir. Kendiliğinden
+denenmez (spec kararı): yarım kalmış bir işin yan etkisi — branch'e
+gönderilmiş bir değişiklik — habersizce tekrarlanmamalı. Kullanıcı
+**"Kaldığı yerden devam et"** düğmesiyle onları yeniden sıraya alır.
+
+---
+
+## Go arayüzleri
+
+```go
+type Batch struct {
+    ID, WorkflowID uuid.UUID
+    Task           string
+    Status         string
+    Counts         Counts        // bekleyen/çalışan/biten/başarısız/kesilen
+}
+
+type Item struct {
+    ID, ProjectID   uuid.UUID
+    ProjectName     string      // JOIN'den; ekran isim gösteriyor
+    Position        int
+    Status          string
+    WorkflowRunID   *uuid.UUID
+    Error           string
+}
+
+func (s *Store) Create(ctx, workflowID uuid.UUID, task string, projectIDs []uuid.UUID) (Batch, error)
+func (s *Store) List(ctx, limit, offset int) ([]Batch, int, error)
+func (s *Store) Get(ctx, id uuid.UUID) (Batch, []Item, error)
+func (s *Store) Cancel(ctx, id uuid.UUID) (int, error)   // yalnızca bekleyenleri düşürür
+func (s *Store) Resume(ctx, id uuid.UUID) (int, error)   // kesilenleri pending yapar
+
+// Zamanlayıcının kullandıkları
+func (s *Store) NextPending(ctx) (Item, bool, error)
+func (s *Store) MarkRunning(ctx, itemID, workflowRunID uuid.UUID) error
+func (s *Store) MarkFinished(ctx, itemID uuid.UUID, status, errMsg string) error
+func (s *Store) InterruptRunning(ctx) (int, error)       // açılışta
+```
+
+---
+
+## HTTP uçları
+
+```
+POST   /api/run-batches            { workflowId, task, projectIds[] }
+GET    /api/run-batches            → liste + sayılar
+GET    /api/run-batches/{id}       → toplu iş + öğeler
+POST   /api/run-batches/{id}/cancel → kaç bekleyen düştü
+POST   /api/run-batches/{id}/resume → kaç kesilen sıraya alındı
+```
+
+---
+
+## Arayüz
+
+**Akış detayında** "Çok projede çalıştır": proje seçim listesi (arama +
+tümünü seç), seçim sayacı, tek birincil eylem.
+
+**Toplu iş ekranı**: üstte sayılar (bekleyen · çalışan · tamamlandı ·
+başarısız), altta öğe listesi. Çalışan/biten satır kendi akış çalışmasına
+bağlanır. İş sürerken tazelenir (mevcut `refetchInterval` kalıbı).
+
+Eylemler: **İptal** (bekleyenler düşer, çalışanlar sürer — onayda yazılı) ve
+**Kaldığı yerden devam et** (yalnızca kesilenler; üzerinde sayı yazar).
+
+---
+
+## Riskler
+
+| Risk | Karşılık |
+| --- | --- |
+| **`ErrTooManyRuns` öğeyi düşürür** → kuyruk kendini yer | Öğe `pending` kalır; testle kilitlenir |
+| Zamanlayıcı iptal edilmiş toplu işin öğesini başlatır | `NextPending` yalnızca `queued`/`running` toplu işlerden okur |
+| Uyandırma sinyali kaçarsa kuyruk donar | Dakikalık emniyet turu; ayrıca `Wake` tamponlu kanala bloklamadan yazdığı için sinyal kaybolmaz |
+| Açılışta uzlaştırma çalışmazsa öğeler sonsuza kadar `running` | `Reconcile` açılışta koşar ve kaç öğeyi düşürdüğünü loglar |
+| Proje silinmiş | `ON DELETE CASCADE` öğeyi düşürür; toplu iş sayıları buna göre |
+| Aynı projeyi iki kez seçme | `UNIQUE (batch_id, project_id)` |
+
+---
+
+## Test stratejisi
+
+**Birim / veritabanı:**
+
+- Sıra: `NextPending` en küçük `position`'ı verir
+- `ErrTooManyRuns` alan öğe **pending kalır** — kuyruğun kendini yemediğinin
+  kanıtı
+- İptal: bekleyenler düşer, çalışan öğe DOKUNULMAZ
+- `Resume`: yalnızca `interrupted` olanlar `pending` olur; `succeeded` ve
+  `failed` dokunulmaz
+- `InterruptRunning`: açılışta `running` olanlar `interrupted` olur
+- Aynı proje iki kez → hata
+- Bir öğe düşünce kuyruk devam eder
+
+**Zamanlayıcı:** sahte bir başlatıcıyla, sınır 2 iken 5 öğenin **ikişer ikişer**
+işlendiği ölçülür — aynı anda çalışan sayısı sınırı aşmaz.
+
+**Arayüz:** seçim mantığı saf modülde; ekran `ui.md`'ye göre iki temada.
+
+---
+
+## Uygulama sırası
+
+1. Şema + depo (sıra, iptal, resume, uzlaştırma).
+2. **Zamanlayıcı** — riskli parça: sınıra uyma ve `ErrTooManyRuns` tuzağı.
+3. Açılışta uzlaştırma + `main.go` bağlantısı.
+4. Uçlar.
+5. Arayüz: seçim ve toplu iş ekranı.
+6. Belgeler, kapanış.
