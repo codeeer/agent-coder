@@ -76,6 +76,19 @@ type RunnerConfig struct {
 	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez.
 	 */
 	ExtraCACert string
+	/*
+	 * HTTPProxy, runner container'ının çıkış trafiğini yönlendireceği vekil.
+	 *
+	 * YALNIZCA ANALİZ İÇİN — `veri-sizintisi-analizi` branch'inin ölçüm
+	 * düzeneği (bkz. scripts/sizinti-analizi/). Doluysa container'a HTTP_PROXY
+	 * ailesi ve Maven'ın -D vekil özellikleri geçilir; opencode'un dışarıya ne
+	 * gönderdiği ancak trafiği açılabilir bir vekilden geçirerek okunabiliyor.
+	 *
+	 * Boş bırakmak varsayılandır ve hiçbir şeyi değiştirmez. Bu alan ana
+	 * branch'e ALINMAMALIDIR: üretimde vekil ayarı, ölçüm aracının değil
+	 * kurumsal ağ ayarlarının işidir.
+	 */
+	HTTPProxy string
 }
 
 // Load ortam değişkenlerini okur ve doğrular.
@@ -107,6 +120,7 @@ func Load() (*Config, error) {
 			Network:        getString("RUNNER_NETWORK", "agent-coder_internal"),
 			ServerPassword: getString("OPENCODE_SERVER_PASSWORD", ""),
 			ExtraCACert:    getString("RUNNER_EXTRA_CA_CERT", ""),
+			HTTPProxy:      getString("RUNNER_HTTP_PROXY", ""),
 		},
 
 		OpenRouterAPIKey:    getString("OPENROUTER_API_KEY", ""),

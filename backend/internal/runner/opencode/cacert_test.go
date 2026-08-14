@@ -20,7 +20,7 @@ import (
 const ornekPEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n"
 
 func TestBuildEnv_SertifikaYokkenDegiskenTanimlanmaz(t *testing.T) {
-	env := buildEnv(runner.Request{})
+	env := buildEnv(runner.Request{}, "")
 
 	require.NotContains(t, env, "NODE_EXTRA_CA_CERTS")
 	require.NotContains(t, env, "GIT_SSL_CAINFO")
@@ -36,7 +36,7 @@ func TestBuildEnv_SertifikaYokkenDegiskenTanimlanmaz(t *testing.T) {
  * gelmesin.
  */
 func TestBuildEnv_SertifikaVarkenUcDegiskenDeTanimlanir(t *testing.T) {
-	env := buildEnv(runner.Request{CACert: ornekPEM})
+	env := buildEnv(runner.Request{CACert: ornekPEM}, "")
 
 	require.Equal(t, runner.CACertPath, env["NODE_EXTRA_CA_CERTS"])
 	require.Equal(t, runner.CACertPath, env["GIT_SSL_CAINFO"])
@@ -48,7 +48,7 @@ func TestBuildEnv_SertifikaVarkenUcDegiskenDeTanimlanir(t *testing.T) {
 // yazılsaydı agent `env` çıktısında görürdü ve çok satırlı değer kabuk
 // tarafından bozulurdu.
 func TestBuildEnv_SertifikaIcerigiOrtamDegiskenineYazilmaz(t *testing.T) {
-	env := buildEnv(runner.Request{CACert: ornekPEM})
+	env := buildEnv(runner.Request{CACert: ornekPEM}, "")
 
 	for k, v := range env {
 		require.NotContains(t, v, "BEGIN CERTIFICATE",
@@ -85,7 +85,7 @@ func TestCACertFile_DogruYolVeMod(t *testing.T) {
 func TestBuildEnv_MavenSureSiniri(t *testing.T) {
 	env := buildEnv(runner.Request{Packages: runner.PackageRegistry{
 		MavenRegistry: "https://m.local/", TimeoutSec: 60,
-	}})
+	}}, "")
 
 	require.Contains(t, env["MAVEN_OPTS"], "aether.connector.connectTimeout=60000")
 	require.Contains(t, env["MAVEN_OPTS"], "aether.connector.requestTimeout=60000")
@@ -95,13 +95,13 @@ func TestBuildEnv_MavenKapaliykenOptsYok(t *testing.T) {
 	// Yalnızca npm tanımlı: Maven'a ait hiçbir şey yazılmamalı.
 	env := buildEnv(runner.Request{Packages: runner.PackageRegistry{
 		NPMRegistry: "https://n.local/", TimeoutSec: 60,
-	}})
+	}}, "")
 	require.NotContains(t, env, "MAVEN_OPTS")
 }
 
 func TestBuildEnv_SureSinirsizkenOptsYok(t *testing.T) {
 	env := buildEnv(runner.Request{Packages: runner.PackageRegistry{
 		MavenRegistry: "https://m.local/",
-	}})
+	}}, "")
 	require.NotContains(t, env, "MAVEN_OPTS")
 }

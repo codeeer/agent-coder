@@ -156,7 +156,14 @@ func run() error {
 	}
 	defer sandboxMgr.Close()
 
-	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network)
+	agentRunner := opencode.New(sandboxMgr, cfg.Runner.Image, cfg.Runner.Network, cfg.Runner.HTTPProxy)
+	if cfg.Runner.HTTPProxy != "" {
+		// Sessiz kalmamalı: vekil, çalıştırmanın TÜM dış trafiğini üçüncü bir
+		// sürece yönlendiriyor. Ölçüm bitip ayar kaldırılmadığında bunu
+		// loglardan görmek gerekir.
+		slog.WarnContext(ctx, "runner trafiği vekile yönlendiriliyor — ÖLÇÜM DÜZENEĞİ",
+			"proxy", cfg.Runner.HTTPProxy)
+	}
 
 	// Docker ve runner imajı hazır mı? Eksikse çalıştırma denenene kadar
 	// fark edilmez; açılışta uyarmak kullanıcıyı erken bilgilendirir.

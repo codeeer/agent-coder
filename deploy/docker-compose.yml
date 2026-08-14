@@ -66,6 +66,8 @@ services:
       # dosyanın Docker host'unda bulunmasını gerektiriyordu ve uzak Docker
       # host kurulumunda çalışmıyordu.
       RUNNER_EXTRA_CA_CERT: ${RUNNER_EXTRA_CA_CERT:-}
+      # ÖLÇÜM DÜZENEĞİ — scripts/sizinti-analizi/. Boşsa hiçbir etkisi yok.
+      RUNNER_HTTP_PROXY: ${RUNNER_HTTP_PROXY:-}
       # Süre sınırı, eşzamanlılık, CPU ve bellek burada DEĞİL: davranış
       # parametreleri arayüzden yönetilir ve veritabanında tutulur.
     ports:

@@ -1,0 +1,66 @@
+# Sızıntı analizi ölçüm düzeneği — ÜRÜNÜN PARÇASI DEĞİLDİR.
+#
+# İki servis, iki ayrı işi görür:
+#
+#   mitm  — runner'ın çıkış trafiğini açıp kaydeder. Ne gönderildiğini
+#           yalnızca burası söyleyebilir.
+#   depo  — kanaryalarla dolu test deposunu HTTP üzerinden sunar. Basic auth
+#           BİLEREK açık: kimlik bilgisinin gerçekten kullanılmasını ve
+#           dolayısıyla kanarya token'ın container'a ulaşmasını sağlıyor.
+#
+# Ağ dışarıdan alınır: runner container'ları da aynı ağda doğuyor, mitm'e
+# `sizinti-mitm` adıyla erişebilmeleri gerek.
+
+name: sizinti-analizi
+
+services:
+  mitm:
+    image: mitmproxy/mitmproxy:latest
+    container_name: sizinti-mitm
+    # `-w` ham akışları yazar; çözümleme SONRADAN, ihrac.py ile yapılır.
+    # Canlı bir eklenti koşsaydı ölçümün ortasında düşme riski olurdu ve
+    # koşu gerçek para harcadığı için tekrarı ucuz değil.
+    #
+    # stream_large_bodies BİLEREK KAPALI (varsayılan): akış modunda gövdeler
+    # diske TAM yazılmaz, tam da aradığımız şey gövdelerin içinde.
+    command:
+      - mitmdump
+      - --listen-host=0.0.0.0
+      - --listen-port=8080
+      - --set
+      - confdir=/certs
+      - -w
+      - /cikti/${KOSU_ETIKETI:-akislar}.mitm
+      - --set
+      - flow_detail=1
+    volumes:
+      - ./cikti/certs:/certs
+      - ./cikti:/cikti
+    networks:
+      - internal
+
+  # SMART HTTP zorunlu — ölçülerek bulundu: ürün depoyu sığ klonluyor
+  # (`runner.clone_depth` en az 1) ve dumb HTTP sığ klonlamayı desteklemiyor:
+  #   fatal: dumb http transport does not support shallow capabilities
+  # Ayrıntı: git-sunucu.py başlığı.
+  depo:
+    image: python:3.13-slim
+    container_name: sizinti-depo
+    environment:
+      DEPO_KOK: /depolar
+      KANARYA_KULLANICI: kanarya
+      KANARYA_GIT_TOKEN: ${KANARYA_GIT_TOKEN:?kanaryalar.env yüklenmeli}
+    command:
+      - sh
+      - -c
+      - apt-get update -qq && apt-get install -y -qq git >/dev/null && exec python3 /srv/git-sunucu.py
+    volumes:
+      - ./cikti/depo:/depolar:ro
+      - ./git-sunucu.py:/srv/git-sunucu.py:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    name: agent-coder_internal
+    external: true

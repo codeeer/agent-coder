@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +22,10 @@ type Runner struct {
 	sandbox *sandbox.Manager
 	image   string
 	network string
+	// proxy, ÖLÇÜM DÜZENEĞİ — bkz. config.RunnerConfig.HTTPProxy.
+	// Sertifikanın aksine kurucuda: vekil çalışma anında değişmiyor, ölçüm
+	// boyunca sabit kalıyor.
+	proxy string
 }
 
 // New yeni runner üretir.
@@ -28,11 +33,12 @@ type Runner struct {
 // Kurumsal sertifika BURADA DEĞİL, her isteğin içinde taşınır
 // (runner.Request.CACert): ayar çalışma anında değişebiliyor ve
 // yapılandırmanın kurucuya bağlanması yeniden başlatma gerektirirdi.
-func New(mgr *sandbox.Manager, image, network string) *Runner {
+func New(mgr *sandbox.Manager, image, network, proxy string) *Runner {
 	return &Runner{
 		sandbox: mgr,
 		image:   image,
 		network: network,
+		proxy:   proxy,
 	}
 }
 
@@ -96,7 +102,7 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 		RunID:    req.RunID.String(),
 		Image:    image,
 		Network:  r.network,
-		Env:      buildEnv(req),
+		Env:      buildEnv(req, r.proxy),
 		CPUCores: req.Limits.CPUCores,
 		MemoryGB: req.Limits.MemoryGB,
 		Files:    toSandboxFiles(configFiles),
@@ -330,7 +336,7 @@ func (r *Runner) warnFailedMCP(ctx context.Context, cli *client, req runner.Requ
 // Sağlayıcı anahtarı buradan geçer; yapılandırma dosyası ona referans verir.
 // Depo kimlik bilgisi de burada — entrypoint bunu credential store'a yazar ve
 // remote URL'e gömmez.
-func buildEnv(req runner.Request) map[string]string {
+func buildEnv(req runner.Request, proxy string) map[string]string {
 	env := map[string]string{
 		runner.APIKeyEnvVar: req.Provider.APIKey,
 		"REPO_URL":          req.Repo.URL,
@@ -396,7 +402,76 @@ func buildEnv(req runner.Request) map[string]string {
 			env[runner.MCPEnvVar(m.Name)] = m.Secret
 		}
 	}
+
+	applyProxy(env, proxy)
 	return env
+}
+
+/*
+ * applyProxy, ÖLÇÜM DÜZENEĞİ — bkz. config.RunnerConfig.HTTPProxy.
+ *
+ * Tek bir vekil adresini, container içindeki her istemcinin okuduğu ayrı ayrı
+ * biçimlere çevirir. Tek bir biçim yeterli olsaydı burası üç satır olurdu; üç
+ * ayrı aile gerekmesinin sebebi ölçülerek bulundu:
+ *
+ *   BÜYÜK/KÜÇÜK HARF İKİSİ BİRDEN — curl yalnızca küçük harfli `http_proxy`'yi
+ *   okur, Node ise büyük harfliyi. Yalnız birini koymak, ölçümde bazı
+ *   isteklerin vekile hiç uğramaması demekti; bu da "sızıntı yok" gibi
+ *   görünürdü.
+ *
+ *   NODE_USE_ENV_PROXY — Node'un yerleşik `fetch`i (undici) vekil ortam
+ *   değişkenlerini KENDİLİĞİNDEN okumaz. Bu bayrak olmadan motorun model
+ *   çağrıları vekili sessizce atlar.
+ *
+ *   MAVEN_OPTS -D — JVM hiçbir `*_PROXY` değişkenini okumaz; Java tarafının
+ *   tek yolu sistem özellikleridir. Koşu B (Maven'lı görev) bu olmadan
+ *   ölçülemezdi.
+ *
+ * NO_PROXY'de localhost ZORUNLU: container'ın sağlık kontrolü 127.0.0.1'e
+ * curl atıyor. Vekile yönlenseydi sağlık kontrolü düşer ve container hiç hazır
+ * sayılmazdı.
+ *
+ * DİKKAT — bu düzenek trafiği vekile YÖNLENDİRİR, MECBUR ETMEZ. Vekili yok
+ * sayan bir istemci doğrudan çıkabilir; o yüzden ölçümün ikinci katmanı
+ * (köprü üzerinde tcpdump) vazgeçilmezdir.
+ */
+func applyProxy(env map[string]string, proxy string) {
+	if proxy == "" {
+		return
+	}
+
+	const nonProxy = "localhost,127.0.0.1,::1"
+	for k, v := range map[string]string{
+		"HTTP_PROXY":  proxy,
+		"HTTPS_PROXY": proxy,
+		"http_proxy":  proxy,
+		"https_proxy": proxy,
+		"NO_PROXY":    nonProxy,
+		"no_proxy":    nonProxy,
+		// Node 24'ün yerleşik fetch'i için; eski sürümlerde etkisiz.
+		"NODE_USE_ENV_PROXY": "1",
+	} {
+		env[k] = v
+	}
+
+	// Java tarafı: host ve port ayrı ayrı gerekiyor.
+	u, err := url.Parse(proxy)
+	if err != nil || u.Hostname() == "" {
+		return
+	}
+	port := u.Port()
+	if port == "" {
+		port = "80"
+	}
+	javaOpts := fmt.Sprintf(
+		"-Dhttp.proxyHost=%s -Dhttp.proxyPort=%s -Dhttps.proxyHost=%s -Dhttps.proxyPort=%s"+
+			" -Dhttp.nonProxyHosts=localhost|127.0.0.1",
+		u.Hostname(), port, u.Hostname(), port)
+	if mevcut := env["MAVEN_OPTS"]; mevcut != "" {
+		env["MAVEN_OPTS"] = mevcut + " " + javaOpts
+	} else {
+		env["MAVEN_OPTS"] = javaOpts
+	}
 }
 
 func toRunnerFiles(files []FileChange) []runner.FileChange {
