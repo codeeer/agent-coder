@@ -18,6 +18,18 @@ export interface CredentialSpec {
   extraFields?: { name: string; label: string; placeholder: string }[];
   /** Bu faz içinde henüz kullanılmıyorsa gösterilecek not. */
   unusedNote?: string;
+  /*
+   * Değer kaydedilmeden önce GERÇEKTEN sınanıyor mu?
+   *
+   * Her türün doğrulanabilir bir ucu yok: Jira'nın `myself` ucu anahtarın
+   * çalıştığını söylüyor, paket deposu token'ı için böyle bir uç yok ve
+   * backend onu sessizce kabul ediyor (`credentials.Validator`).
+   *
+   * Bayrak BİLEREK "doğrulanır" tarafına varsayılan DEĞİL: varsayılan
+   * doğruysa, doğrulaması olmayan yeni bir tür eklendiğinde arayüz
+   * kendiliğinden yanlış söz vermiş olur. Sözü, sözü tutabilen tür verir.
+   */
+  verifies?: boolean;
 }
 
 export function CredentialCard({
@@ -174,13 +186,21 @@ function CredentialForm({
 
       <div className="flex items-center gap-2 pt-1">
         <Button type="submit" variant="primary" disabled={!canSubmit || save.isPending}>
-          {save.isPending ? "Doğrulanıyor…" : "Doğrula ve kaydet"}
+          {save.isPending
+            ? spec.verifies
+              ? "Doğrulanıyor…"
+              : "Kaydediliyor…"
+            : spec.verifies
+              ? "Doğrula ve kaydet"
+              : "Kaydet"}
         </Button>
         <Button type="button" onClick={onDone} disabled={save.isPending}>
           Vazgeç
         </Button>
         <span className="text-xs text-ink-2">
-          Kaydetmeden önce değerin gerçekten çalıştığı sınanır.
+          {spec.verifies
+            ? "Kaydetmeden önce değerin gerçekten çalıştığı sınanır."
+            : "Değer sınanmadan kaydedilir; yanlışsa ilk çalıştırmada görülür."}
         </span>
       </div>
     </form>

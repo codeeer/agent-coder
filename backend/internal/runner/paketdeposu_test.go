@@ -77,6 +77,25 @@ func TestBuildNPMRC_KimlikAdreseBaglanir(t *testing.T) {
 	}
 }
 
+/*
+ * TestBuildNPMRC_OlmeyenAyarYazilmaz — npm'in tanımadığı anahtar yazılmaz.
+ *
+ * `always-auth` npm 9'da KALDIRILDI; runner npm 11 taşıyor (Node 24, bkz.
+ * node-versions.txt). Etkisi yok ama zararsız da değil: dosya KULLANICI
+ * seviyesinde (`$HOME/.npmrc`) olduğu için npm HER çağrıda
+ * "Unknown user config" uyarısı basıyor. O uyarı agent'ın okuduğu her araç
+ * çıktısına ve derleme loglarına düşüyor.
+ *
+ * Kimlik doğrulama bu satır olmadan da çalışıyor — üstveri VE tarball
+ * istekleri kimlikli gidiyor (kurumsal depoya karşı ölçüldü).
+ */
+func TestBuildNPMRC_OlmeyenAyarYazilmaz(t *testing.T) {
+	got := string(buildNPMRC(kurulum()))
+	if strings.Contains(got, "always-auth") {
+		t.Fatalf("npm 9+'ta kaldırılan ayar yazılmış — her komutta uyarı basar:\n%s", got)
+	}
+}
+
 func TestBuildNPMRC_SondakiSlashEklenir(t *testing.T) {
 	p := kurulum()
 	p.NPMRegistry = "https://nexus.sirket.local/repository/npm-group"
