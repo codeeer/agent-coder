@@ -20,11 +20,23 @@ type Store struct {
 // NewStore yeni depo üretir.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
-const columns = `id, name, description, content, created_at, updated_at`
+/*
+ * Seçilen sütunlar. Klasör adı JOIN'den geliyor: yol üretmek için gerekli ve
+ * her script için ayrı sorgu atmak, yüz script'lik bir agent'ta yüz sorgu
+ * demekti.
+ */
+const columns = `s.id, s.name, s.description, s.content, s.folder_id,
+	s.created_at, s.updated_at, COALESCE(f.name, '')`
+
+// kaynak, `columns` ile birlikte kullanılan FROM bölümü.
+//
+// LEFT JOIN: klasörsüz script'ler de dönmeli — bugünkü davranış değişmiyor.
+const kaynak = ` FROM scripts s LEFT JOIN script_folders f ON f.id = s.folder_id`
 
 func scan(row pgx.Row) (Script, error) {
 	var s Script
-	err := row.Scan(&s.ID, &s.Name, &s.Description, &s.Content, &s.CreatedAt, &s.UpdatedAt)
+	err := row.Scan(&s.ID, &s.Name, &s.Description, &s.Content, &s.FolderID,
+		&s.CreatedAt, &s.UpdatedAt, &s.FolderName)
 	if err != nil {
 		return Script{}, err
 	}
@@ -52,7 +64,7 @@ func (s *Store) List(ctx context.Context, limit, offset int) (items []Script, to
 	}
 
 	rows, err := s.pool.Query(ctx,
-		`SELECT `+columns+` FROM scripts ORDER BY name LIMIT $1 OFFSET $2`, limit, offset)
+		`SELECT `+columns+kaynak+` ORDER BY COALESCE(f.name, ''), s.name LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("betikler listelenemedi: %w", err)
 	}
@@ -65,7 +77,7 @@ func (s *Store) List(ctx context.Context, limit, offset int) (items []Script, to
 
 // Get, tek bir betiği döner.
 func (s *Store) Get(ctx context.Context, id uuid.UUID) (Script, error) {
-	out, err := scan(s.pool.QueryRow(ctx, `SELECT `+columns+` FROM scripts WHERE id = $1`, id))
+	out, err := scan(s.pool.QueryRow(ctx, `SELECT `+columns+kaynak+` WHERE s.id = $1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Script{}, ErrNotFound
 	}
@@ -81,11 +93,22 @@ func (s *Store) Get(ctx context.Context, id uuid.UUID) (Script, error) {
 // sırada olsun. Değişen bir sıra, aynı agent'ın farklı çalıştırmalarında farklı
 // bir talimat dosyası üretirdi.
 func (s *Store) ForAgent(ctx context.Context, agentID uuid.UUID) ([]Script, error) {
+	/*
+	 * İKİ KÜMENİN BİRLEŞİMİ: agent'a doğrudan atanmış script'ler ve atanmış
+	 * KLASÖRLERİN tüm script'leri.
+	 *
+	 * Klasör içeriği burada, çalıştırma anında çözülüyor. Atama sırasında
+	 * çözülseydi klasöre sonradan eklenen bir script o agent'ta geçerli olmaz
+	 * ve kullanıcı her eklemede bütün agent'ları tekrar düzenlerdi (spec 022 H3).
+	 *
+	 * DISTINCT şart: bir script hem tekil hem klasör üzerinden atanmış
+	 * olabilir; iki kez dönseydi talimatta iki kez yazılırdı.
+	 */
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+columns+` FROM scripts s
-		JOIN agent_scripts a ON a.script_id = s.id
-		WHERE a.agent_id = $1
-		ORDER BY s.name`, agentID)
+		SELECT DISTINCT `+columns+kaynak+`
+		WHERE s.id IN (SELECT script_id FROM agent_scripts WHERE agent_id = $1)
+		   OR s.folder_id IN (SELECT folder_id FROM agent_script_folders WHERE agent_id = $1)
+		ORDER BY COALESCE(f.name, ''), s.name`, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("agent'ın betikleri okunamadı: %w", err)
 	}
@@ -131,6 +154,8 @@ type CreateInput struct {
 	Name        string
 	Description string
 	Content     string
+	// FolderID nil ise script klasörsüz olur.
+	FolderID *uuid.UUID
 }
 
 // Create, yeni betik kaydeder.
@@ -139,22 +164,29 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Script, error) {
 		Name:        strings.TrimSpace(in.Name),
 		Description: strings.TrimSpace(in.Description),
 		Content:     normalizeContent(in.Content),
+		FolderID:    in.FolderID,
 	}
 	if err := next.Validate(); err != nil {
 		return Script{}, err
 	}
 
-	out, err := scan(s.pool.QueryRow(ctx, `
-		INSERT INTO scripts (name, description, content)
-		VALUES ($1, $2, $3)
-		RETURNING `+columns, next.Name, next.Description, next.Content))
+	// Yeni kayıt kendi kimliğiyle geri okunuyor: `RETURNING` klasör adını
+	// veremez (JOIN yok) ve yol üretimi ona bağlı.
+	var id uuid.UUID
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO scripts (name, description, content, folder_id)
+		VALUES ($1, $2, $3, $4) RETURNING id`,
+		next.Name, next.Description, next.Content, next.FolderID).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Script{}, ErrDuplicateName
 		}
+		if isForeignKeyViolation(err) {
+			return Script{}, ErrFolderNotFound
+		}
 		return Script{}, fmt.Errorf("betik kaydedilemedi: %w", err)
 	}
-	return out, nil
+	return s.Get(ctx, id)
 }
 
 // UpdateInput, güncellenebilir alanlar. nil olanlar değiştirilmez.
@@ -162,41 +194,60 @@ type UpdateInput struct {
 	Name        *string
 	Description *string
 	Content     *string
+
+	// FolderID nil ise klasör DEĞİŞMEZ. Klasörden çıkarmak için `clearFolder`
+	// kullanılır — `projects.Store.Update`'teki `clearProvider` kalıbının
+	// aynısı. Tek bir işaretçiyle ikisini ayırt etmek mümkün değil: nil hem
+	// "dokunma" hem "boşalt" anlamına gelirdi.
+	FolderID *uuid.UUID
 }
 
 // Update, mevcut betiği günceller.
 //
 // Yeni içerik BİR SONRAKİ çalıştırmada geçerli olur: dosyalar container
 // başlatılmadan önce yazılıyor, süren bir çalıştırmaya müdahale edilmiyor.
-func (s *Store) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (Script, error) {
+func (s *Store) Update(ctx context.Context, id uuid.UUID, in UpdateInput, clearFolder bool) (Script, error) {
 	current, err := s.Get(ctx, id)
 	if err != nil {
 		return Script{}, err
+	}
+
+	folderID := current.FolderID
+	switch {
+	case clearFolder:
+		folderID = nil
+	case in.FolderID != nil:
+		folderID = in.FolderID
 	}
 
 	next := Script{
 		Name:        strings.TrimSpace(valueOr(in.Name, current.Name)),
 		Description: strings.TrimSpace(valueOr(in.Description, current.Description)),
 		Content:     normalizeContent(valueOr(in.Content, current.Content)),
+		FolderID:    folderID,
 	}
 	if err := next.Validate(); err != nil {
 		return Script{}, err
 	}
 
-	out, err := scan(s.pool.QueryRow(ctx, `
-		UPDATE scripts SET name = $2, description = $3, content = $4, updated_at = now()
-		WHERE id = $1
-		RETURNING `+columns, id, next.Name, next.Description, next.Content))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Script{}, ErrNotFound
-	}
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE scripts SET name = $2, description = $3, content = $4,
+			folder_id = $5, updated_at = now()
+		WHERE id = $1`,
+		id, next.Name, next.Description, next.Content, next.FolderID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return Script{}, ErrDuplicateName
 		}
+		if isForeignKeyViolation(err) {
+			return Script{}, ErrFolderNotFound
+		}
 		return Script{}, fmt.Errorf("betik güncellenemedi: %w", err)
 	}
-	return out, nil
+	if tag.RowsAffected() == 0 {
+		return Script{}, ErrNotFound
+	}
+	return s.Get(ctx, id)
 }
 
 // Delete, betiği siler. Agent atamaları da düşer (ON DELETE CASCADE).

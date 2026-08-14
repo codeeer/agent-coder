@@ -54,17 +54,35 @@ type Script struct {
 	Name string `json:"name"`
 	// Description agent'ın talimat dosyasına yazılır — betiğin NE ZAMAN
 	// çağrılacağını modele anlatan tek şey budur.
-	Description string    `json:"description"`
-	Content     string    `json:"content"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	Description string `json:"description"`
+	Content     string `json:"content"`
+
+	// FolderID nil ise script klasörsüz: bugünkü davranış, bugünkü yol.
+	FolderID *uuid.UUID `json:"folderId"`
+	// FolderName yolu üretmek için JOIN'den gelir; ayrı sorgu yapılmaz.
+	FolderName string `json:"folderName,omitempty"`
+
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // FileName, container'daki dosya adı. Uzantıyı kullanıcı değil sistem koyar.
 func (s Script) FileName() string { return s.Name + ".sh" }
 
-// Path, container içindeki mutlak yol.
-func (s Script) Path() string { return Dir + "/" + s.FileName() }
+/*
+Path, container içindeki mutlak yol.
+
+TEK ÜRETİCİ. Klasörlü script kendi alt dizinine düşer; klasörsüz olan kökte
+kalır ve bugünkü yolu birebir korur. İkinci bir yol üreticisi yazılsaydı
+dosyanın yazıldığı yer ile talimatta anlatılan yer ayrışabilirdi — ve model
+var olmayan bir yolu denerdi.
+*/
+func (s Script) Path() string {
+	if s.FolderName == "" {
+		return Dir + "/" + s.FileName()
+	}
+	return Dir + "/" + s.FolderName + "/" + s.FileName()
+}
 
 // Validate, kaydedilmeye uygun mu diye sınar.
 func (s Script) Validate() error {

@@ -12,38 +12,38 @@ Docker ile kanıtlanabilir.
 
 ## Blok 1 — Şema ve benzersizlik
 
-- [ ] T01 `000016_script_klasorleri.sql`: `script_folders`, `scripts.folder_id`
+- [x] T01 `000016_script_klasorleri.sql`: `script_folders`, `scripts.folder_id`
       (ON DELETE SET NULL), `agent_script_folders` → migration uygulanır,
       `make test-integration` şemayı kurar
-- [ ] T02 Aynı klasörde aynı ad REDDEDİLİR → iki script aynı klasöre aynı adla
+- [x] T02 Aynı klasörde aynı ad REDDEDİLİR → iki script aynı klasöre aynı adla
       eklenince ikincisi hata verir
-- [ ] T03 Farklı klasörde aynı ad KABUL EDİLİR → iki klasörde `01-baslat`
+- [x] T03 Farklı klasörde aynı ad KABUL EDİLİR → iki klasörde `01-baslat`
       birlikte var olabilir
-- [ ] T04 **İki klasörsüz script aynı adı ALAMAZ** → `NULLS NOT DISTINCT`
+- [x] T04 **İki klasörsüz script aynı adı ALAMAZ** → `NULLS NOT DISTINCT`
       olmadan bu test geçer ve iki script container'da aynı dosyaya yazılırdı;
       testin varlık sebebi bu
-- [ ] T05 Klasör adı benzersiz → aynı adla ikinci klasör reddedilir
+- [x] T05 Klasör adı benzersiz → aynı adla ikinci klasör reddedilir
 
 ## Blok 2 — Klasör deposu ve çözümleme
 
-- [ ] T10 Klasör CRUD → oluştur, listele, güncelle, sil; liste her klasörün
+- [x] T10 Klasör CRUD → oluştur, listele, güncelle, sil; liste her klasörün
       script sayısını taşır
-- [ ] T11 Klasör adı doğrulaması script kuralının AYNISI → geçersiz karakter
+- [x] T11 Klasör adı doğrulaması script kuralının AYNISI → geçersiz karakter
       için aynı hata; kural kopyalanmadığı testle kilitlenir
-- [ ] T12 `Folder.Path()` ve klasörlü `Script.Path()` → `/home/agent/scripts/
+- [x] T12 `Folder.Path()` ve klasörlü `Script.Path()` → `/home/agent/scripts/
       node-24/01-x.sh`; klasörsüzde bugünkü yol birebir korunur
-- [ ] T13 Klasör silinince script'ler KALIR, `folder_id` NULL olur → silme
+- [x] T13 Klasör silinince script'ler KALIR, `folder_id` NULL olur → silme
       sonrası script hâlâ okunabilir
-- [ ] T14 `FolderUsage` kaç script ve kaç agent → silme onayında kullanılacak
-- [ ] T15 `SetAgentFolders` sil+ekle tek transaction → ikinci çağrı öncekini
+- [x] T14 `FolderUsage` kaç script ve kaç agent → silme onayında kullanılacak
+- [x] T15 `SetAgentFolders` sil+ekle tek transaction → ikinci çağrı öncekini
       tamamen değiştirir
-- [ ] T16 `ForAgent` birleşimi → tekil atama + atanmış klasörlerin TÜM
+- [x] T16 `ForAgent` birleşimi → tekil atama + atanmış klasörlerin TÜM
       script'leri döner
-- [ ] T17 `ForAgent` MÜKERRER DÖNMEZ → bir script hem tekil hem klasör
+- [x] T17 `ForAgent` MÜKERRER DÖNMEZ → bir script hem tekil hem klasör
       üzerinden atanmışsa listede bir kez görünür
-- [ ] T18 `ForAgent` sırası: önce klasörsüzler, sonra klasör adı, sonra script
+- [x] T18 `ForAgent` sırası: önce klasörsüzler, sonra klasör adı, sonra script
       adı → sıra testle kilitlenir (talimat metni buna dayanıyor)
-- [ ] T19 **Klasöre sonradan eklenen script atama tazelenmeden görünür** →
+- [x] T19 **Klasöre sonradan eklenen script atama tazelenmeden görünür** →
       H3'ün kanıtı; `agent_scripts`'e yazan bir tasarım bu testte düşer
 
 ## Blok 3 — Container yerleşimi
@@ -111,3 +111,12 @@ Docker ile kanıtlanabilir.
 ## Notlar
 
 Plandan sapılırsa **neden** sapıldığı buraya yazılır.
+
+**`Update` imzası değişti: `clearFolder bool` eklendi.** Tek bir `*uuid.UUID`
+ile "klasöre dokunma" ile "klasörden çıkar" ayırt edilemiyordu — ikisi de nil.
+`projects.Store.Update`'teki `clearProvider` kalıbının aynısı kullanıldı; yeni
+bir kalıp icat edilmedi.
+
+**`NULLS NOT DISTINCT` gerçekten uygulandı, göze güvenilmedi.** Testler geçtikten
+sonra indeks tanımı veritabanından okundu:
+`CREATE UNIQUE INDEX scripts_klasor_ad ON public.scripts USING btree (folder_id, name) NULLS NOT DISTINCT`

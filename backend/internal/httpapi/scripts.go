@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 
@@ -10,15 +11,24 @@ import (
 )
 
 type createScriptRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Content     string     `json:"content"`
+	FolderID    *uuid.UUID `json:"folderId"`
 }
 
 type updateScriptRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
-	Content     *string `json:"content"`
+	Name        *string    `json:"name"`
+	Description *string    `json:"description"`
+	Content     *string    `json:"content"`
+	FolderID    *uuid.UUID `json:"folderId"`
+
+	// ClearFolder, script'i klasörden çıkarır.
+	//
+	// AYRI BİR ALAN olmak zorunda: `folderId: null` ile alanın hiç
+	// gönderilmemesi JSON'da aynı görünüyor ve ilki "klasörden çıkar",
+	// ikincisi "dokunma" demek.
+	ClearFolder bool `json:"clearFolder"`
 }
 
 func (h *Handler) listScripts(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +61,7 @@ func (h *Handler) createScript(w http.ResponseWriter, r *http.Request) {
 
 	s, err := h.deps.Scripts.Create(r.Context(), scripts.CreateInput{
 		Name: req.Name, Description: req.Description, Content: req.Content,
+		FolderID: req.FolderID,
 	})
 	if err != nil {
 		h.respondScriptError(w, r, err)
@@ -77,9 +88,15 @@ func (h *Handler) updateScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	/*
+	 * `folderId` alanı GÖNDERİLMEDİYSE klasör değişmez; AÇIKÇA null
+	 * gönderildiyse klasörden çıkarılır. İkisini ayırt etmek için ham gövdeye
+	 * bakılıyor — tek bir işaretçide nil hem "dokunma" hem "boşalt" olurdu.
+	 */
 	s, err := h.deps.Scripts.Update(r.Context(), id, scripts.UpdateInput{
 		Name: req.Name, Description: req.Description, Content: req.Content,
-	})
+		FolderID: req.FolderID,
+	}, req.ClearFolder)
 	if err != nil {
 		h.respondScriptError(w, r, err)
 		return

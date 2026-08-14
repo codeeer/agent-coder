@@ -54,7 +54,7 @@ func TestStore_CRUD(t *testing.T) {
 
 	t.Run("güncelleme kısmî olabilir", func(t *testing.T) {
 		desc := "Yeni açıklama"
-		updated, err := store.Update(ctx, created.ID, scripts.UpdateInput{Description: &desc})
+		updated, err := store.Update(ctx, created.ID, scripts.UpdateInput{Description: &desc}, false)
 		require.NoError(t, err)
 		require.Equal(t, desc, updated.Description)
 		require.Equal(t, created.Content, updated.Content, "gönderilmeyen alan korunur")
