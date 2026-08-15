@@ -15,6 +15,10 @@ const MaxLength = 48
 var (
 	invalid = regexp.MustCompile(`[^a-z0-9]+`)
 	edges   = regexp.MustCompile(`^-+|-+$`)
+	// gecerli, dosyadaki diğer iki desenle aynı yerde: `Valid` her çağrıda
+	// yeniden derliyordu ve bu fonksiyon liste ekranlarında kayıt başına
+	// çağrılıyor.
+	gecerli = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
 )
 
 // turkishFolding, Türkçe harflerin ASCII karşılıkları.
@@ -56,5 +60,5 @@ func Valid(s string) bool {
 	if s == "" || len(s) > MaxLength {
 		return false
 	}
-	return regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`).MatchString(s)
+	return gecerli.MatchString(s)
 }
