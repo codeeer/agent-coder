@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Martian_Mono } from "next/font/google";
 
 import {
   Architecture,
@@ -43,27 +42,6 @@ export const metadata: Metadata = {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const display = Martian_Mono({
-  subsets: ["latin", "latin-ext"],
-  weight: ["500", "600"],
-  variable: "--yazi-display",
-  display: "swap",
-});
-
-const govde = IBM_Plex_Sans({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
-  variable: "--yazi-govde",
-  display: "swap",
-});
-
-const veri = IBM_Plex_Mono({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500"],
-  variable: "--yazi-veri",
-  display: "swap",
-});
-
 /** Kahraman: ürünün kendi olay akışı — metinler koddaki gerçek satırlar. */
 const KOSU = [
   ["00:00", "çalışma ortamı hazırlanıyor (node 24)"],
@@ -89,7 +67,7 @@ const BOLUMLER = [
 
 export default function HowItWorksPage() {
   return (
-    <div className={`${display.variable} ${govde.variable} ${veri.variable} sayfa`}>
+    <div className="sayfa">
       <style>{CSS}</style>
 
       {/*
@@ -464,7 +442,85 @@ function Sinir({
 /* ── Biçim ───────────────────────────────────────────────────────────────── */
 
 const CSS = `
+/*
+ * FONTLAR REPODA — derleme anında ağa çıkılmıyor.
+ *
+ * Önce next/font/google kullanılıyordu; o, dosyaları BUILD SIRASINDA Google'dan
+ * indiriyor. Kapalı ağda derleme yapan bir kurulumda bu, sayfanın değil
+ * DERLEMENİN kırılması demek. Dosyalar public/fonts altında duruyor (sekiz
+ * woff2, 156 KB) ve yalnızca bu sayfa yüklenince iniyorlar.
+ *
+ * Alt kümeler ayrı dosyalarda: latin-ext Türkçe için zorunlu (ş, ğ, İ, ı),
+ * latin gerisi. Tarayıcı yalnızca gereken aralığı indirir.
+ */
+@font-face {
+  font-family: 'Martian Mono';
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url('/fonts/martian-mono-latin.woff2') format('woff2');
+  unicode-range: u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+0304,u+0308,u+0329,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd;
+}
+@font-face {
+  font-family: 'Martian Mono';
+  font-style: normal;
+  font-weight: 500 600;
+  font-display: swap;
+  src: url('/fonts/martian-mono-latin-ext.woff2') format('woff2');
+  unicode-range: u+0100-02ba,u+02bd-02c5,u+02c7-02cc,u+02ce-02d7,u+02dd-02ff,u+0304,u+0308,u+0329,u+1d00-1dbf,u+1e00-1e9f,u+1ef2-1eff,u+2020,u+20a0-20ab,u+20ad-20c0,u+2113,u+2c60-2c7f,u+a720-a7ff;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/plex-sans-latin.woff2') format('woff2');
+  unicode-range: u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+0304,u+0308,u+0329,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range: u+0100-02ba,u+02bd-02c5,u+02c7-02cc,u+02ce-02d7,u+02dd-02ff,u+0304,u+0308,u+0329,u+1d00-1dbf,u+1e00-1e9f,u+1ef2-1eff,u+2020,u+20a0-20ab,u+20ad-20c0,u+2113,u+2c60-2c7f,u+a720-a7ff;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin.woff2') format('woff2');
+  unicode-range: u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+0304,u+0308,u+0329,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: u+0100-02ba,u+02bd-02c5,u+02c7-02cc,u+02ce-02d7,u+02dd-02ff,u+0304,u+0308,u+0329,u+1d00-1dbf,u+1e00-1e9f,u+1ef2-1eff,u+2020,u+20a0-20ab,u+20ad-20c0,u+2113,u+2c60-2c7f,u+a720-a7ff;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin.woff2') format('woff2');
+  unicode-range: u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+0304,u+0308,u+0329,u+2000-206f,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin-ext.woff2') format('woff2');
+  unicode-range: u+0100-02ba,u+02bd-02c5,u+02c7-02cc,u+02ce-02d7,u+02dd-02ff,u+0304,u+0308,u+0329,u+1d00-1dbf,u+1e00-1e9f,u+1ef2-1eff,u+2020,u+20a0-20ab,u+20ad-20c0,u+2113,u+2c60-2c7f,u+a720-a7ff;
+}
 .sayfa {
+  --yazi-display: 'Martian Mono';
+  --yazi-govde: 'IBM Plex Sans';
+  --yazi-veri: 'IBM Plex Mono';
   /* Palet: milimetrik kâğıt. Kâğıt soğuk beyaz, mürekkep lacivert, iki aksan —
      çizim mavisi (izinli) ve mühür kırmızısı (reddedilen). */
   --kagit: #e8eef3;
