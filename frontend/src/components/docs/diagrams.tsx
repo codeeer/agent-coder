@@ -43,24 +43,44 @@ function Box({
   const titleFill =
     tone === "accent" ? "var(--color-accent)" : "var(--color-ink)";
 
+  /*
+   * DİK KÖŞE ve SAÇ TELİ ÇİZGİ — bu bir kart değil, bir çizim öğesi.
+   *
+   * Yuvarlatılmış köşe ve 1,5px kenarlık, kutuyu arayüzdeki bir bileşene
+   * benzetiyordu. Teknik çizimde kenar kalınlığı bilgi taşır: vurgulu olan
+   * kalın, sıradan olan ince. Köşedeki tik işareti de aynı dilden — çizim
+   * sayfalarındaki hizalama işareti.
+   */
+  const kalinlik = tone === "accent" ? 1.4 : 0.9;
+
   return (
-    <g>
+    <g className="cizim-kutu">
       <rect
         x={x}
         y={y}
         width={w}
         height={h}
-        rx={10}
+        rx={1}
         fill={fill}
         stroke={stroke}
-        strokeWidth={1.5}
+        strokeWidth={kalinlik}
       />
+      {tone === "accent" && (
+        /* Sol üstte tik: vurgulu kutuyu renk DIŞINDA bir kanalla da işaretler. */
+        <path
+          d={`M${x} ${y + 9} L${x} ${y} L${x + 9} ${y}`}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={2.4}
+        />
+      )}
       <text
         x={x + w / 2}
-        y={subtitle ? y + h / 2 - 5 : y + h / 2 + 4}
+        y={subtitle ? y + h / 2 - 4 : y + h / 2 + 4}
         textAnchor="middle"
-        fontSize={13}
-        fontWeight={500}
+        fontSize={12.5}
+        fontWeight={600}
+        letterSpacing="-0.01em"
         fill={titleFill}
       >
         {title}
@@ -70,9 +90,19 @@ function Box({
           x={x + w / 2}
           y={y + h / 2 + 13}
           textAnchor="middle"
-          fontSize={11}
+          fontSize={9.5}
+          letterSpacing="0.04em"
           fill="var(--color-ink-3)"
+          className="cizim-mono"
         >
+          {/*
+            BÜYÜK HARFE ÇEVRİLMİYOR — iki sebeple. Altyazılarda araç ve dosya
+            adları geçiyor (`akislari_listele`) ve Türkçe büyük harf onları
+            `AKİSLARİ_LİSTELE` yapıyordu: tanımlayıcı artık yanlış yazılmış
+            oluyor. Ayrıca büyük harf metni genişletip iki kutudan taşırıyordu
+            (ölçüldü: 317px yazı, 280px kutu). Teknik his mono ve harf
+            aralığından geliyor, versaldan değil.
+          */}
           {subtitle}
         </text>
       )}
@@ -104,17 +134,19 @@ function Arrow({
         x2={x2}
         y2={y2}
         stroke="var(--color-line-strong)"
-        strokeWidth={1.5}
-        strokeDasharray={dashed ? "4 4" : undefined}
+        strokeWidth={1}
+        strokeDasharray={dashed ? "3 3" : undefined}
         markerEnd="url(#ac-ok)"
       />
       {label && (
         <text
           x={(x1 + x2) / 2}
-          y={y1 === y2 ? y1 - 7 : (y1 + y2) / 2 - 5}
+          y={y1 === y2 ? y1 - 8 : (y1 + y2) / 2 - 6}
           textAnchor="middle"
-          fontSize={10.5}
+          fontSize={9.5}
+          letterSpacing="0.06em"
           fill="var(--color-ink-3)"
+          className="cizim-mono cizim-etiket"
         >
           {label}
         </text>
@@ -161,6 +193,10 @@ function Zone({
    */
   const labelFill = tone === "line" ? "var(--color-ink-2)" : stroke;
 
+  /* Köşe tikleri: çizim sayfalarındaki hizalama işaretleri. Kesikli çerçeveye
+     sınır olduğunu tek başına söyletmiyor — köşeler de söylüyor. */
+  const tik = 10;
+
   return (
     <g>
       <rect
@@ -168,13 +204,28 @@ function Zone({
         y={y}
         width={w}
         height={h}
-        rx={12}
+        rx={1}
         fill="none"
         stroke={stroke}
-        strokeDasharray="5 5"
+        strokeWidth={0.9}
+        strokeDasharray="4 4"
       />
-      <text x={x + 14} y={y + 18} fontSize={11} fontWeight={600} fill={labelFill}>
-        {label}
+      <g fill="none" stroke={stroke} strokeWidth={1.6}>
+        <path d={`M${x} ${y + tik} L${x} ${y} L${x + tik} ${y}`} />
+        <path d={`M${x + w - tik} ${y} L${x + w} ${y} L${x + w} ${y + tik}`} />
+        <path d={`M${x + w} ${y + h - tik} L${x + w} ${y + h} L${x + w - tik} ${y + h}`} />
+        <path d={`M${x + tik} ${y + h} L${x} ${y + h} L${x} ${y + h - tik}`} />
+      </g>
+      <text
+        x={x + 16}
+        y={y + 17}
+        fontSize={9.5}
+        fontWeight={500}
+        letterSpacing="0.14em"
+        fill={labelFill}
+        className="cizim-mono"
+      >
+        {label.toLocaleUpperCase("tr")}
       </text>
     </g>
   );
@@ -213,9 +264,11 @@ function Blocked({
         strokeWidth={1.5}
         strokeDasharray="4 4"
       />
-      <g stroke="var(--color-danger)" strokeWidth={2} strokeLinecap="round">
-        <line x1={mx - 6} y1={my - 6} x2={mx + 6} y2={my + 6} />
-        <line x1={mx + 6} y1={my - 6} x2={mx - 6} y2={my + 6} />
+      {/* Çarpı yerine BARİYER: çizginin üzerine dik duran çift çizgi, teknik
+          çizimde "buradan geçilmez" işaretidir ve renkten bağımsız okunur. */}
+      <g stroke="var(--color-danger)" strokeWidth={2} strokeLinecap="square">
+        <line x1={mx - 3} y1={my - 8} x2={mx - 3} y2={my + 8} />
+        <line x1={mx + 3} y1={my - 8} x2={mx + 3} y2={my + 8} />
       </g>
       {label && (
         <text
@@ -241,11 +294,17 @@ function Defs() {
         viewBox="0 0 10 10"
         refX="9"
         refY="5"
-        markerWidth="6"
-        markerHeight="6"
+        markerWidth="5"
+        markerHeight="5"
         orient="auto"
       >
-        <path d="M0 0 L10 5 L0 10 z" fill="var(--color-line-strong)" />
+        {/* Dolu üçgen değil açık uç: teknik çizimin ok başı incedir. */}
+        <path
+          d="M0 1 L10 5 L0 9"
+          fill="none"
+          stroke="var(--color-line-strong)"
+          strokeWidth="1.6"
+        />
       </marker>
     </defs>
   );
@@ -275,7 +334,7 @@ function Frame({
       <div className="overflow-x-auto">
         <svg
           viewBox={viewBox}
-          className="w-full"
+          className="cizim-svg w-full"
           style={{ minWidth: 760 }}
           role="img"
           aria-label={label}
@@ -284,9 +343,6 @@ function Frame({
           {children}
         </svg>
       </div>
-      <p className="mt-1.5 text-2xs text-ink-3 sm:hidden">
-        Diyagramın tamamı için yana kaydırın →
-      </p>
     </div>
   );
 }
@@ -330,8 +386,10 @@ export function ProductFlow() {
         x={510}
         y={110}
         textAnchor="middle"
-        fontSize={11}
+        fontSize={9.5}
+        letterSpacing="0.1em"
         fill="var(--color-ink-3)"
+        className="cizim-mono"
       >
         Her kutu tuvalde sürüklenir, birbirine bağlanır ve kendi modelini seçer.
       </text>
@@ -358,25 +416,7 @@ export function Architecture() {
       <Arrow x1={95} y1={86} x2={95} y2={116} />
 
       {/* Sunucu */}
-      <rect
-        x={220}
-        y={20}
-        width={300}
-        height={240}
-        rx={12}
-        fill="none"
-        stroke="var(--color-line)"
-        strokeDasharray="5 5"
-      />
-      <text
-        x={370}
-        y={42}
-        textAnchor="middle"
-        fontSize={11}
-        fill="var(--color-ink-3)"
-      >
-        BACKEND (Go) — tek servis, ek altyapı yok
-      </text>
+      <Zone x={220} y={20} w={300} h={240} label="Backend (Go) — tek servis" />
       <Box
         x={240}
         y={56}
@@ -413,30 +453,12 @@ export function Architecture() {
         w={260}
         h={54}
         title="PostgreSQL"
-        subtitle="akışlar · çalışmalar · şifreli anahtarlar"
+        subtitle="akışlar · çalışmalar · anahtarlar"
       />
       <Arrow x1={370} y1={264} x2={370} y2={286} />
 
       {/* Sandbox */}
-      <rect
-        x={580}
-        y={20}
-        width={420}
-        height={200}
-        rx={12}
-        fill="none"
-        stroke="var(--color-line)"
-        strokeDasharray="5 5"
-      />
-      <text
-        x={790}
-        y={42}
-        textAnchor="middle"
-        fontSize={11}
-        fill="var(--color-ink-3)"
-      >
-        İZOLE AĞ — dışarıya port açmaz
-      </text>
+      <Zone x={580} y={20} w={420} h={200} label="İzole ağ — dışarıya port açmaz" />
       <Box
         x={600}
         y={56}
@@ -469,8 +491,10 @@ export function Architecture() {
         x={790}
         y={276}
         textAnchor="middle"
-        fontSize={11}
+        fontSize={9.5}
+        letterSpacing="0.14em"
         fill="var(--color-ink-3)"
+        className="cizim-mono"
       >
         DIŞ SERVİSLER
       </text>
@@ -534,28 +558,50 @@ export function Architecture() {
 
 /** Seviye kavramı: aynı sütundaki adımlar aynı anda koşar. */
 export function Parallelism() {
+  /*
+   * SEVİYE ÇİZGİLERİ SÜTUNLARIN ARASINDA, İÇİNDEN DEĞİL.
+   *
+   * Önce çizgiler sabit aralıkla (140, 430, 720) konuyordu ve birincisi
+   * "Başlangıç" kutusunun tam ortasından geçiyordu — kutu ikiye bölünmüş
+   * görünüyordu. Ayrıca başlangıç bir SEVİYE DEĞİL, tetikleyici: etiketler
+   * artık sütunların üstünde, ayraçlar boşluklarda.
+   */
+  const sutunlar = [
+    { x: 30, w: 150, etiket: "başlangıç" },
+    { x: 250, w: 180, etiket: "1. seviye" },
+    { x: 540, w: 180, etiket: "2. seviye" },
+    { x: 830, w: 160, etiket: "3. seviye" },
+  ];
+  const ayraclar = [215, 485, 775];
+
   return (
-    <Frame viewBox="0 0 1020 260" label="Paralel çalıştırma">
-      {[0, 1, 2].map((i) => (
-        <g key={i}>
-          <line
-            x1={140 + i * 290}
-            y1={30}
-            x2={140 + i * 290}
-            y2={215}
-            stroke="var(--color-line)"
-            strokeDasharray="4 4"
-          />
-          <text
-            x={140 + i * 290}
-            y={22}
-            textAnchor="middle"
-            fontSize={11}
-            fill="var(--color-ink-3)"
-          >
-            {i + 1}. seviye
-          </text>
-        </g>
+    <Frame viewBox="0 0 1020 268" label="Paralel çalıştırma">
+      {ayraclar.map((x) => (
+        <line
+          key={x}
+          x1={x}
+          y1={34}
+          x2={x}
+          y2={214}
+          stroke="var(--color-line)"
+          strokeWidth={0.9}
+          strokeDasharray="3 5"
+        />
+      ))}
+
+      {sutunlar.map((s) => (
+        <text
+          key={s.etiket}
+          x={s.x + s.w / 2}
+          y={24}
+          textAnchor="middle"
+          fontSize={9.5}
+          letterSpacing="0.1em"
+          fill="var(--color-ink-3)"
+          className="cizim-mono"
+        >
+          {s.etiket}
+        </text>
       ))}
 
       <Box x={30} y={95} w={150} h={54} title="Başlangıç" tone="accent" />
@@ -580,15 +626,35 @@ export function Parallelism() {
       <Arrow x1={436} y1={168} x2={534} y2={134} />
       <Arrow x1={726} y1={122} x2={824} y2={122} />
 
+      {/*
+        ÖLÇÜ ÇİZGİSİ — teknik çizimin kendi aracı ve buradaki asıl bilgi:
+        iki adım örtüştüğü için seviye 18 saniyede bitiyor, 30'da değil.
+      */}
+      <g stroke="var(--color-accent)" strokeWidth={0.9} fill="none">
+        <line x1={250} y1={216} x2={250} y2={230} />
+        <line x1={430} y1={216} x2={430} y2={230} />
+        <line x1={250} y1={223} x2={430} y2={223} />
+      </g>
       <text
-        x={510}
-        y={238}
+        x={340}
+        y={246}
         textAnchor="middle"
-        fontSize={11.5}
+        fontSize={9.5}
+        letterSpacing="0.04em"
+        fill="var(--color-accent)"
+        className="cizim-mono"
+      >
+        örnek: aynı anda 18 sn — sırayla olsaydı 30 sn
+      </text>
+
+      <text
+        x={730}
+        y={246}
+        textAnchor="middle"
+        fontSize={11}
         fill="var(--color-ink-2)"
       >
-        Aynı sütundaki adımlar aynı anda başlar. Sonraki seviye, öncekinin
-        TAMAMI bitmeden başlamaz.
+        Sonraki seviye, öncekinin TAMAMI bitmeden başlamaz.
       </text>
     </Frame>
   );
@@ -877,16 +943,18 @@ export function MCPDirections() {
         x2={512}
         y2={300}
         stroke="var(--color-line)"
-        strokeDasharray="5 5"
+        strokeWidth={0.9}
+        strokeDasharray="3 5"
       />
 
       <text
         x={256}
         y={30}
         textAnchor="middle"
-        fontSize={11.5}
-        fontWeight={600}
+        fontSize={9.5}
+        letterSpacing="0.12em"
         fill="var(--color-ink-2)"
+        className="cizim-mono"
       >
         DIŞARIYA — biz araç kullanırız
       </text>
@@ -894,9 +962,10 @@ export function MCPDirections() {
         x={768}
         y={30}
         textAnchor="middle"
-        fontSize={11.5}
-        fontWeight={600}
+        fontSize={9.5}
+        letterSpacing="0.12em"
         fill="var(--color-ink-2)"
+        className="cizim-mono"
       >
         İÇERİYE — bizi araç olarak kullanırlar
       </text>
@@ -960,7 +1029,7 @@ export function MCPDirections() {
         w={280}
         h={62}
         title="Agent Coder"
-        subtitle="akislari_listele · akis_calistir · calisma_durumu"
+        subtitle="listele · çalıştır · durum"
         tone="accent"
       />
       <Arrow x1={760} y1={222} x2={760} y2={252} />
@@ -1010,9 +1079,10 @@ export function ScriptDeterminism() {
       <text
         x={30}
         y={30}
-        fontSize={11.5}
-        fontWeight={600}
+        fontSize={9.5}
+        letterSpacing="0.12em"
         fill="var(--color-ink-2)"
+        className="cizim-mono"
       >
         BETİKSİZ — model her seferinde yeniden karar verir
       </text>
@@ -1050,15 +1120,17 @@ export function ScriptDeterminism() {
         x2={990}
         y2={148}
         stroke="var(--color-line)"
-        strokeDasharray="5 5"
+        strokeWidth={0.9}
+        strokeDasharray="3 5"
       />
 
       <text
         x={30}
         y={182}
-        fontSize={11.5}
-        fontWeight={600}
+        fontSize={9.5}
+        letterSpacing="0.12em"
         fill="var(--color-ink-2)"
+        className="cizim-mono"
       >
         BETİKLE — model NE ZAMAN&apos;a, betik NE YAPILACAĞINA karar verir
       </text>
@@ -1151,11 +1223,11 @@ export function RunnerAnatomy() {
         Çıkış denetimi açıkken internete rotası olmayan ayrı bir ağda doğar.
       </text>
 
-      <Arrow x1={724} y1={120} x2={790} y2={120} label="silmeden önce" />
+      <Arrow x1={724} y1={120} x2={806} y2={120} label="silmeden önce" />
       <Box
-        x={796}
+        x={812}
         y={92}
-        w={200}
+        w={184}
         h={56}
         title="Engine logları"
         subtitle="container çıktısı + oturum"
