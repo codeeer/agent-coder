@@ -547,12 +547,24 @@ const CSS = `
   --color-ink-3: #55697b;
   --color-accent: var(--mavi);
   --color-accent-soft: rgba(23, 83, 159, 0.1);
+  /* Aksanın ÜZERİNDEKİ mürekkep. Kâğıt rengine bağlanıyor: koyu temada
+     --sayfa-yuzey zaten dönüyor, ayrı bir koyu tanım gerekmiyor. Bu jeton
+     eşlenmezse StepLifecycle'ın adım numaraları global paletten gelir ve
+     sayfanın mavisiyle yalnızca tesadüfen uyuşur. */
+  --color-accent-ink: var(--sayfa-yuzey);
   --color-danger: var(--kirmizi);
   --color-ok: #0f6b4a;
   --color-warn: var(--kehribar);
 
-  margin: -1.5rem -1.25rem;
-  padding: 0 1.25rem 5rem;
+  /* Kabuğun iç boşluğu (AppShell: px-5 py-6 sm:px-6 lg:px-8 lg:py-7). Kâğıdın
+     kenara ulaşması için taşma bu boşluğun tam negatifi olmalı. Sabit
+     yazıldığında yalnızca en dar kırılma noktası iptal oluyordu: 1600px'te iki
+     yanda 12px uygulama zemini ölçüldü. Şerit de aynı jetonlardan besleniyor. */
+  --kabuk-x: 1.25rem;
+  --kabuk-y: 1.5rem;
+
+  margin: calc(var(--kabuk-y) * -1) calc(var(--kabuk-x) * -1);
+  padding: 0 var(--kabuk-x) 5rem;
   position: relative;
   background-color: var(--kagit);
   /* Milimetrik kâğıt: 8px ince, 40px kalın kare. */
@@ -568,26 +580,26 @@ const CSS = `
   line-height: 1.6;
 }
 
-/* Koyu: cyanotype. Mavi zeminde açık çizgiler — blueprint'in kendisi. */
-:root[data-theme="dark"] .sayfa {
-  --kagit: #08192b;
-  --sayfa-yuzey: #0d2338;
-  --murekkep: #e8f1f8;
-  --murekkep-2: #a9c2d6;
-  --cizgi: #24455f;
-  --cizgi-koyu: #4d7796;
-  --mavi: #7fb3f2;
-  --kirmizi: #ff8b84;
-  --kehribar: #e3b25f;
-  --izgara: rgba(127, 179, 242, 0.08);
-  --color-ink-3: #93aec4;
-  --color-raised: #123049;
-  --color-accent-soft: rgba(127, 179, 242, 0.2);
-  --color-ok: #4cc79a;
+/* Tailwind kırılma noktaları: sm 40rem, lg 64rem. Kabuk bu noktalarda iç
+   boşluğunu değiştiriyor, kâğıdın taşması da onu takip ediyor. */
+@media (min-width: 40rem) {
+  .sayfa { --kabuk-x: 1.5rem; }
+}
+@media (min-width: 64rem) {
+  .sayfa { --kabuk-x: 2rem; --kabuk-y: 1.75rem; }
 }
 
+/*
+ * Koyu: cyanotype. Mavi zeminde açık çizgiler — blueprint'in kendisi.
+ *
+ * Jeton listesi globals.css'teki kalıbın aynısıyla İKİ KEZ yazılıyor; sebebi
+ * ve neden tek seçiciye indirilemediği orada anlatılıyor (üç durum: sistem,
+ * açık, koyu). Buradaki kopya sayfanın kendi paletini taşıdığı için gerekli.
+ * Medya sorgusu yalnızca "seçim yapılmamış" durumu kapsar — :not([data-theme])
+ * ve açık seçim sonda durup gerektiğinde kazanır, globals.css ile aynı sıra.
+ */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .sayfa {
+  :root:not([data-theme]) .sayfa {
     --kagit: #08192b;
     --sayfa-yuzey: #0d2338;
     --murekkep: #e8f1f8;
@@ -605,6 +617,23 @@ const CSS = `
   }
 }
 
+:root[data-theme="dark"] .sayfa {
+  --kagit: #08192b;
+  --sayfa-yuzey: #0d2338;
+  --murekkep: #e8f1f8;
+  --murekkep-2: #a9c2d6;
+  --cizgi: #24455f;
+  --cizgi-koyu: #4d7796;
+  --mavi: #7fb3f2;
+  --kirmizi: #ff8b84;
+  --kehribar: #e3b25f;
+  --izgara: rgba(127, 179, 242, 0.08);
+  --color-ink-3: #93aec4;
+  --color-raised: #123049;
+  --color-accent-soft: rgba(127, 179, 242, 0.2);
+  --color-ok: #4cc79a;
+}
+
 /* ── Bölüm rayı ─────────────────────────────────────────────────────────── */
 
 .sayfa .govde { min-width: 0; }
@@ -620,10 +649,9 @@ const CSS = `
     column-gap: 3rem;
     align-items: start;
   }
-  .sayfa .kahraman,
-  .sayfa .soru,
-  .sayfa .sinirlar,
-  .sayfa .kapanis { grid-column: 1; }
+  /* Izgaranın tek içerik öğesi .govde; bölümler onun İÇİNDE, dolayısıyla
+     ızgara öğesi değiller ve kendilerine grid-column verilemez. */
+  .sayfa .govde { grid-column: 1; }
 
   .sayfa .ray {
     display: flex;
@@ -664,13 +692,17 @@ const CSS = `
 /* Dar ekranda ray yerine üstte şerit. */
 .sayfa .serit {
   position: sticky;
-  top: 0;
+  /* Yapışkan ölçü kabuğun İÇ kutusuna göre alınıyor, dolayısıyla top: 0 şeridi
+     kabuğun üst boşluğu kadar aşağıda tutuyordu: üstünde kalan bantta içerik
+     görünerek kayıyordu (1280px'te 28px ölçüldü). Boşluğun negatifi şeridi
+     kâğıdın gerçek üst kenarına oturtuyor. */
+  top: calc(var(--kabuk-y) * -1);
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin: 0 -1.25rem;
-  padding: 0.6rem 1.25rem;
+  margin: 0 calc(var(--kabuk-x) * -1);
+  padding: 0.6rem var(--kabuk-x);
   background: color-mix(in srgb, var(--kagit) 88%, transparent);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--cizgi);
@@ -702,12 +734,40 @@ const CSS = `
   border-bottom: 1px solid currentColor;
 }
 
-/* Bölümler rayın altına gizlenmesin. */
+/* Bölümler şeridin altına gizlenmesin. Şerit tek satır: 820px'e kadar hiçbir
+   masaüstü genişliğinde sarmıyor, 43,8px ölçüldü. 3,5rem şeridin altını
+   kurtarmıyordu — çapa sıçramasında bölümün üst kenarlığı, S3'ün mavi vurgu
+   çizgisi dahil, şeridin arkasında kalıyordu. 4rem hem şeridi hem kenarlığı
+   açıkta bırakıyor. */
 .sayfa .soru,
 .sayfa .sinirlar,
-.sayfa .kahraman { scroll-margin-top: 3.5rem; }
+.sayfa .kahraman { scroll-margin-top: 4rem; }
 
 /* ── Çizimler ───────────────────────────────────────────────────────────── */
+
+/* Çizim dar ekranda küçülmez, kabı kaydırılır — 11px etiketler 4px'e inseydi
+   diyagram görünür ama okunmaz olurdu. Ölçü TEK yerde: aşağıdaki container
+   query aynı sayıya bakıyor. */
+.sayfa .cizim-svg { min-width: 760px; }
+
+.sayfa .cizim-kap { container-type: inline-size; }
+
+/* Kaydırma ipucu yalnızca çizim gerçekten sığmadığında. Kap 760'tan darsa
+   diyagram kırpılıyordu ve bunu söyleyen hiçbir şey yoktu; "her ihtimale
+   karşı" sürekli duran bir ipucu ise sığdığı yerde yalan söylerdi. */
+.sayfa .cizim-ipucu { display: none; }
+
+@container (width < 760px) {
+  .sayfa .cizim-ipucu {
+    display: block;
+    margin: 0.5rem 0 0;
+    font-family: var(--yazi-veri), monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-ink-3);
+  }
+}
 
 /* Çizimin küçük etiketleri mono: teknik çizimde yazı da bir ölçü aracıdır.
    Yalnızca cizim-mono işaretli metinler — kutu başlıkları gövde yazısında

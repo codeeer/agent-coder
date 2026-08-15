@@ -236,20 +236,22 @@ function Zone({
  *
  * Diyagramda "olmayan yol"u çizmek bilinçli: kurumsal okuyucunun ilk sorusu
  * "peki şuraya çıkabilir mi" oluyor ve cevabı ancak çizilmiş bir engel
- * gösterebiliyor. Renk tek kanal değil — yanında "reddedilir" yazıyor.
+ * gösterebiliyor.
+ *
+ * Renk tek kanal değil: engelin yanındaki metni ÇAĞIRAN yazar. Bileşenin kendi
+ * `label` desteği vardı ama hiç kullanılmadı ve kullanılsaydı yazıyı bariyer
+ * çizgilerinin üstüne bindirirdi — çağıran, metni engelin altına koyuyor.
  */
 function Blocked({
   x1,
   y1,
   x2,
   y2,
-  label,
 }: {
   x1: number;
   y1: number;
   x2: number;
   y2: number;
-  label?: string;
 }) {
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
@@ -270,17 +272,6 @@ function Blocked({
         <line x1={mx - 3} y1={my - 8} x2={mx - 3} y2={my + 8} />
         <line x1={mx + 3} y1={my - 8} x2={mx + 3} y2={my + 8} />
       </g>
-      {label && (
-        <text
-          x={mx}
-          y={my - 12}
-          textAnchor="middle"
-          fontSize={10.5}
-          fill="var(--color-danger)"
-        >
-          {label}
-        </text>
-      )}
     </g>
   );
 }
@@ -321,28 +312,33 @@ function Frame({
   label: string;
 }) {
   /*
-   * `minWidth`: dar ekranda diyagram KÜÇÜLMEZ, kabı kaydırılır.
+   * En küçük genişlik: dar ekranda diyagram KÜÇÜLMEZ, kabı kaydırılır.
    *
    * Yalnızca `w-full` verilseydi 1020 birimlik çizim 390px'e sığdırılır ve
    * 11px'lik etiketler ~4px'e inerdi — diyagram görünür ama okunmaz olurdu.
    * Kart `overflow-x-auto` taşıdığı için yatay kaydırma sayfayı bozmuyor.
+   *
+   * Ölçü buraya DEĞİL sayfanın CSS'ine yazılı (`.cizim-svg { min-width }`):
+   * ipucunu gösteren container query aynı sayıya bakıyor ve iki yere yazılırsa
+   * biri değişip diğeri kalır.
    */
   return (
-    <div>
+    <div className="cizim-kap">
       {/* Kaydırma YALNIZCA çizimi sarar. Kart taşısaydı diyagramın altındaki
           açıklama metni de yatay kayardı — okunacak bir paragraf için yanlış. */}
       <div className="overflow-x-auto">
-        <svg
-          viewBox={viewBox}
-          className="cizim-svg w-full"
-          style={{ minWidth: 760 }}
-          role="img"
-          aria-label={label}
-        >
+        <svg viewBox={viewBox} className="cizim-svg w-full" role="img" aria-label={label}>
           <Defs />
           {children}
         </svg>
       </div>
+      {/* Kap çizimden darsa kırpılıyor ve kırpıldığını söyleyen hiçbir şey
+          yoktu. Container query ile ölçülüyor: JavaScript yok, sayfa sunucu
+          bileşeni kalıyor. Ekran okuyucu için gereksiz — svg'nin aria-label'ı
+          zaten çizimin tamamını anlatıyor. */}
+      <p className="cizim-ipucu" aria-hidden="true">
+        ↔ çizim geniş, yatay kaydırın
+      </p>
     </div>
   );
 }
