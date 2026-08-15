@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -106,9 +107,25 @@ func TestGecersizSertifikaVarsayilanaDuser(t *testing.T) {
 	require.Nil(t, kokHavuzu(tr))
 }
 
-func TestClient_TasiyiciyiKullanir(t *testing.T) {
-	c := New(func() string { return kokPEM(t) }).Client(0)
+/*
+ * Taşıyıcı, çağıranın kurduğu istemciye takılabilir olmalı.
+ *
+ * Paketin dışa verdiği tek şey bu: hazır bir `*http.Client` DEĞİL. Sekiz
+ * çağıranın hepsi `rt http.RoundTripper` alıyor ve kendi zaman aşımıyla kendi
+ * istemcisini kuruyor; test de o kullanımı ölçüyor.
+ */
+func TestRoundTripper_CagirananIstemcisineTakilir(t *testing.T) {
+	rt := New(func() string { return kokPEM(t) }).RoundTripper()
+	require.NotNil(t, rt, "dışa verilen taşıyıcı kurulabilmeli")
+
+	// Sekiz çağıranın hepsinin yaptığı şey: kendi zaman aşımıyla kendi
+	// istemcisini kurup taşıyıcıyı takmak.
+	c := &http.Client{Timeout: 15 * time.Second, Transport: rt}
 	require.NotNil(t, c.Transport, "istemci güven katmanından beslenmeli")
+
+	// Sarmalayıcının altında gerçekten kurumsal kök var: `current` her çağrıda
+	// yeniden okunduğu için dışarıdan görünen tek kanıt bu.
+	require.NotNil(t, kokHavuzu(New(func() string { return kokPEM(t) }).current()))
 }
 
 /*

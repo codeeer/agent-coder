@@ -12,6 +12,15 @@
 // yedi ayrı istemciyi tek hamlede kapsardı ama global durumu değiştirmek
 // testlere sızıyor ve ayar değiştiğinde güvenli yenileme yapılamıyor. Bunun
 // yerine taşıyıcı AÇIKÇA enjekte ediliyor.
+//
+// NEDEN HAZIR `*http.Client` VERMİYOR: böyle bir yardımcı vardı ve hiç
+// kullanılmadı — kullanılamazdı. Giden çağrıyı yapan sekiz paketin
+// (llm, mcp, catalog, credentials, gitprovider, jira, github, httpapi)
+// kurucuları `rt http.RoundTripper` alıyor; hazır istemci alabilmeleri için
+// bu paketi import etmeleri, yani yukarıdaki "açıkça enjekte et" kararını
+// tersine çevirmeleri gerekirdi. Zaman aşımı da her çağrının kendi kararı
+// (15 sn doğrulama, 30 sn Jira/GitHub, MCP'de ayardan). Taşıyıcı verilir,
+// istemciyi çağıran kurar.
 package tlstrust
 
 import (
@@ -20,7 +29,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"time"
 )
 
 // Trust, geçerli sertifikaya göre taşıyıcı üretir ve sertifika değişince
@@ -55,14 +63,6 @@ func (t *Trust) RoundTripper() http.RoundTripper {
 	return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		return t.current().RoundTrip(req)
 	})
-}
-
-// Client, verilen zaman aşımıyla hazır bir istemci verir.
-//
-// Çağrı yerlerinin `&http.Client{Timeout: x, Transport: t.RoundTripper()}`
-// kalıbını tekrar tekrar yazmaması için.
-func (t *Trust) Client(timeout time.Duration) *http.Client {
-	return &http.Client{Timeout: timeout, Transport: t.RoundTripper()}
 }
 
 // current, geçerli PEM'e karşılık gelen taşıyıcıyı verir; gerekirse yeniden kurar.
