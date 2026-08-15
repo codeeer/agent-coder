@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -242,23 +243,37 @@ sahteJira, arama ucuna sabit bir sonuç kümesi döndüren sunucu.
 Atlassian'ın gerçek yanıtı değil KENDİ kodumuz doğrulanıyor: kaç task
 bulunduğu, kaçının başladığı ve hatanın kaydedilip kaydedilmediği.
 */
+// sahteGuncellenme, sahte Jira'nın verdiği güncellenme zamanı. Tekrar
+// kontrolünün anahtarı bu değer.
+const sahteGuncellenme = "2026-08-10T00:00:00.000+0300"
+
 func sahteJira(t *testing.T, anahtarlar []string, durum int) *httptest.Server {
 	t.Helper()
+
+	tek := func(k string) map[string]any {
+		return map[string]any{
+			"key": k,
+			"fields": map[string]any{
+				"summary": k + " özeti",
+				"updated": sahteGuncellenme,
+			},
+		}
+	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if durum != http.StatusOK {
 			w.WriteHeader(durum)
 			return
 		}
+		// Webhook yolu tek task okur; tarama yolu liste. Aynı sunucu ikisine de
+		// hizmet ediyor ki webhook'un GERÇEKTEN API'ye gittiği görülebilsin.
+		if key, bulundu := strings.CutPrefix(r.URL.Path, "/rest/api/3/issue/"); bulundu {
+			_ = json.NewEncoder(w).Encode(tek(key))
+			return
+		}
 		var issues []map[string]any
 		for _, k := range anahtarlar {
-			issues = append(issues, map[string]any{
-				"key": k,
-				"fields": map[string]any{
-					"summary": k + " özeti",
-					"updated": "2026-08-10T00:00:00.000+0300",
-				},
-			})
+			issues = append(issues, tek(k))
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"issues": issues})
 	}))
@@ -361,7 +376,7 @@ func TestScanOne_ZatenIslenmisTaskBaslayanaSayilmaz(t *testing.T) {
 	f := scanFixture(t, sahteJira(t, []string{"SCRUM-1", "SCRUM-2", "SCRUM-3"}, 200).URL, true, true)
 	ctx := context.Background()
 
-	fresh, err := f.store.MarkProcessed(ctx, f.wf.ID, "SCRUM-2", "2026-08-10T00:00:00.000+0300")
+	fresh, err := f.store.MarkProcessed(ctx, f.wf.ID, "SCRUM-2", sahteGuncellenme)
 	require.NoError(t, err)
 	require.True(t, fresh)
 
@@ -424,4 +439,136 @@ func TestScanOne_AramaDusersaSebepYazilir(t *testing.T) {
 	require.NotNil(t, st.Error)
 	require.Equal(t, 0, st.Found)
 	require.Equal(t, 0, st.Started)
+}
+
+// ── ScanAll: hangi akış taranır ─────────────────────────────────────────────
+
+/*
+tarananlarFixture, ikisi de ETKİN iki akış kurar: biri Jira tetikleyicili,
+diğeri elle tetiklenen.
+
+İkincisi asıl deneğimiz — taramanın ona hiç dokunmaması gerekiyor.
+*/
+func tarananlarFixture(t *testing.T, jiraURL string) (*Trigger, *workflow.Store, uuid.UUID, uuid.UUID) {
+	t.Helper()
+
+	pool := testutil.TestDB(t)
+	testutil.Truncate(t, pool, "workflows", "runs", "projects", "agents", "credentials")
+
+	ctx := context.Background()
+	var projectID, agentID uuid.UUID
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO projects (name, repo_url) VALUES ('Deneme','https://example.com/r.git')
+		 RETURNING id`).Scan(&projectID))
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO agents (slug, name, prompt, source) VALUES ('coder','Coder','p','builtin')
+		 RETURNING id`).Scan(&agentID))
+
+	store := workflow.NewStore(pool)
+	adim := workflow.Node{ID: "a1", Kind: workflow.KindAgent, Name: "Analiz",
+		Config: workflow.NodeConfig{AgentID: agentID.String(), Model: "m1", Prompt: "{{ input }}"}}
+
+	kur := func(ad string, tetik workflow.Node) uuid.UUID {
+		w, err := store.Create(ctx, workflow.CreateInput{ProjectID: projectID, Name: ad})
+		require.NoError(t, err)
+		_, err = store.SaveVersion(ctx, w.ID, workflow.Graph{
+			Nodes: []workflow.Node{tetik, adim},
+			Edges: []workflow.Edge{{From: tetik.ID, To: adim.ID}},
+		})
+		require.NoError(t, err)
+		_, err = store.Update(ctx, w.ID, workflow.UpdateInput{Name: ad, IsActive: true})
+		require.NoError(t, err)
+		return w.ID
+	}
+
+	jiraID := kur("Jira akışı", workflow.Node{ID: "t1", Kind: workflow.KindTriggerJira,
+		Config: workflow.NodeConfig{JQL: "project = SCRUM"}})
+	elleID := kur("Elle akış", workflow.Node{ID: "t1", Kind: workflow.KindTriggerManual})
+
+	cipher, err := secrets.NewCipher(base64.StdEncoding.EncodeToString(make([]byte, secrets.KeySize)))
+	require.NoError(t, err)
+	creds := credentials.NewStore(pool, cipher)
+	require.NoError(t, creds.Put(ctx, credentials.KindJira, "token",
+		map[string]string{"base_url": jiraURL, "email": "u@e.com"}))
+
+	launcher := workflow.NewLauncher(store,
+		workflow.NewExecutor(store, workflow.Handlers{}, sessizBus{}))
+
+	return New(store, launcher, creds, jira.New(nil), nil, func() int { return 20 }),
+		store, jiraID, elleID
+}
+
+/*
+JIRA TETİKLEYİCİSİ OLMAYAN AKIŞ TARANMAZ.
+
+Tarama bütün etkin akışları geziyor. Elle tetiklenen bir akışta JQL yok; onu
+da taramaya kalkmak yalnızca boşa iş değil, kullanıcının istemediği bir anda
+akış başlatmak demek olurdu.
+
+Dokunulmadığının kanıtı: o akışın tarama durumu HİÇ yazılmamış olmalı.
+*/
+func TestScanAll_YalnizcaJiraTetikleyicisiOlanTaranir(t *testing.T) {
+	tr, store, jiraID, elleID := tarananlarFixture(t, sahteJira(t, []string{"SCRUM-1"}, 200).URL)
+	ctx := context.Background()
+
+	tr.ScanAll(ctx)
+
+	jiraDurum, err := store.ScanState(ctx, jiraID)
+	require.NoError(t, err)
+	require.NotNil(t, jiraDurum.ScannedAt, "Jira tetikleyicili akış taranmalı")
+	require.Equal(t, 1, jiraDurum.Found)
+
+	elleDurum, err := store.ScanState(ctx, elleID)
+	require.NoError(t, err)
+	require.Nil(t, elleDurum.ScannedAt, "elle tetiklenen akışa dokunulmamalı")
+	require.Equal(t, 0, elleDurum.Found)
+}
+
+// ── HandleWebhook ───────────────────────────────────────────────────────────
+
+/*
+WEBHOOK TASK'I API'DEN YENİDEN OKUR.
+
+Gövdedeki alanlara güvenilmiyor: yalnızca anahtar alınıp task API'den
+okunuyor. Sebebi tekrar kontrolü — anahtar, güncellenme zamanı. Webhook kendi
+gövdesindeki zamanı kullansaydı tarama ile webhook aynı task'ı iki FARKLI
+zamanla işaretler ve aynı iş iki kez çalışırdı.
+
+Kanıt: API'nin verdiği zamanla önceden işaretlenmiş bir task webhook'tan
+geçince "zaten işlendi" diye atlanıyor.
+*/
+func TestHandleWebhook_TaskAPIdenOkunurVeTekrarKontroluneGirer(t *testing.T) {
+	tr, store, jiraID, _ := tarananlarFixture(t, sahteJira(t, nil, 200).URL)
+	ctx := context.Background()
+
+	fresh, err := store.MarkProcessed(ctx, jiraID, "SCRUM-9", sahteGuncellenme)
+	require.NoError(t, err)
+	require.True(t, fresh)
+
+	started, err := tr.HandleWebhook(ctx, jiraID, "SCRUM-9")
+	require.NoError(t, err)
+	require.False(t, started,
+		"API'den okunan zaman tekrar kontrolüne girmeli — girmeseydi aynı iş ikinci kez çalışırdı")
+}
+
+// Bilinmeyen task'ta webhook sessiz kalmaz: çağıran 404'ü görebilmeli.
+func TestHandleWebhook_TaskOkunamazsaHataDoner(t *testing.T) {
+	tr, _, jiraID, _ := tarananlarFixture(t, sahteJira(t, nil, http.StatusInternalServerError).URL)
+
+	_, err := tr.HandleWebhook(context.Background(), jiraID, "SCRUM-9")
+	require.Error(t, err)
+}
+
+/*
+JIRA ERİŞİMİ YOKKEN WEBHOOK HATA DÖNER.
+
+Tarama yolundan farkı bilinçli: tarama arka planda çalışıyor ve sebebi tarama
+durumuna yazıyor, webhook ise bir isteğin içinde — çağıran cevabı bekliyor ve
+sessiz bir "başlatılmadı" ona hiçbir şey söylemezdi.
+*/
+func TestHandleWebhook_KimlikYokkenHataDoner(t *testing.T) {
+	f := scanFixture(t, "http://kullanilmayacak.local", false, true)
+
+	_, err := f.tr.HandleWebhook(context.Background(), f.wf.ID, "SCRUM-9")
+	require.Error(t, err)
 }
