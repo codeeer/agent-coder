@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import type { ReportDay } from "@/lib/types";
-import { Tooltip, niceTicks, tickIndexes, useWidth } from "@/components/charts/chrome";
+import {
+  DayLabels,
+  GridLines,
+  HoverGuide,
+  Tooltip,
+  useWidth,
+} from "@/components/charts/chrome";
+import { niceTicks, tickIndexes } from "@/components/charts/scale";
 import {
   formatCount,
   formatDayLabel,
@@ -89,26 +96,13 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
           role="img"
           aria-label={`Günlük maliyet grafiği, toplam ${formatMoney(total)}`}
         >
-          {ticks.map((t) => (
-            <g key={t}>
-              <line
-                x1={PAD.left}
-                x2={width - PAD.right}
-                y1={y(t)}
-                y2={y(t)}
-                className="stroke-line"
-                strokeWidth={1}
-              />
-              <text
-                x={PAD.left - 8}
-                y={y(t) + 3}
-                textAnchor="end"
-                className="fill-ink-3 text-2xs tabular-nums"
-              >
-                {tickLabel(t)}
-              </text>
-            </g>
-          ))}
+          <GridLines
+            ticks={ticks}
+            y={y}
+            x1={PAD.left}
+            x2={width - PAD.right}
+            format={tickLabel}
+          />
 
           {/* Alan dolgusu bir yıkama: seriyi bastırmadan gövde kazandırır. */}
           <path d={area} fill="var(--color-series)" opacity={0.1} />
@@ -123,14 +117,7 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
 
           {active && hover !== null && (
             <>
-              <line
-                x1={x(hover)}
-                x2={x(hover)}
-                y1={PAD.top}
-                y2={PAD.top + plotH}
-                className="stroke-line-strong"
-                strokeWidth={1}
-              />
+              <HoverGuide x={x(hover)} y1={PAD.top} y2={PAD.top + plotH} />
               <circle
                 cx={x(hover)}
                 cy={y(active.costUsd)}
@@ -152,23 +139,13 @@ export function CostTrendChart({ days }: { days: ReportDay[] }) {
             strokeWidth={2}
           />
 
-          {days.map((d, i) =>
-            labelled.has(i) ? (
-              <text
-                key={d.date}
-                x={x(i)}
-                y={HEIGHT - 6}
-                // Uç etiketler ortalanırsa yarısı çizim alanının dışında kalır
-                // ve kırpılır; uçlarda hizalama içeri döner.
-                textAnchor={
-                  i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"
-                }
-                className="fill-ink-3 text-2xs"
-              >
-                {formatDayLabel(d.date)}
-              </text>
-            ) : null,
-          )}
+          <DayLabels
+            days={days}
+            x={x}
+            y={HEIGHT - 6}
+            indexes={labelled}
+            format={formatDayLabel}
+          />
         </svg>
       )}
 

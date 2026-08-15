@@ -3,13 +3,15 @@
 import { useState } from "react";
 import type { ReportDay } from "@/lib/types";
 import {
+  DayLabels,
+  GridLines,
+  HoverGuide,
   Legend,
   Tooltip,
-  niceTicks,
-  tickIndexes,
   useWidth,
   type Series,
 } from "@/components/charts/chrome";
+import { niceTicks, tickIndexes } from "@/components/charts/scale";
 import { formatCount, formatDayLabel, formatDayLong } from "@/components/charts/format";
 
 /**
@@ -84,39 +86,17 @@ export function DailyTrendChart({ days }: { days: ReportDay[] }) {
             aria-label={`Gün gün seyir — ${days.length} gün`}
             onPointerLeave={() => setHover(null)}
           >
-            {/* Izgara çizgileri ve eksen etiketleri */}
-            {ticks.map((t) => (
-              <g key={t}>
-                <line
-                  x1={AXIS_WIDTH}
-                  y1={y(t)}
-                  x2={width}
-                  y2={y(t)}
-                  stroke="var(--color-line)"
-                  strokeWidth={1}
-                />
-                <text
-                  x={AXIS_WIDTH - 6}
-                  y={y(t) + 3}
-                  textAnchor="end"
-                  className="fill-(--color-ink-3) text-[10px] tabular-nums"
-                >
-                  {formatCount(t)}
-                </text>
-              </g>
-            ))}
+            <GridLines
+              ticks={ticks}
+              y={y}
+              x1={AXIS_WIDTH}
+              x2={width}
+              format={formatCount}
+            />
 
             <g transform={`translate(${AXIS_WIDTH} 0)`}>
-              {/* İmlecin bulunduğu günü işaretleyen dikey kılavuz. */}
               {hover !== null && (
-                <line
-                  x1={x(hover)}
-                  y1={TOP_PAD}
-                  x2={x(hover)}
-                  y2={PLOT_HEIGHT}
-                  stroke="var(--color-line-strong)"
-                  strokeWidth={1}
-                />
+                <HoverGuide x={x(hover)} y1={TOP_PAD} y2={PLOT_HEIGHT} />
               )}
 
               {SERIES.map((s) => {
@@ -150,24 +130,13 @@ export function DailyTrendChart({ days }: { days: ReportDay[] }) {
               })}
 
               {/* Gün etiketleri — seyreltilmiş, üst üste binmesin. */}
-              {days.map((d, i) =>
-                labelIndexes.has(i) ? (
-                  <text
-                    key={d.date}
-                    x={x(i)}
-                    y={PLOT_HEIGHT + 16}
-                    /* Uçlardaki etiket ORTALANMAZ: ortalandığında yarısı
-                       çizim alanının dışına taşıyor ve son gün "12 A…"
-                       diye kırpılıyordu. */
-                    textAnchor={
-                      i === 0 ? "start" : i === days.length - 1 ? "end" : "middle"
-                    }
-                    className="fill-(--color-ink-3) text-[10px]"
-                  >
-                    {formatDayLabel(d.date)}
-                  </text>
-                ) : null,
-              )}
+              <DayLabels
+                days={days}
+                x={x}
+                y={PLOT_HEIGHT + 16}
+                indexes={labelIndexes}
+                format={formatDayLabel}
+              />
 
               {/*
                 İşaretçi hedefleri EN SONDA ve şeffaf: çizgilerin üstünde

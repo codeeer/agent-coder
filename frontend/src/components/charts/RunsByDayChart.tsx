@@ -5,11 +5,10 @@ import type { ReportDay } from "@/lib/types";
 import {
   Legend,
   Tooltip,
-  niceTicks,
-  tickIndexes,
   useWidth,
   type Series,
 } from "@/components/charts/chrome";
+import { niceTicks, tickIndexes } from "@/components/charts/scale";
 import { formatCount, formatDayLabel, formatDayLong } from "@/components/charts/format";
 
 /**

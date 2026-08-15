@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { edgeAnchor } from "./scale";
+
 /**
  * Grafik iskeleti — her grafiğin ortak parçaları.
  *
@@ -67,43 +69,89 @@ export function useWidth<T extends HTMLElement>() {
 }
 
 /**
- * Eksen için yuvarlak sayılar üretir.
+ * Yatay ızgara ve y ekseni etiketleri.
  *
- * Ham en büyük değeri eksen ucu yapmak "37" gibi okunmayan bir tavan bırakır;
- * 1/2/5 katlarına yuvarlamak eksen etiketlerini akılda kalır hale getirir.
+ * Koordinatları ÇAĞIRAN verir: iki grafiğin çizim alanı farklı yerde başlıyor
+ * (biri dolgu payıyla, diğeri kaydırılmış bir grupla). Ortaklanan şey geometri
+ * değil, GÖRÜNÜM — çizgi rengi, etiketin hizası ve puntosu.
+ *
+ * Ayrı ayrı yazıldıklarında gerçekten ayrıştılar: biri jetonun utility
+ * karşılığını (`text-2xs`, 11px) kullanırken diğeri `text-[10px]` sabitliyordu
+ * ve aynı sayfadaki iki grafik ekseni farklı puntoda çiziyordu.
  */
-export function niceTicks(max: number, count = 4): number[] {
-  if (max <= 0) return [0, 1];
-
-  const rough = max / count;
-  const magnitude = 10 ** Math.floor(Math.log10(rough));
-  const normalized = rough / magnitude;
-
-  let step: number;
-  if (normalized <= 1) step = magnitude;
-  else if (normalized <= 2) step = 2 * magnitude;
-  else if (normalized <= 5) step = 5 * magnitude;
-  else step = 10 * magnitude;
-
-  // Adım TOPLANARAK değil ÇARPILARAK üretilir: 0,005 gibi bir adımı arka arkaya
-  // toplamak kayan nokta hatası biriktirir ve eksende "0,0100000002" belirir.
-  const steps = Math.ceil(max / step);
-  return Array.from({ length: steps + 1 }, (_, i) => i * step);
+export function GridLines({
+  ticks,
+  y,
+  x1,
+  x2,
+  format,
+}: {
+  ticks: number[];
+  /** Değeri dikey piksel konumuna çeviren ölçek. */
+  y: (value: number) => number;
+  /** Izgara çizgisinin başladığı ve bittiği yatay konum. */
+  x1: number;
+  x2: number;
+  format: (value: number) => string;
+}) {
+  return (
+    <>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={x1} x2={x2} y1={y(t)} y2={y(t)} className="stroke-line" strokeWidth={1} />
+          <text
+            x={x1 - 6}
+            y={y(t) + 3}
+            textAnchor="end"
+            className="fill-ink-3 text-2xs tabular-nums"
+          >
+            {format(t)}
+          </text>
+        </g>
+      ))}
+    </>
+  );
 }
 
-/**
- * Zaman ekseninde gösterilecek etiketleri seyreltir.
- *
- * 90 günün 90 etiketi üst üste biner ve hiçbiri okunmaz; eksen yalnızca
- * konumu anlatacak kadar etiket taşır, geri kalanı ipucunda durur.
- */
-export function tickIndexes(length: number, max = 7): number[] {
-  if (length <= max) return Array.from({ length }, (_, i) => i);
+/** Seyreltilmiş gün etiketleri — hangi günlerin yazılacağını `tickIndexes` seçer. */
+export function DayLabels({
+  days,
+  x,
+  y,
+  indexes,
+  format,
+}: {
+  days: readonly { date: string }[];
+  x: (i: number) => number;
+  /** Etiket satırının dikey konumu (px). */
+  y: number;
+  indexes: ReadonlySet<number>;
+  format: (iso: string) => string;
+}) {
+  return (
+    <>
+      {days.map((d, i) =>
+        indexes.has(i) ? (
+          <text
+            key={d.date}
+            x={x(i)}
+            y={y}
+            textAnchor={edgeAnchor(i, days.length)}
+            className="fill-ink-3 text-2xs"
+          >
+            {format(d.date)}
+          </text>
+        ) : null,
+      )}
+    </>
+  );
+}
 
-  const step = (length - 1) / (max - 1);
-  const out = new Set<number>();
-  for (let i = 0; i < max; i++) out.add(Math.round(i * step));
-  return [...out].sort((a, b) => a - b);
+/** İmlecin durduğu günü işaretleyen dikey kılavuz. */
+export function HoverGuide({ x, y1, y2 }: { x: number; y1: number; y2: number }) {
+  return (
+    <line x1={x} x2={x} y1={y1} y2={y2} className="stroke-line-strong" strokeWidth={1} />
+  );
 }
 
 /**
