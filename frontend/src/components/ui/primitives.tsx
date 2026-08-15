@@ -782,7 +782,8 @@ export function ConfirmStrip({
   onCancel,
   className = "",
 }: {
-  question: string;
+  /** Silinecek şeyin adı yazılabilsin diye düz metin değil. */
+  question: React.ReactNode;
   consequence?: React.ReactNode;
   confirmLabel?: string;
   busyLabel?: string;
@@ -810,6 +811,58 @@ export function ConfirmStrip({
         </Button>
       </div>
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Satır İÇİ onay — eylemin kendi yerinde soran hâli.
+ *
+ * `ConfirmStrip`'ten AYRI bir bileşen çünkü yerleşimleri gerçekten farklı: o
+ * satırın ALTINA tam genişlikte bir bant koyar, bu satırın kendi eylem alanında
+ * kalır. Aynı bileşene sıkıştırılsalardı biri diğerinin yerinde yamuk dururdu.
+ *
+ * NEDEN VAR: bu kalıp beş ekranda ayrı ayrı yazılmıştı ve dördü ayrışmıştı —
+ * kimi "Emin misiniz?" diyip neyin silineceğini söylemiyor, kimi yalnızca
+ * sonucu yazıp soruyu atlıyor, hiçbirinde uyarı işareti yok. Yıkıcı bir eylemin
+ * onayı ekrandan ekrana değişmemeli.
+ *
+ * SORU ZORUNLU, sonuç isteğe bağlı: kullanıcı neye razı olduğunu bilmeden
+ * "Evet, sil" düğmesine basmamalı.
+ */
+export function ConfirmInline({
+  question,
+  consequence,
+  confirmLabel = "Evet, sil",
+  busyLabel = "Siliniyor…",
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  question: React.ReactNode;
+  /** Silmenin sonucu — "Agent'lardan da kaldırılacak." gibi. */
+  consequence?: React.ReactNode;
+  confirmLabel?: string;
+  busyLabel?: string;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="flex items-start gap-1.5 text-xs text-ink-2">
+        <IconAlert className="mt-px size-3.5 shrink-0 text-danger" />
+        <span>
+          {question}
+          {consequence && <> {consequence}</>}
+        </span>
+      </span>
+      <Button size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
+        {busy ? busyLabel : confirmLabel}
+      </Button>
+      <Button size="sm" onClick={onCancel} disabled={busy}>
+        Vazgeç
+      </Button>
     </div>
   );
 }

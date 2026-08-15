@@ -12,6 +12,7 @@ import {
   Panel,
   Skeleton,
   Well,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /**
@@ -69,22 +70,17 @@ export function McpAccessSection() {
                   Yenile
                 </Button>
               ) : (
-                <>
-                  <span className="text-xs text-ink-2">
-                    Eski adres anında geçersiz olur.
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={() => rotate.mutate()}
-                    disabled={rotate.isPending}
-                  >
-                    {rotate.isPending ? "Yenileniyor…" : "Evet, yenile"}
-                  </Button>
-                  <Button size="sm" onClick={() => setConfirming(false)}>
-                    Vazgeç
-                  </Button>
-                </>
+                /* Silme değil ama aynı sınıf: geri alınamaz ve dışarıdaki
+                   istemcileri kırar. Onay biçimi de aynı olmalı. */
+                <ConfirmInline
+                  question="Erişim adresi yenilensin mi?"
+                  consequence="Eski adres anında geçersiz olur."
+                  confirmLabel="Evet, yenile"
+                  busyLabel="Yenileniyor…"
+                  busy={rotate.isPending}
+                  onConfirm={() => rotate.mutate()}
+                  onCancel={() => setConfirming(false)}
+                />
               )}
             </div>
 

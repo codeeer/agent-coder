@@ -24,6 +24,7 @@ import {
   Textarea,
   Well,
   formatDate,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /**
@@ -297,22 +298,18 @@ function ScriptRow({ script }: { script: Script }) {
       </div>
 
       {confirming && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-ink-2">
-            <strong>{script.name}</strong> silinsin mi? Agent&apos;lardan da
-            kaldırılacak.
-          </span>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => remove.mutate()}
-            disabled={remove.isPending}
-          >
-            {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-          </Button>
-          <Button size="sm" onClick={() => setConfirming(false)}>
-            Vazgeç
-          </Button>
+        <div className="mt-2">
+          <ConfirmInline
+            question={
+              <>
+                <strong>{script.name}</strong> silinsin mi?
+              </>
+            }
+            consequence="Agent'lardan da kaldırılacak."
+            busy={remove.isPending}
+            onConfirm={() => remove.mutate()}
+            onCancel={() => setConfirming(false)}
+          />
         </div>
       )}
 

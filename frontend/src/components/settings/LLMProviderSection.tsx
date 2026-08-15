@@ -15,6 +15,7 @@ import {
   Select,
   Panel,
   formatDate,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /** Tür başına arayüz davranışı. */
@@ -326,21 +327,20 @@ function DeleteButton({
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-ink-2">
-        {provider.sync?.modelCount ?? 0} model de silinecek.
-      </span>
-      <Button
-        variant="danger"
-        onClick={() => remove.mutate()}
-        disabled={remove.isPending}
-      >
-        {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-      </Button>
-      <Button onClick={() => setConfirming(false)} disabled={remove.isPending}>
-        Vazgeç
-      </Button>
-    </div>
+    <>
+      {/* Soru eklendi: önce yalnızca sonuç yazıyordu. */}
+      <ConfirmInline
+        question={
+          <>
+            <strong>{provider.name}</strong> silinsin mi?
+          </>
+        }
+        consequence={`${provider.sync?.modelCount ?? 0} model de silinecek.`}
+        busy={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }
 

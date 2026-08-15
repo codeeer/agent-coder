@@ -49,6 +49,7 @@ import {
   Well,
   formatRelative,
   panelLinkClass,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /**
@@ -556,16 +557,19 @@ function AgentDetail({
             açılıyordu; detay sütununda yer var, saklamaya gerek yok.
           */}
           {confirming ? (
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="text-xs text-ink-2">Bu agent silinsin mi?</span>
-              <Button
-                variant="danger"
-                onClick={() => remove.mutate()}
-                disabled={remove.isPending}
-              >
-                {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-              </Button>
-              <Button onClick={() => setConfirming(false)}>Vazgeç</Button>
+            <div className="shrink-0">
+              {/* Adı yazılıyor: detay sütunu seçili agent'ı gösteriyor ama
+                  onay metni tek başına da okunabilir olmalı. */}
+              <ConfirmInline
+                question={
+                  <>
+                    <strong>{agent.name}</strong> silinsin mi?
+                  </>
+                }
+                busy={remove.isPending}
+                onConfirm={() => remove.mutate()}
+                onCancel={() => setConfirming(false)}
+              />
             </div>
           ) : (
             <div className="flex shrink-0 flex-wrap items-center gap-2">

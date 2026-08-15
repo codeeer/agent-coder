@@ -31,7 +31,6 @@ import {
 import {
   IconEdit,
   IconFolder,
-  IconAlert,
   IconGrid,
   IconPlus,
   IconRows,
@@ -626,41 +625,31 @@ function ProjectCard({
 
       {/* ── Silme onayı ── */}
       {confirming && (
-        <div className="border-t border-danger/30 bg-danger-soft px-4 py-3">
-          <p className="flex items-start gap-2 text-xs text-ink">
-            <IconAlert className="mt-px size-4 shrink-0 text-danger" />
-            <span>
-              {project.runCount > 0 ? (
-                <>
-                  <strong>
-                    {formatCount(project.runCount)} çalıştırma geçmişi
-                  </strong>{" "}
-                  de silinecek. Bu geri alınamaz.
-                </>
-              ) : (
-                <>Bu proje silinsin mi?</>
-              )}
-            </span>
-          </p>
-          <div className="mt-2.5 flex gap-2">
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
-            >
-              {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-            </Button>
-            <Button size="sm" onClick={() => setConfirming(false)}>
-              Vazgeç
-            </Button>
-          </div>
-          {remove.isError && (
-            <p className="mt-2 text-xs text-danger">
-              {describeError(remove.error).message}
-            </p>
-          )}
-        </div>
+        /*
+          Elle yazılmış kopyaydı — aynı dosyanın başka bir yerinde zaten
+          `ConfirmStrip` kullanılıyordu. Kopyada SORU da kaybolmuştu: geçmişi
+          olan projede yalnızca sonuç yazıyor, "silinsin mi?" hiç sorulmuyordu.
+        */
+        <ConfirmStrip
+          className="border-t"
+          question={
+            <>
+              <strong>{project.name}</strong> silinsin mi?
+            </>
+          }
+          consequence={
+            project.runCount > 0 ? (
+              <>
+                <strong>{formatCount(project.runCount)} çalıştırma geçmişi</strong>{" "}
+                de silinecek. Bu geri alınamaz.
+              </>
+            ) : undefined
+          }
+          busy={remove.isPending}
+          error={remove.isError ? describeError(remove.error).message : undefined}
+          onConfirm={() => remove.mutate()}
+          onCancel={() => setConfirming(false)}
+        />
       )}
     </div>
   );

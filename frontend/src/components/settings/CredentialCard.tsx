@@ -4,7 +4,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import type { Credential, CredentialKind } from "@/lib/types";
-import { Badge, Button, Input, PanelCard, formatDate } from "@/components/ui/primitives";
+import {
+  Badge,
+  Button,
+  ConfirmInline,
+  Input,
+  PanelCard,
+  formatDate,
+} from "@/components/ui/primitives";
 
 /** Bir kimlik bilgisi türünün arayüzde nasıl görüneceği. */
 export interface CredentialSpec {
@@ -65,7 +72,7 @@ export function CredentialCard({
             <Button onClick={() => setEditing(true)}>
               {configured ? "Değiştir" : "Ekle"}
             </Button>
-            {configured && <DeleteButton kind={spec.kind} />}
+            {configured && <DeleteButton kind={spec.kind} title={spec.title} />}
           </div>
         )}
       </div>
@@ -245,7 +252,7 @@ function describeError(error: unknown): { message: string; hint?: string } {
   }
 }
 
-function DeleteButton({ kind }: { kind: CredentialKind }) {
+function DeleteButton({ kind, title }: { kind: CredentialKind; title: string }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
 
@@ -267,18 +274,17 @@ function DeleteButton({ kind }: { kind: CredentialKind }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-ink-2">Emin misiniz?</span>
-      <Button
-        variant="danger"
-        onClick={() => remove.mutate()}
-        disabled={remove.isPending}
-      >
-        {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-      </Button>
-      <Button onClick={() => setConfirming(false)} disabled={remove.isPending}>
-        Vazgeç
-      </Button>
-    </div>
+    /* "Emin misiniz?" idi: hangi kimlik bilgisinin silineceğini söylemiyordu ve
+       kartta yan yana birkaç tür duruyor. */
+    <ConfirmInline
+      question={
+        <>
+          <strong>{title}</strong> kimlik bilgisi silinsin mi?
+        </>
+      }
+      busy={remove.isPending}
+      onConfirm={() => remove.mutate()}
+      onCancel={() => setConfirming(false)}
+    />
   );
 }

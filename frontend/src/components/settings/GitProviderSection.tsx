@@ -16,6 +16,7 @@ import {
   Select,
   Panel,
   formatDate,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /**
@@ -160,16 +161,20 @@ function GitProviderCard({ provider }: { provider: GitProvider }) {
         )}
 
         {confirming && (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-ink-2">Emin misiniz?</span>
-            <Button
-              variant="danger"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
-            >
-              {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-            </Button>
-            <Button onClick={() => setConfirming(false)}>Vazgeç</Button>
+          <div className="shrink-0">
+            {/* "Emin misiniz?" idi: neyin silineceğini de sonucunu da
+                söylemiyordu. Kullanıcı neye razı olduğunu bilmeli. */}
+            <ConfirmInline
+              question={
+                <>
+                  <strong>{provider.name}</strong> erişimi silinsin mi?
+                </>
+              }
+              consequence="Bu erişimi kullanan projeler kimlik doğrulamasız kalır."
+              busy={remove.isPending}
+              onConfirm={() => remove.mutate()}
+              onCancel={() => setConfirming(false)}
+            />
           </div>
         )}
       </div>

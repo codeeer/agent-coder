@@ -16,6 +16,7 @@ import {
   Select,
   Skeleton,
   formatDate,
+  ConfirmInline,
 } from "@/components/ui/primitives";
 
 /**
@@ -128,19 +129,20 @@ function ServerCard({ server }: { server: McpServer }) {
             </Button>
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-ink-2">Agent&apos;lardan da kaldırılacak.</span>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
-            >
-              {remove.isPending ? "Siliniyor…" : "Evet, sil"}
-            </Button>
-            <Button size="sm" onClick={() => setConfirming(false)}>
-              Vazgeç
-            </Button>
+          <div className="shrink-0">
+            {/* Soru eklendi: önce yalnızca sonuç yazıyordu ve kullanıcı neyin
+                silineceğini satırın başlığından çıkarmak zorundaydı. */}
+            <ConfirmInline
+              question={
+                <>
+                  <strong>{server.name}</strong> silinsin mi?
+                </>
+              }
+              consequence="Agent'lardan da kaldırılacak."
+              busy={remove.isPending}
+              onConfirm={() => remove.mutate()}
+              onCancel={() => setConfirming(false)}
+            />
           </div>
         )}
       </div>
