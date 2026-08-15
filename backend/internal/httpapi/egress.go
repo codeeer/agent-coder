@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/agent-coder/backend/internal/hostlist"
 	"github.com/agent-coder/backend/internal/paging"
 	"github.com/agent-coder/backend/internal/settings"
 )
@@ -88,7 +89,7 @@ func (h *Handler) saglayiciHostlari(ctx context.Context) []string {
 	for _, p := range list {
 		adresler = append(adresler, p.BaseURL)
 	}
-	return hostlariTekille(adresler)
+	return hostlist.Hosts(adresler)
 }
 
 func (h *Handler) depoHostlari(ctx context.Context) []string {
@@ -109,49 +110,34 @@ func (h *Handler) depoHostlari(ctx context.Context) []string {
 	for _, p := range list {
 		adresler = append(adresler, p.RepoURL)
 	}
-	return hostlariTekille(adresler)
+	return hostlist.Hosts(adresler)
 }
 
 func (h *Handler) registryHostlari() []string {
 	if h.deps.Settings == nil {
 		return nil
 	}
-	return hostlariTekille([]string{
+	return hostlist.Hosts([]string{
 		h.deps.Settings.Text(settings.KeyNPMRegistry),
 		h.deps.Settings.Text(settings.KeyMavenRegistry),
 	})
 }
 
-// proxyHostu, proxy adresinden host:port kısmını çıkarır.
-// Tam URL göstermek gereksiz gürültü: şema hep http(s) ve yol yok.
+/*
+ * proxyHostu, proxy adresinden host:port kısmını çıkarır.
+ *
+ * Tam URL göstermek gereksiz gürültü: şema hep http(s) ve yol yok.
+ *
+ * `hostlist.Host` DEĞİL, çünkü ikisi farklı iş yapıyor: orası izin kararına
+ * giren adı üretir ve portu atar — izinli bir domain'e tüm portlar açık
+ * olduğu için port oraya girmemeli. Burası ise yalnızca ekrana yazılan bir
+ * etiket ve portu göstermek gerekiyor; ayrıştırılamayan değer de gizlenmeyip
+ * olduğu gibi yazılıyor, kullanıcı ayara ne girdiğini görebilsin.
+ */
 func proxyHostu(adres string) string {
 	u, err := url.Parse(adres)
 	if err != nil || u.Host == "" {
 		return adres
 	}
 	return u.Host
-}
-
-/*
- * hostlariTekille, adres listesinden yinelemesiz host listesi üretir.
- *
- * Ayrıştırılamayan ve boş değerler ATLANIR: yapılandırılmamış bir alan
- * yüzünden ekranda "bu adres bozuk" gibi bir şey göstermek, kullanıcının hiç
- * dokunmadığı bir yer için gereksiz gürültü olurdu.
- */
-func hostlariTekille(adresler []string) []string {
-	gorulen := map[string]bool{}
-	var hostlar []string
-	for _, a := range adresler {
-		if a == "" {
-			continue
-		}
-		u, err := url.Parse(a)
-		if err != nil || u.Hostname() == "" || gorulen[u.Hostname()] {
-			continue
-		}
-		gorulen[u.Hostname()] = true
-		hostlar = append(hostlar, u.Hostname())
-	}
-	return hostlar
 }

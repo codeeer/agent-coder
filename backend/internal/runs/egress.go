@@ -1,8 +1,7 @@
 package runs
 
 import (
-	"net/url"
-
+	"github.com/agent-coder/backend/internal/hostlist"
 	"github.com/agent-coder/backend/internal/runner"
 )
 
@@ -37,28 +36,11 @@ func zorunluHostlar(
 		adresler = append(adresler, s.URL)
 	}
 
-	gorulen := map[string]bool{}
-	var hostlar []string
-	for _, a := range adresler {
-		h := hostAdi(a)
-		if h == "" || gorulen[h] {
-			continue
-		}
-		gorulen[h] = true
-		hostlar = append(hostlar, h)
-	}
-	return hostlar
-}
-
-// hostAdi, bir adresten host kısmını çıkarır. Ayrıştırılamayan veya host
-// taşımayan değer için boş döner.
-func hostAdi(adres string) string {
-	if adres == "" {
-		return ""
-	}
-	u, err := url.Parse(adres)
-	if err != nil {
-		return ""
-	}
-	return u.Hostname()
+	/*
+		Adres → host çevrimi `hostlist`'te: aynı listeyi bir de "hangi kapılar
+		açık" ekranı hesaplıyor (`httpapi/egress.go`). İki kopyayla yürüseydi
+		biri değişip diğeri kalabilirdi ve ekran, kapının gerçekte izin
+		verdiğinden başka bir şey gösterirdi.
+	*/
+	return hostlist.Hosts(adresler)
 }

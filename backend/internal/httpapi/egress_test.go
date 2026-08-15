@@ -14,23 +14,10 @@ import (
  *
  * Uydurulmuş bir örnek liste göstermek, kullanıcının bilmediği bir kapının
  * açık olduğunu gizlerdi — kuralın tam tersi.
+ *
+ * Adres → host çevriminin kendi testleri `hostlist` paketinde: ilkeli bu uçla
+ * kapının izin listesi paylaşıyor ve testi tek tarafın içinde durmamalı.
  */
-func TestHostlariTekille_AdresteYalnizcaHostKalir(t *testing.T) {
-	hostlar := hostlariTekille([]string{
-		"https://openrouter.ai/api/v1",
-		"https://nexus.sirket.local:8081/repository/npm/",
-	})
-
-	require.Equal(t, []string{"openrouter.ai", "nexus.sirket.local"}, hostlar)
-}
-
-func TestHostlariTekille_YinelenenVeBosAtlanir(t *testing.T) {
-	hostlar := hostlariTekille([]string{
-		"https://ayni.local/a", "https://ayni.local/b", "", "bu adres değil",
-	})
-
-	require.Equal(t, []string{"ayni.local"}, hostlar)
-}
 
 // Proxy tanımlı değilken kaynak "none" olmalı: arayüz "denetim kapalı"
 // diyebilmek için bunu bilmek zorunda.

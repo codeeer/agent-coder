@@ -120,3 +120,66 @@ func TestParse_TekParcaliWildcard(t *testing.T) {
 	require.True(t, Match(desenler, "alt.nexus"))
 	require.False(t, Match(desenler, "nexus"))
 }
+
+/*
+ * Host / Hosts — "kullanıcı yazmasa da izinli" listesinin ilkeli.
+ *
+ * Testler burada, çağıranların içinde değil: aynı ilkeli hem kapının izin
+ * listesi (`runs`) hem de kullanıcıya "hangi kapılar açık" diyen ekran
+ * (`httpapi`) kullanıyor. Çağıranlardan birinin içinde dursaydı, ilkel
+ * değiştiğinde yalnızca o taraf korunurdu.
+ */
+
+// Adresten YALNIZCA host kalır: şema, port ve yol düşer. Port özellikle
+// düşüyor — izinli bir domain'e tüm portlar açıktır (kurumsal Nexus 8081'de).
+func TestHosts_AdresteYalnizcaHostKalir(t *testing.T) {
+	hostlar := Hosts([]string{
+		"https://openrouter.ai/api/v1",
+		"https://nexus.sirket.local:8081/repository/npm/",
+	})
+
+	require.Equal(t, []string{"openrouter.ai", "nexus.sirket.local"}, hostlar)
+}
+
+// Yinelenen, boş ve ayrıştırılamayan değerler sessizce atlanır: bunlar
+// kullanıcının doldurmamış olabileceği ayar alanlarından geliyor.
+func TestHosts_YinelenenVeBosAtlanir(t *testing.T) {
+	hostlar := Hosts([]string{
+		"https://ayni.local/a", "https://ayni.local/b", "", "bu adres değil",
+	})
+
+	require.Equal(t, []string{"ayni.local"}, hostlar)
+}
+
+// SIRA KORUNUR: liste kullanıcıya gösteriliyor ve her okunuşta farklı
+// sıralanan bir liste değişmiş gibi okunurdu.
+func TestHosts_SiraKorunur(t *testing.T) {
+	hostlar := Hosts([]string{
+		"https://ucuncu.local", "https://birinci.local", "https://ikinci.local",
+	})
+
+	require.Equal(t, []string{"ucuncu.local", "birinci.local", "ikinci.local"}, hostlar)
+}
+
+/*
+Host'un ürettiği ad Parse'a VERİLEBİLİR olmalı.
+
+İkisi bu pakette yan yana duruyor ama zinciri kuran çağıran: `runs` adresten
+host çıkarıyor, `runner/opencode` o host'u Parse'a veriyor. Araya şema, port
+ya da yol sızsaydı Parse reddederdi ve zorunlu adres — kullanıcının hiç
+yazmadığı ama ürünün ihtiyaç duyduğu adres — listeye giremezdi.
+*/
+func TestHost_UrettigiAdParseEdilebilir(t *testing.T) {
+	for _, adres := range []string{
+		"https://nexus.sirket.local:8081/repository/npm/",
+		"https://git.sirket.local/takim/proje.git",
+		"http://sizinti-depo/proje.git", // tek parçalı iç ad
+	} {
+		h := Host(adres)
+		require.NotEmpty(t, h, adres)
+
+		desenler, err := Parse(h)
+		require.NoError(t, err, "çıkarılan host whitelist satırı olarak geçerli olmalı: %s", adres)
+		require.True(t, Match(desenler, h))
+	}
+}

@@ -13,6 +13,7 @@ package hostlist
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -125,6 +126,60 @@ func Match(desenler []Pattern, host string) bool {
 		}
 	}
 	return false
+}
+
+/*
+Host, bir YAPILANDIRMA ADRESİNDEN host adını çıkarır.
+
+Boş, ayrıştırılamayan veya host taşımayan değer için boş döner — hata değil.
+Bu adreslerin hepsi kullanıcının doldurmamış olabileceği ayar alanlarından
+geliyor (LLM sağlayıcı, registry, MCP sunucusu). Yapılandırılmamış bir alan
+yüzünden çalıştırmayı reddetmek ya da ekranda "bozuk adres" göstermek,
+kullanıcının hiç dokunmadığı bir yer için gürültü çıkarmak olurdu.
+
+`normalize` UYGULANMAZ: dönen ad `Parse`'a veriliyor ve normalleştirme orada
+zaten yapılıyor. Burada da yapmak, aynı işin iki yerde durması olurdu.
+
+Kapının istek üzerinden gördüğü hedef host BAŞKA bir şeydir ve netgate'in
+kendi işidir: orada kaynak bir URL değil `host:port` biçiminde bir istek
+hedefidir.
+*/
+func Host(adres string) string {
+	if adres == "" {
+		return ""
+	}
+	u, err := url.Parse(adres)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
+/*
+Hosts, adres listesinden SIRAYI KORUYAN, yinelemesiz host listesi üretir.
+
+İKİ ÇAĞIRANI VAR ve ikisi de aynı soruya cevap veriyor: "kullanıcı yazmasa da
+hangi adresler izinli". Biri kapının gerçekten izin verdiği listeyi kuruyor
+(`runs`), diğeri kullanıcıya gösterilen listeyi (`httpapi`). Ayrı kopyalarla
+hesaplandıklarında biri değişip diğeri kalabilir ve ekran, açık olan kapıları
+yanlış gösterir — oysa o ekranın var olma sebebi tam da kullanıcının bilmediği
+bir kapı bırakmamak. Bu yüzden ilkel burada, iki çağıranın da altında duruyor.
+
+Sıra korunuyor: liste kullanıcıya gösteriliyor ve her okunuşta farklı sıralanan
+bir liste, değişmiş gibi okunurdu.
+*/
+func Hosts(adresler []string) []string {
+	gorulen := make(map[string]bool, len(adresler))
+	var hostlar []string
+	for _, a := range adresler {
+		h := Host(a)
+		if h == "" || gorulen[h] {
+			continue
+		}
+		gorulen[h] = true
+		hostlar = append(hostlar, h)
+	}
+	return hostlar
 }
 
 // normalize, DNS adını karşılaştırılabilir hâle getirir: küçük harf ve sondaki
