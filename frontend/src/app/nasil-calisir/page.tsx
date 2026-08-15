@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import {
   Architecture,
+  BatchQueue,
+  CorporateTLS,
+  DataBoundary,
   DataModel,
+  EgressControl,
   Parallelism,
   MCPDirections,
   ProductFlow,
+  RunnerAnatomy,
   ScriptDeterminism,
   StepLifecycle,
   TriggerPaths,
@@ -47,8 +52,42 @@ export default function HowItWorksPage() {
     <div className="space-y-10">
       <PageHeader
         title="Nasıl çalışır?"
-        description="Bir Jira task'ının koda, koddan pull request'e dönüşene kadar izlediği yol."
+        description="Bir Jira task'ının koda, koddan pull request'e dönüşene kadar izlediği yol — ve kurumsal bir ağda nerede durduğu."
       />
+
+      {/*
+        İÇİNDEKİLER — sayfa on iki bölüme çıktı ve sunum sırasında "şu kısma
+        atla" demek gerekiyor. Saf çapa bağlantısı: sayfa hâlâ sunucu bileşeni,
+        JavaScript taşımıyor.
+      */}
+      <nav
+        aria-label="Sayfa bölümleri"
+        className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-1.5 bg-canvas/85 px-1 py-2 backdrop-blur"
+      >
+        {[
+          { id: "urun", label: "Ürün" },
+          { id: "mimari", label: "Mimari" },
+          { id: "kurumsal", label: "Kurumsal kurulum" },
+          { id: "olcek", label: "Ölçek" },
+          { id: "baglantilar", label: "Bağlantılar" },
+          { id: "kararlar", label: "Kararlar ve sınırlar" },
+        ].map((b) => (
+          <a
+            key={b.id}
+            href={`#${b.id}`}
+            className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+          >
+            {b.label}
+          </a>
+        ))}
+      </nav>
+
+      <Chapter
+        id="urun"
+        title="Ürün"
+        lead="Ne yaptığı ve neden tek tek çalıştırmaktan hızlı olduğu."
+      />
+
 
       <Step
         no={1}
@@ -65,25 +104,23 @@ export default function HowItWorksPage() {
 
       <Step
         no={2}
-        title="Parçalar ve sınırlar"
-        lead="Üç servis ve bir de iş başına açılıp kapanan geçici container'lar. Kuyruk, mesaj aracısı, ayrı bir işçi servisi yok."
+        title="Neden hızlı"
+        lead="Motor adımları düz bir sıraya dizmiyor; grafı seviyelere ayırıyor. Birbirini beklemeyen adımlar aynı anda koşuyor."
       >
-        <Architecture />
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Mini title="Canvas">
-            Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi
-            talimat.
-          </Mini>
-          <Mini title="Engine">
-            Grafı seviyelere ayırır, sırayı ve paralelliği belirler, her adımı
-            kaydeder.
-          </Mini>
-          <Mini title="Sandbox">
-            Agent&apos;ı kendi container&apos;ında çalıştırır. Kod dışarı
-            sızmaz, kimlik bilgisi içeri girmez.
-          </Mini>
-        </div>
+        <Parallelism />
+        <Note>
+          Ölçüldü: tuvalden kurulan iki dallı bir akışta iki adım{" "}
+          <b>10 saniye örtüştü</b>. Sıraya dizilseydi toplam süre ikisinin
+          toplamı olurdu.
+        </Note>
       </Step>
+
+      <Chapter
+        id="mimari"
+        title="Mimari"
+        lead="Üç servis, bir de iş başına açılıp kapanan geçici container'lar."
+      />
+
 
       {/*
         Beş sıfat şeridi — mimarinin hemen ardında, bilerek.
@@ -132,8 +169,32 @@ export default function HowItWorksPage() {
         </Trait>
       </div>
 
+
+
       <Step
         no={3}
+        title="Parçalar ve sınırlar"
+        lead="Üç servis ve bir de iş başına açılıp kapanan geçici container'lar. Kuyruk, mesaj aracısı, ayrı bir işçi servisi yok."
+      >
+        <Architecture />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Mini title="Canvas">
+            Akışı çizersiniz. Hangi adım hangi adıma bağlı, hangi model, hangi
+            talimat.
+          </Mini>
+          <Mini title="Engine">
+            Grafı seviyelere ayırır, sırayı ve paralelliği belirler, her adımı
+            kaydeder.
+          </Mini>
+          <Mini title="Sandbox">
+            Agent&apos;ı kendi container&apos;ında çalıştırır. Kod dışarı
+            sızmaz, kimlik bilgisi içeri girmez.
+          </Mini>
+        </div>
+      </Step>
+
+      <Step
+        no={4}
         title="Bir adımın ömrü"
         lead="Her agent adımı sıfırdan başlar: temiz bir container, temiz bir klon. Önceki adımdan yalnızca metin geçer."
       >
@@ -167,65 +228,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={4}
-        title="Neden hızlı"
-        lead="Motor adımları düz bir sıraya dizmiyor; grafı seviyelere ayırıyor. Birbirini beklemeyen adımlar aynı anda koşuyor."
-      >
-        <Parallelism />
-        <Note>
-          Ölçüldü: tuvalden kurulan iki dallı bir akışta iki adım{" "}
-          <b>10 saniye örtüştü</b>. Sıraya dizilseydi toplam süre ikisinin
-          toplamı olurdu.
-        </Note>
-      </Step>
-
-      <Step
         no={5}
-        title="Jira'dan kendiliğinden başlaması"
-        lead="İki giriş yolu var: düzenli JQL taraması ve Jira webhook'u. İkisi de aynı kapıdan geçiyor."
-      >
-        <TriggerPaths />
-        <Note>
-          Aynı task&apos;ın iki kez işlenmemesi <b>veritabanı kısıtıyla</b>{" "}
-          garanti ediliyor. Uygulama içinde &quot;önce sor, sonra yaz&quot;
-          biçiminde bir kontrol olsaydı iki yol aynı anda gelince ikisi de
-          &quot;işlenmemiş&quot; görür ve akış iki kez başlardı.
-        </Note>
-      </Step>
-
-      <Step
-        no={6}
-        title="MCP Server — iki yön"
-        lead="Bir agent yalnızca klonlanmış depoyla çalışırsa çok şey bilmez. MCP, standart bir protokolle dış kaynaklara bağlanmayı sağlıyor — ve aynı protokol ters yönde de işliyor."
-      >
-        <MCPDirections />
-        <Note>
-          Üç kullanım aynı protokolün üç yüzü. <b>Agent karar verirse</b>{" "}
-          esnektir: &quot;bu hatayı düzelt&quot; dediğinizde yığın izini kendisi
-          çeker. <b>Akış karar verirse</b> tekrarlanabilir: her çalıştırmada
-          aynı araç, aynı argümanlarla. <b>Ters yönde</b> ise Agent Coder başka
-          bir agent&apos;ın aracı olur — akışlarınız Claude Desktop&apos;tan
-          tetiklenebilir.
-        </Note>
-      </Step>
-
-      <Step
-        no={7}
-        title="Standart işte standart sonuç"
-        lead="Model her seferinde yeniden karar verir. Keşifte bu doğru; prosedürde risk. Betikler bu ikisini ayırıyor."
-      >
-        <ScriptDeterminism />
-        <Note>
-          Ayarlar&apos;da bir <b>script kütüphanesi</b> var: bir kez yazarsınız,
-          birden fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
-          <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği
-          bugün de kendisi yazıp çalıştırabiliyordu. Değişen tek şey,
-          çalıştırdığı metnin sizin gözden geçirdiğiniz metin olması.
-        </Note>
-      </Step>
-
-      <Step
-        no={8}
         title="Neyi nerede saklıyor"
         lead="Kaydedilen graf değişmez. Geçmiş bir çalışma, o gün hangi tanımla koştuysa onu gösterir."
       >
@@ -244,8 +247,244 @@ export default function HowItWorksPage() {
         </Note>
       </Step>
 
+      <Chapter
+        id="kurumsal"
+        title="Kurumsal kurulum"
+        lead="Kapalı ağda, SSL inspection'ın ardında ve verinin kurumdan çıkmasının istenmediği yerde nasıl duruyor."
+      />
+
+      <Step
+        no={6}
+        title="Bir agent adımı nerede çalışıyor"
+        lead="Her adım kendi geçici container'ında koşar. İçinde ne var, ne yok ve iş bitince ne kalıyor."
+      >
+        <RunnerAnatomy />
+        <Note>
+          Container <b>dışarıya port açmaz</b>, host dosya sistemine bağlanmaz
+          ve başka bir çalıştırmanın container&apos;ını görmez. CPU ve bellek
+          sınırı ayarlardan gelir; varsayılan iş başına iki çekirdek ve dört GB.
+        </Note>
+        <Note>
+          <b>İş bitince silinir</b> — zaman aşımı, iptal ya da sunucunun yeniden
+          başlaması fark etmez. Silmeden hemen önce motorun teşhis verisi
+          toplanır: container çıktısı, motorun log dosyaları ve agent&apos;ın
+          tam oturum geçmişi. Asıl ihtiyaç düşen koşularda ve o veri
+          container&apos;la birlikte gidiyordu.
+        </Note>
+      </Step>
+
+      <Step
+        no={7}
+        title="Çıkış denetimi: proxy ve whitelist"
+        lead="Denetim ayardan değil AĞDAN geliyor: container internete rotası olmayan bir ağda doğuyor ve dışarıya tek yol çıkış kapısı."
+      >
+        <EgressControl />
+        <Note>
+          <b>Neden ortam değişkeni yetmedi:</b> sızıntı ölçümünde{" "}
+          <code className="mx-1 rounded bg-raised px-1.5 py-0.5 font-mono text-xs">
+            HTTP_PROXY
+          </code>
+          ile verilen proxy <b>atlanabiliyordu</b> — 26 bağlantının 5&apos;i
+          atladı. Bu yüzden proxy değişkeni hâlâ yazılıyor (Java, curl ve npm
+          için ayrı ayrı) ama asıl kısıt ağda: rota yoksa atlanacak bir şey de
+          yok.
+        </Note>
+        <Note>
+          <b>Kapı TLS açmaz.</b> Yalnızca{" "}
+          <code className="font-mono text-xs">CONNECT host:443</code>{" "}
+          satırındaki adı görür ve baytları tünneller. Bilinçli bir sınır:
+          araya, sağlayıcı anahtarını görebilecek bir nokta koymuyoruz. Bedeli,
+          kararın yalnızca <b>host&apos;a</b> dayanması — izinli bir host
+          üzerinden sızdırma bu kapının çözebileceği bir şey değil.
+        </Note>
+        <Note>
+          <b>Boş whitelist kısıt yokluğudur.</b> Liste boşken tüm adreslere
+          çıkılır. Bu yüzden zorunlu adresler (LLM sağlayıcı, depo, registry,
+          MCP) listeye <b>yalnızca liste doluyken</b> ekleniyor: boş bir listeye
+          ekleme yapmak, kısıtsız olması gereken bir çalıştırmayı sessizce o dört
+          adresle sınırlardı.
+        </Note>
+      </Step>
+
+      <Step
+        no={8}
+        title="Veri kurumdan çıkıyor mu"
+        lead="Cevap kurulumunuza bağlı ve koşulu net: belirleyici olan modelin nerede çalıştığı."
+      >
+        <DataBoundary />
+        <Note>
+          <b>Kurum içi sağlayıcıyla</b> (LiteLLM, vLLM, OpenAI-uyumlu bir servis)
+          hiçbir istek kurum ağının dışına çıkmaz: kod, talimat ve model yanıtı
+          aynı ağda kalır. OpenRouter zorunlu bir bağımlılık değildir.
+        </Note>
+        <Note>
+          <b>Dış bir sağlayıcıyla</b> model çağrısı kodun bir parçasını dışarı
+          taşır. Bunu çıkış kapısı engelleyemez — engellenirse model hiç
+          çalışmaz. Dürüst cümle şu: bu bir <b>kurulum kararıdır</b>, bir güvenlik
+          ayarı değil. Depoya gönderim ve PR ise her iki kurulumda da{" "}
+          <b>akışın</b> işidir; git kimlik bilgisi agent&apos;a hiç ulaşmaz.
+        </Note>
+      </Step>
+
       <Step
         no={9}
+        title="SSL inspection ve kapalı ağ"
+        lead="Kurumsal ağda giden her bağlantı kurumun sertifikasıyla imzalanır. Dört ayrı yerin bunu bilmesi gerekiyor."
+      >
+        <CorporateTLS />
+        <Note>
+          Sertifika <b>Ayarlar → Kurumsal ağ</b>&apos;dan girilir; biçimi
+          kaydetme anında doğrulanır ve bir sonraki çalıştırmada geçerli olur —
+          yeniden başlatma gerekmez. Biri eksik kalırsa o araç sessizce
+          &quot;sertifika doğrulanamadı&quot; der; bu yüzden dördü birden
+          besleniyor.
+        </Note>
+        <Note>
+          <b>Kapalı ağda kurulum:</b> npm ve Maven kayıt defteri adresi
+          ayarlardan verilir, kimlik container&apos;a <b>dosya olarak</b> girer —
+          ortam değişkenine değil, çünkü agent{" "}
+          <code className="font-mono text-xs">env</code> yazdırabiliyor. Runner
+          imajı ve desteklenen Node sürümleri <b>derleme anında</b> hazırlanır;
+          koşu sırasında hiçbir şey indirilmez.
+        </Note>
+      </Step>
+
+      <Chapter
+        id="olcek"
+        title="Ölçek"
+        lead="Bir projede çalışan bir şeyi otuz projede yürütmek — ve otuz projeyi tek tek eklememek."
+      />
+
+      <Step
+        no={10}
+        title="Aynı akış otuz projede"
+        lead="Otuz projeyi tek tek tetiklemek otuz tur demek. Hepsini birden başlatmak ise çalışmıyor: sınır dolduğunda çalıştırma reddedilir, sıraya alınmaz."
+      >
+        <BatchQueue />
+        <Note>
+          Kuyruk <b>mevcut eşzamanlılık sınırına uyar</b>, kendi paralellik
+          ayarını tanımlamaz — &quot;aynı anda kaç iş&quot; sorusunun tek bir
+          cevabı olmalı. Bir iş bitince sıradaki kendiliğinden başlar; yoklama
+          yok, bitiş olayı kuyruğu uyandırıyor.
+        </Note>
+        <Note>
+          <b>Kuyruk veritabanında yaşar.</b> Otuz projelik bir kampanya saatler
+          sürer ve o sürede bir yeniden başlatma olağandır: bekleyenler beklemeye
+          devam eder, o an çalışanlar <b>kesildi</b> olarak işaretlenir.
+          Kesilenler kendiliğinden tekrarlanmaz — yarım kalmış bir işin yan
+          etkisi habersizce tekrarlanmamalı; &quot;kaldığı yerden devam et&quot;
+          düğmesi kaç işin sıraya alınacağını üzerinde yazar.
+        </Note>
+        <Note>
+          Bir proje düşerse kuyruk <b>durmaz</b>: sebebi o satırda yazar,
+          sıradaki başlar. İptal bekleyenleri düşürür, çalışanlar kendi hâlinde
+          sürer ve sonuçları kaydedilir — onay ekranında bu sayılarla yazılıdır.
+        </Note>
+      </Step>
+
+      <Step
+        no={11}
+        title="Standart işte standart sonuç"
+        lead="Model her seferinde yeniden karar verir. Keşifte bu doğru; prosedürde risk. Betikler bu ikisini ayırıyor."
+      >
+        <ScriptDeterminism />
+        <Note>
+          Ayarlar&apos;da bir <b>script kütüphanesi</b> var: bir kez yazarsınız,
+          birden fazla agent&apos;a atarsınız. Yeni bir yetki açılmıyor —{" "}
+          <b>komut çalıştırma yetkisi zaten açık</b> olan bir agent o betiği
+          bugün de kendisi yazıp çalıştırabiliyordu. Değişen tek şey,
+          çalıştırdığı metnin sizin gözden geçirdiğiniz metin olması.
+        </Note>
+        <Note>
+          <b>Kampanya klasörleri</b> çok adımlı işler için: yedi adımlık bir
+          Node yükseltmesinin adımları bir klasörde toplanır ve agent&apos;a{" "}
+          <b>tek seçimle</b> bağlanır. Klasöre sonradan eklediğiniz bir adım o
+          agent&apos;ta kendiliğinden geçerli olur — atama tazelenmez, çünkü
+          klasörün içeriği çalıştırma anında okunur. Klasör silinirse betikler
+          silinmez, klasörsüz kalır.
+        </Note>
+        <Note>
+          Bu ikisi birleşince kampanya olur: <b>bir klasör + otuz proje</b>.
+          Gerçek bir ölçüm — beş adımlık bir Spring bakım kampanyası beş projede
+          toplu çalıştırıldı; sınır 3 olduğu için üçü koştu, ikisi sırada
+          bekledi. Toplam <b>60 saniye</b> ve <b>$0,0152</b>; çok modüllü bir
+          depoda betikler on üç alt modülü tek tek gezdi.
+        </Note>
+      </Step>
+
+      <Step
+        no={12}
+        title="Otuz projeyi tek tek eklememek"
+        lead="Kurumsal Bitbucket'ta bir grubun adresini verirsiniz; altındaki repository'ler listelenir ve seçtikleriniz proje olur."
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <Mini title="Önizleme">
+            Grup adresi verilir, repository&apos;ler listelenir. Bu adım yan
+            etkisizdir: hiçbir şey kaydedilmez.
+          </Mini>
+          <Mini title="Seçim">
+            Zaten kayıtlı olanlar seçilemez ama <b>listede durur</b> —
+            gizlenselerdi &quot;gruptaki her şey geldi mi&quot; sorusu
+            cevapsız kalırdı. Arşivli olanlar varsayılan seçimin dışındadır.
+          </Mini>
+          <Mini title="Sonuç">
+            Satırlar geldikçe yazılır ve sonunda özet kalır:{" "}
+            <b>9 eklendi, 3 atlandı, 1 başarısız</b> — hangisi neden, satırında
+            yazar.
+          </Mini>
+        </div>
+      </Step>
+
+      <Chapter
+        id="baglantilar"
+        title="Bağlantılar"
+        lead="Sistemin dış dünyayla konuştuğu iki yol: tetikleyiciler ve MCP."
+      />
+
+
+
+
+
+      <Step
+        no={13}
+        title="Jira'dan kendiliğinden başlaması"
+        lead="İki giriş yolu var: düzenli JQL taraması ve Jira webhook'u. İkisi de aynı kapıdan geçiyor."
+      >
+        <TriggerPaths />
+        <Note>
+          Aynı task&apos;ın iki kez işlenmemesi <b>veritabanı kısıtıyla</b>{" "}
+          garanti ediliyor. Uygulama içinde &quot;önce sor, sonra yaz&quot;
+          biçiminde bir kontrol olsaydı iki yol aynı anda gelince ikisi de
+          &quot;işlenmemiş&quot; görür ve akış iki kez başlardı.
+        </Note>
+      </Step>
+
+      <Step
+        no={14}
+        title="MCP Server — iki yön"
+        lead="Bir agent yalnızca klonlanmış depoyla çalışırsa çok şey bilmez. MCP, standart bir protokolle dış kaynaklara bağlanmayı sağlıyor — ve aynı protokol ters yönde de işliyor."
+      >
+        <MCPDirections />
+        <Note>
+          Üç kullanım aynı protokolün üç yüzü. <b>Agent karar verirse</b>{" "}
+          esnektir: &quot;bu hatayı düzelt&quot; dediğinizde yığın izini kendisi
+          çeker. <b>Akış karar verirse</b> tekrarlanabilir: her çalıştırmada
+          aynı araç, aynı argümanlarla. <b>Ters yönde</b> ise Agent Coder başka
+          bir agent&apos;ın aracı olur — akışlarınız Claude Desktop&apos;tan
+          tetiklenebilir.
+        </Note>
+      </Step>
+
+      <Chapter
+        id="kararlar"
+        title="Kararlar ve sınırlar"
+        lead="Geri alınması pahalı seçimler ve neyin nereye eriştiği."
+      />
+
+
+
+      <Step
+        no={15}
         title="Üç karar"
         lead="Sistemin bugünkü halini belirleyen, geri alınması pahalı olan seçimler."
       >
@@ -270,7 +509,7 @@ export default function HowItWorksPage() {
       </Step>
 
       <Step
-        no={10}
+        no={16}
         title="Güvenlik sınırları"
         lead="Neyin nereye eriştiği bilinçli olarak dar tutuldu."
       >
@@ -404,6 +643,31 @@ function Trait({
 
 /* ── Sayfa parçaları ─────────────────────────────────────────────────────── */
 
+/**
+ * Bölüm başlığı — sayfa on altı adıma çıkınca gerekti.
+ *
+ * Adımlar numaralı bir dizi olarak akıyor; bölüm başlığı o diziyi konularına
+ * ayırıyor ve içindekiler bağlantısının hedefi oluyor. Numaralar SÜREKLİ
+ * kalıyor (her bölümde 1'den başlamıyor): sunumda "yedinci adım" demek,
+ * "kurumsal bölümünün ikinci adımı" demekten kısa.
+ */
+function Chapter({
+  id,
+  title,
+  lead,
+}: {
+  id: string;
+  title: string;
+  lead: string;
+}) {
+  return (
+    <section id={id} className="scroll-mt-14 border-t border-line pt-6">
+      <h2 className="text-lg font-semibold tracking-[-0.01em]">{title}</h2>
+      <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">{lead}</p>
+    </section>
+  );
+}
+
 function Step({
   no,
   title,
@@ -422,9 +686,8 @@ function Step({
           {no}
         </span>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-[-0.01em]">
-            {title}
-          </h2>
+          {/* Bölüm h2 olduğu için adım h3: başlık sırası atlanmamalı. */}
+          <h3 className="text-base font-semibold tracking-[-0.01em]">{title}</h3>
           <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-2">
             {lead}
           </p>

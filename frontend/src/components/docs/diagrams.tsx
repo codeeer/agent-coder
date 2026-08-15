@@ -123,6 +123,115 @@ function Arrow({
   );
 }
 
+/**
+ * Bölge — bir sınırı çevreleyen kesikli kutu (container, ağ, kurum).
+ *
+ * Mimari diyagramında elle tekrarlanıyordu; kurumsal diyagramlarda beş kez
+ * daha gerekince kendi parçasına çıkarıldı.
+ */
+function Zone({
+  x,
+  y,
+  w,
+  h,
+  label,
+  tone = "line",
+}: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  tone?: "line" | "danger" | "ok";
+}) {
+  const stroke =
+    tone === "danger"
+      ? "var(--color-danger)"
+      : tone === "ok"
+        ? "var(--color-ok)"
+        : "var(--color-line-strong)";
+
+  /*
+   * ETİKET ÇİZGİYLE AYNI RENK DEĞİL — ölçümle düzeltildi.
+   *
+   * Önce ikisi de `stroke` kullanıyordu; nötr bölgede bu `line-strong` demek
+   * ve koyu temada 11px'lik etiket kart zemininde **1,77** kontrastla
+   * çıkıyordu (eşik 4,5). Çizgi için doğru olan renk, metin için yanlış:
+   * kenarlık sessiz olmalı, etiket okunmalı.
+   */
+  const labelFill = tone === "line" ? "var(--color-ink-2)" : stroke;
+
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx={12}
+        fill="none"
+        stroke={stroke}
+        strokeDasharray="5 5"
+      />
+      <text x={x + 14} y={y + 18} fontSize={11} fontWeight={600} fill={labelFill}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * REDDEDİLEN yol — kırmızı kesikli çizgi ve ucunda çarpı.
+ *
+ * Diyagramda "olmayan yol"u çizmek bilinçli: kurumsal okuyucunun ilk sorusu
+ * "peki şuraya çıkabilir mi" oluyor ve cevabı ancak çizilmiş bir engel
+ * gösterebiliyor. Renk tek kanal değil — yanında "reddedilir" yazıyor.
+ */
+function Blocked({
+  x1,
+  y1,
+  x2,
+  y2,
+  label,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  label?: string;
+}) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  return (
+    <g>
+      <line
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke="var(--color-danger)"
+        strokeWidth={1.5}
+        strokeDasharray="4 4"
+      />
+      <g stroke="var(--color-danger)" strokeWidth={2} strokeLinecap="round">
+        <line x1={mx - 6} y1={my - 6} x2={mx + 6} y2={my + 6} />
+        <line x1={mx + 6} y1={my - 6} x2={mx - 6} y2={my + 6} />
+      </g>
+      {label && (
+        <text
+          x={mx}
+          y={my - 12}
+          textAnchor="middle"
+          fontSize={10.5}
+          fill="var(--color-danger)"
+        >
+          {label}
+        </text>
+      )}
+    </g>
+  );
+}
+
 /** Ok ucu tanımı — her SVG'de bir kez. */
 function Defs() {
   return (
@@ -991,6 +1100,419 @@ export function ScriptDeterminism() {
         Yalnızca komut çalıştırma yetkisi açık agent&apos;lara verilir;
         kapalıysa dosya ortama hiç girmez.
       </text>
+    </Frame>
+  );
+}
+
+/* ── Kurumsal: runner container'ının anatomisi ───────────────────────────── */
+
+/**
+ * Bir agent adımının içinde ne var, ne yok.
+ *
+ * Kurumsal değerlendirmede ilk sorulan bu: "kodum nerede çalışıyor, orada
+ * başka ne var, iş bitince ne kalıyor". Cevabın tamamı tek çizimde.
+ */
+export function RunnerAnatomy() {
+  return (
+    <Frame viewBox="0 0 1020 392" label="Runner container'ının anatomisi">
+      <Box x={20} y={150} w={160} h={64} title="Backend" subtitle="Go, tek servis" />
+      <Arrow x1={186} y1={182} x2={246} y2={182} label="Docker API" />
+
+      <Zone x={250} y={30} w={470} h={330} label="GEÇİCİ CONTAINER — iş başına açılır" />
+
+      <Box x={272} y={62} w={200} h={54} title="/work" subtitle="deponun klonu" tone="accent" />
+      <Box x={490} y={62} w={208} h={54} title="opencode motoru" subtitle="başsız (headless)" />
+      <Box
+        x={272}
+        y={132}
+        w={200}
+        h={54}
+        title="/home/agent/scripts"
+        subtitle="yalnızca yetkiliyse"
+      />
+      <Box x={490} y={132} w={208} h={54} title="ortam değişkenleri" subtitle="token'lar, proxy" />
+      <Box
+        x={272}
+        y={202}
+        w={426}
+        h={48}
+        title="CPU ve bellek sınırı — ayardan"
+        subtitle="varsayılan 2 çekirdek / 4 GB"
+        tone="muted"
+      />
+
+      <text x={272} y={286} fontSize={11.5} fill="var(--color-ink-2)">
+        Dışarıya PORT AÇMAZ. Host dosya sistemine bağlanmaz.
+      </text>
+      <text x={272} y={306} fontSize={11.5} fill="var(--color-ink-2)">
+        Başka bir çalıştırmanın container&apos;ını görmez.
+      </text>
+      <text x={272} y={334} fontSize={11} fill="var(--color-ink-3)">
+        Çıkış denetimi açıkken internete rotası olmayan ayrı bir ağda doğar.
+      </text>
+
+      <Arrow x1={724} y1={120} x2={790} y2={120} label="silmeden önce" />
+      <Box
+        x={796}
+        y={92}
+        w={200}
+        h={56}
+        title="Engine logları"
+        subtitle="container çıktısı + oturum"
+      />
+
+      <Arrow x1={724} y1={230} x2={790} y2={230} label="iş bitince" />
+      <Box
+        x={796}
+        y={202}
+        w={200}
+        h={56}
+        title="container + volume"
+        subtitle="SİLİNİR"
+        tone="muted"
+      />
+      <text x={796} y={286} fontSize={11} fill="var(--color-ink-3)">
+        Zaman aşımı, iptal ya da sunucunun
+      </text>
+      <text x={796} y={302} fontSize={11} fill="var(--color-ink-3)">
+        yeniden başlaması — hepsinde silinir.
+      </text>
+    </Frame>
+  );
+}
+
+/* ── Kurumsal: çıkış denetimi ────────────────────────────────────────────── */
+
+/**
+ * Proxy, whitelist ve reddedilen yol.
+ *
+ * DENETİM AYARDAN DEĞİL AĞDAN GELİYOR — ölçülmüş bir karar: ortam
+ * değişkeniyle verilen proxy ATLANABİLİYOR (26 bağlantının 5'i atladı).
+ * Bu yüzden container internete rotası olmayan bir ağda doğuyor ve dışarıya
+ * tek yol kapı.
+ */
+export function EgressControl() {
+  return (
+    <Frame viewBox="0 0 1020 470" label="Çıkış denetimi: kapı, whitelist ve kurumsal proxy">
+      <Zone x={20} y={40} w={250} h={190} label="İNTERNETE ROTASI OLMAYAN AĞ" />
+      <Box
+        x={42}
+        y={80}
+        w={206}
+        h={64}
+        title="Runner container"
+        subtitle="HTTP_PROXY = kapı"
+        tone="accent"
+      />
+      <text x={42} y={176} fontSize={11} fill="var(--color-ink-3)">
+        Java, curl ve npm için de
+      </text>
+      <text x={42} y={192} fontSize={11} fill="var(--color-ink-3)">
+        ayrı ayrı yazılır — atlanamasın.
+      </text>
+
+      {/* Etiket okun ÜSTÜNDE değil altında: 66px'lik boşluğa 95px'lik metin
+          sığmıyordu ve iki kutunun üzerine biniyordu. */}
+      <Arrow x1={274} y1={112} x2={340} y2={112} />
+      <text x={307} y={136} textAnchor="middle" fontSize={10.5} fill="var(--color-ink-3)">
+        CONNECT
+      </text>
+
+      <Box
+        x={346}
+        y={70}
+        w={240}
+        h={84}
+        title="Çıkış kapısı"
+        subtitle="çalıştırma başına ayrı dinleyici"
+        tone="accent"
+      />
+      <text x={346} y={176} fontSize={11} fill="var(--color-ink-3)">
+        TLS AÇMAZ: yalnızca CONNECT
+      </text>
+      <text x={346} y={192} fontSize={11} fill="var(--color-ink-3)">
+        satırındaki adı görür, baytları tünneller.
+      </text>
+
+      {/* İzinli yol */}
+      <Arrow x1={590} y1={96} x2={660} y2={96} label="izinliyse" />
+      <Box
+        x={666}
+        y={68}
+        w={150}
+        h={56}
+        title="Kurumsal proxy"
+        subtitle="tanımlıysa"
+        tone="muted"
+      />
+      <Arrow x1={820} y1={96} x2={880} y2={96} />
+      <Box x={886} y={68} w={110} h={56} title="Hedef" subtitle="izinli host" />
+
+      {/* Reddedilen yol */}
+      <Blocked x1={590} y1={166} x2={790} y2={196} />
+      <text x={690} y={208} textAnchor="middle" fontSize={10.5} fill="var(--color-danger)">
+        403 — bu adrese çıkış izinli değil
+      </text>
+      <Box x={796} y={170} w={200} h={52} title="Listede olmayan adres" tone="muted" />
+
+      {/* Liste */}
+      <Zone x={20} y={258} w={976} h={186} label="KAPININ BAKTIĞI LİSTE" />
+
+      <Box
+        x={42}
+        y={292}
+        w={300}
+        h={62}
+        title="Sizin whitelist'iniz"
+        subtitle="satır başına bir domain"
+      />
+      <text x={42} y={378} fontSize={11.5} fill="var(--color-ink-2)">
+        BOŞ BIRAKMAK KISIT YOKLUĞUDUR: liste boşken
+      </text>
+      <text x={42} y={396} fontSize={11.5} fill="var(--color-ink-2)">
+        tüm adreslere çıkılır, denetim yalnızca proxy&apos;dir.
+      </text>
+
+      <text x={372} y={318} fontSize={16} fill="var(--color-ink-3)">
+        +
+      </text>
+
+      <Box
+        x={400}
+        y={292}
+        w={330}
+        h={62}
+        title="Zorunlu adresler — kendiliğinden"
+        subtitle="LLM sağlayıcı · depo · registry · MCP"
+        tone="accent"
+      />
+      <text x={400} y={378} fontSize={11.5} fill="var(--color-ink-2)">
+        Ayarlara zaten girdiğiniz adresler listeye kendiliğinden
+      </text>
+      <text x={400} y={396} fontSize={11.5} fill="var(--color-ink-2)">
+        eklenir — ama YALNIZCA whitelist doluyken.
+      </text>
+
+      <text x={766} y={310} fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        Karar host&apos;a bakar,
+      </text>
+      <text x={766} y={328} fontSize={11.5} fontWeight={600} fill="var(--color-ink-2)">
+        porta bakmaz.
+      </text>
+      <text x={766} y={352} fontSize={11} fill="var(--color-ink-3)">
+        İzinli bir host üzerinden
+      </text>
+      <text x={766} y={368} fontSize={11} fill="var(--color-ink-3)">
+        sızdırma bu kapının
+      </text>
+      <text x={766} y={384} fontSize={11} fill="var(--color-ink-3)">
+        çözebileceği bir şey değil.
+      </text>
+    </Frame>
+  );
+}
+
+/* ── Kurumsal: verinin sınırı ────────────────────────────────────────────── */
+
+/**
+ * Kodun kurumdan çıkıp çıkmadığı — koşullu bir cevap, ve koşulu çizili.
+ *
+ * "Veri dışarı çıkmaz" tek başına YANLIŞ olurdu: model çağrısı kodun bir
+ * parçasını sağlayıcıya taşır. Belirleyici olan sağlayıcının nerede
+ * çalıştığı; diyagram iki kurulumu yan yana koyuyor.
+ */
+export function DataBoundary() {
+  return (
+    <Frame viewBox="0 0 1020 430" label="Verinin sınırı: iki kurulum">
+      <Zone x={20} y={30} w={470} h={370} label="A · KURUM İÇİ SAĞLAYICI" tone="ok" />
+      <Box x={44} y={70} w={190} h={54} title="Depo" subtitle="kurum içi git" />
+      <Box x={44} y={144} w={190} h={54} title="Runner" subtitle="klon + agent" tone="accent" />
+      <Arrow x1={139} y1={130} x2={139} y2={140} />
+      <Box
+        x={266}
+        y={144}
+        w={200}
+        h={54}
+        title="LLM sağlayıcı"
+        subtitle="LiteLLM / vLLM — kurum içi"
+        tone="accent"
+      />
+      <Arrow x1={240} y1={171} x2={260} y2={171} />
+      <Box x={44} y={222} w={422} h={48} title="Agent Coder veritabanı" subtitle="çıktı, diff, maliyet, loglar" tone="muted" />
+
+      <text x={44} y={306} fontSize={11.5} fontWeight={600} fill="var(--color-ok)">
+        Hiçbir istek kurum ağının dışına çıkmaz.
+      </text>
+      <text x={44} y={326} fontSize={11} fill="var(--color-ink-2)">
+        Kod, prompt ve model yanıtı aynı ağın içinde kalır;
+      </text>
+      <text x={44} y={342} fontSize={11} fill="var(--color-ink-2)">
+        çıkış kapısı yalnızca iç adreslere izinlidir.
+      </text>
+      <text x={44} y={370} fontSize={11} fill="var(--color-ink-3)">
+        Kapalı ağ kurulumu: runner imajı ve Node sürümleri
+      </text>
+      <text x={44} y={386} fontSize={11} fill="var(--color-ink-3)">
+        derleme anında hazırlanır, koşuda indirme yapılmaz.
+      </text>
+
+      <Zone x={520} y={30} w={476} h={370} label="B · DIŞ SAĞLAYICI (OpenRouter vb.)" />
+      <Box x={544} y={70} w={190} h={54} title="Depo" subtitle="kurum içi git" />
+      <Box x={544} y={144} w={190} h={54} title="Runner" subtitle="klon + agent" tone="accent" />
+      <Arrow x1={639} y1={130} x2={639} y2={140} />
+      <Arrow x1={740} y1={171} x2={790} y2={171} label="izinli host" />
+      <Box x={796} y={144} w={180} h={54} title="Dış LLM API" subtitle="internet" />
+      <Box x={544} y={222} w={432} h={48} title="Agent Coder veritabanı" subtitle="çıktı, diff, maliyet, loglar" tone="muted" />
+
+      <text x={544} y={306} fontSize={11.5} fontWeight={600} fill="var(--color-warn)">
+        Model çağrısı kodun bir parçasını dışarı taşır.
+      </text>
+      <text x={544} y={326} fontSize={11} fill="var(--color-ink-2)">
+        Talimat ve ilgili dosyalar sağlayıcıya gider — bu, çıkış
+      </text>
+      <text x={544} y={342} fontSize={11} fill="var(--color-ink-2)">
+        kapısının engelleyebileceği bir şey değil, kurulum kararıdır.
+      </text>
+      <text x={544} y={370} fontSize={11} fill="var(--color-ink-3)">
+        Depoya gönderim ve PR yine akışın işidir; git kimlik
+      </text>
+      <text x={544} y={386} fontSize={11} fill="var(--color-ink-3)">
+        bilgisi agent&apos;a hiç ulaşmaz.
+      </text>
+    </Frame>
+  );
+}
+
+/* ── Kurumsal: SSL inspection ────────────────────────────────────────────── */
+
+/** Kurumsal kök sertifikanın gittiği dört yer. */
+export function CorporateTLS() {
+  return (
+    <Frame viewBox="0 0 1020 300" label="Kurumsal kök sertifikanın dağıtımı">
+      <Box
+        x={20}
+        y={110}
+        w={220}
+        h={70}
+        title="Kök sertifika (PEM)"
+        subtitle="Ayarlar → Kurumsal ağ"
+        tone="accent"
+      />
+
+      <Arrow x1={246} y1={100} x2={330} y2={62} />
+      <Arrow x1={246} y1={132} x2={330} y2={124} />
+      <Arrow x1={246} y1={158} x2={330} y2={186} />
+      <Arrow x1={246} y1={186} x2={330} y2={248} />
+
+      <Box x={336} y={36} w={300} h={52} title="Backend'in giden çağrıları" subtitle="Jira, git API, katalog, MCP" />
+      <Box x={336} y={98} w={300} h={52} title="Container'ın sistem deposu" subtitle="curl, git, opencode" />
+      <Box x={336} y={160} w={300} h={52} title="Java truststore" subtitle="Maven ve JVM ayrı bakar" />
+      <Box x={336} y={222} w={300} h={52} title="Node / npm" subtitle="NODE_EXTRA_CA_CERTS" />
+
+      <text x={676} y={70} fontSize={11.5} fill="var(--color-ink-2)">
+        SSL inspection yapan bir ağda dördü de
+      </text>
+      <text x={676} y={88} fontSize={11.5} fill="var(--color-ink-2)">
+        gerekiyor: biri eksikse o araç sessizce
+      </text>
+      <text x={676} y={106} fontSize={11.5} fill="var(--color-ink-2)">
+        &quot;sertifika doğrulanamadı&quot; der.
+      </text>
+
+      <text x={676} y={150} fontSize={11} fill="var(--color-ink-3)">
+        Sertifika arayüzden değiştirilir ve
+      </text>
+      <text x={676} y={166} fontSize={11} fill="var(--color-ink-3)">
+        bir sonraki çalıştırmada geçerli olur —
+      </text>
+      <text x={676} y={182} fontSize={11} fill="var(--color-ink-3)">
+        yeniden başlatma gerekmez.
+      </text>
+
+      <text x={676} y={222} fontSize={11} fill="var(--color-ink-3)">
+        Bozuk bir PEM kaydedilmez: dosya
+      </text>
+      <text x={676} y={238} fontSize={11} fill="var(--color-ink-3)">
+        biçimi kaydetme anında doğrulanır.
+      </text>
+    </Frame>
+  );
+}
+
+/* ── Ölçek: toplu çalıştırma kuyruğu ─────────────────────────────────────── */
+
+/** Otuz projede aynı akış — sınır kadar paralel, gerisi sırada. */
+export function BatchQueue() {
+  // Aralık 44'ten 38'e indi: son kutu bölge çerçevesinin ve altındaki notun
+  // üzerine biniyordu (ölçüldü, ekran görüntüsünde görüldü).
+  const bekleyen = ["proje-4", "proje-5", "proje-6", "…proje-30"].map((ad, i) => ({
+    ad,
+    y: 226 + i * 38,
+  }));
+
+  return (
+    <Frame viewBox="0 0 1020 420" label="Toplu çalıştırma kuyruğu">
+      <Box
+        x={20}
+        y={120}
+        w={190}
+        h={64}
+        title="Akış + 30 proje"
+        subtitle="tek hamlede sıraya"
+        tone="accent"
+      />
+      <Arrow x1={216} y1={152} x2={276} y2={152} />
+
+      <Zone x={280} y={30} w={300} h={356} label="KUYRUK — kalıcı, veritabanında" />
+      <Box x={302} y={70} w={256} h={44} title="proje-1" subtitle="çalışıyor" tone="accent" />
+      <Box x={302} y={122} w={256} h={44} title="proje-2" subtitle="çalışıyor" tone="accent" />
+      <Box x={302} y={174} w={256} h={44} title="proje-3" subtitle="çalışıyor" tone="accent" />
+      {bekleyen.map((b) => (
+        <Box key={b.ad} x={302} y={b.y} w={256} h={32} title={b.ad} tone="muted" />
+      ))}
+
+      <text x={302} y={406} fontSize={11} fill="var(--color-ink-3)">
+        Sıra eklenme sırasıdır; öncelik yok.
+      </text>
+
+      <Arrow x1={584} y1={92} x2={650} y2={92} label="sınır kadar" />
+      <Box
+        x={656}
+        y={62}
+        w={200}
+        h={60}
+        title="Eşzamanlılık sınırı"
+        subtitle="Ayarlar → Çalıştırma"
+        tone="accent"
+      />
+      <text x={866} y={88} fontSize={11.5} fill="var(--color-ink-2)">
+        Kuyruğun kendi
+      </text>
+      <text x={866} y={104} fontSize={11.5} fill="var(--color-ink-2)">
+        paralellik ayarı YOK.
+      </text>
+
+      <Arrow x1={584} y1={196} x2={650} y2={196} label="biri bitince" />
+      <Box x={656} y={166} w={340} h={60} title="sıradaki kendiliğinden başlar" subtitle="olay güdümlü — yoklama yok" />
+
+      <Box
+        x={656}
+        y={252}
+        w={340}
+        h={64}
+        title="Bir proje düşerse kuyruk DURMAZ"
+        subtitle="sebebi satırında yazar, sıradaki başlar"
+        tone="muted"
+      />
+      <Box
+        x={656}
+        y={330}
+        w={340}
+        h={64}
+        title="Sunucu yeniden başlarsa"
+        subtitle="bekleyenler bekler, kesilenler düğmeyle sürer"
+        tone="muted"
+      />
     </Frame>
   );
 }
