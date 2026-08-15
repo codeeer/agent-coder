@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { modelAra, vurguAraligi } from "@/components/models/model-search";
 import type { Model } from "@/lib/types";
 import { IconSearch } from "@/components/ui/icons";
 import { Badge } from "@/components/ui/primitives";
@@ -48,41 +49,11 @@ export function ModelPicker({
     [models, modelId, providerId],
   );
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    /*
-     * Arama boşken SEÇİLİ model listenin başında durur.
-     *
-     * Önceden liste alfabetik ilk 60 modeli gösteriyordu ve seçili model —
-     * örneğin `anthropic/claude-haiku-4.5` — çoğu zaman o 60'ın dışında
-     * kalıyordu: kullanıcı listeyi açtığında kendi seçimini göremiyor, hangi
-     * modelde olduğunu doğrulamak için adını yazmak zorunda kalıyordu.
-     */
-    if (!q) {
-      const rest = models.filter((m) => m !== selected).slice(0, 59);
-      return selected ? [selected, ...rest] : models.slice(0, 60);
-    }
-
-    // Kimlik, ad ve sağlayıcı adında arar. Kimlikte geçenler önce gelsin:
-    // kullanıcı genelde model kimliğini yazar.
-    const scored = models
-      .map((m) => {
-        const id = m.id.toLowerCase();
-        const name = m.name.toLowerCase();
-        const provider = m.providerName.toLowerCase();
-
-        if (id.startsWith(q)) return { m, score: 0 };
-        if (id.includes(q)) return { m, score: 1 };
-        if (name.toLowerCase().includes(q)) return { m, score: 2 };
-        if (provider.includes(q)) return { m, score: 3 };
-        return null;
-      })
-      .filter((x): x is { m: Model; score: number } => x !== null);
-
-    scored.sort((a, b) => a.score - b.score || a.m.id.localeCompare(b.m.id));
-    return scored.slice(0, 60).map((x) => x.m);
-  }, [models, query, selected]);
+  // Sıralama ve vurgulama `model-search`'te: ikisi de gözle doğrulanamıyor.
+  const matches = useMemo(
+    () => modelAra(models, query, selected),
+    [models, query, selected],
+  );
 
   // Liste değişince vurgu başa döner; aksi halde var olmayan satır seçili kalır.
   useEffect(() => setHighlight(0), [query]);
@@ -278,19 +249,15 @@ export function ModelPicker({
 
 /** Eşleşen harfleri kalınlaştırır — kullanıcı neden bu sonucun geldiğini görür. */
 function Highlight({ text, query }: { text: string; query: string }) {
-  const q = query.trim().toLowerCase();
-  if (!q) return <>{text}</>;
+  const aralik = vurguAraligi(text, query);
+  if (!aralik) return <>{text}</>;
 
-  const at = text.toLowerCase().indexOf(q);
-  if (at < 0) return <>{text}</>;
-
+  const [bas, son] = aralik;
   return (
     <>
-      {text.slice(0, at)}
-      <span className="font-semibold text-accent">
-        {text.slice(at, at + q.length)}
-      </span>
-      {text.slice(at + q.length)}
+      {text.slice(0, bas)}
+      <span className="font-semibold text-accent">{text.slice(bas, son)}</span>
+      {text.slice(son)}
     </>
   );
 }

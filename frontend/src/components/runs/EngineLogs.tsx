@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
+import { matchesAny, needle } from "@/lib/search";
 import { formatCount } from "@/components/charts/format";
 import { IconDownload } from "@/components/ui/icons";
 import {
@@ -91,13 +92,13 @@ export function EngineLogs({ runId, live }: { runId: string; live: boolean }) {
 
   const satirlar = useMemo(() => {
     const hepsi = (secili?.content ?? "").split("\n");
-    const needle = q.trim().toLocaleLowerCase("tr");
-    if (needle === "") return hepsi.map((metin, i) => ({ no: i + 1, metin }));
+    const n = needle(q);
+    if (n === "") return hepsi.map((metin, i) => ({ no: i + 1, metin }));
     // Satır numarası ARAMADAN ÖNCEKİ numaradır: kullanıcı süzülmüş listede
     // gördüğü satırı ham metinde bulabilmeli.
     return hepsi
       .map((metin, i) => ({ no: i + 1, metin }))
-      .filter((s) => s.metin.toLocaleLowerCase("tr").includes(needle));
+      .filter((s) => matchesAny([s.metin], n));
   }, [secili, q]);
 
   function indir() {

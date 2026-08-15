@@ -12,6 +12,7 @@ import {
 } from "@/lib/project-view";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
+import { matchesAny, needle } from "@/lib/search";
 import type {
   GitProvider,
   Project,
@@ -156,17 +157,12 @@ export default function ProjectsPage() {
 
   const items = useMemo(() => {
     const rows = projects.data?.items ?? [];
-    const needle = q.trim().toLocaleLowerCase("tr");
+    const n = needle(q);
     return rows.filter((p) => {
       const authed = p.gitProviderId !== null;
       if (filter === "auth" && !authed) return false;
       if (filter === "public" && authed) return false;
-      return (
-        needle === "" ||
-        [p.name, p.repoUrl, p.defaultBranch].some((v) =>
-          v.toLocaleLowerCase("tr").includes(needle),
-        )
-      );
+      return matchesAny([p.name, p.repoUrl, p.defaultBranch], n);
     });
   }, [projects.data, filter, q]);
 

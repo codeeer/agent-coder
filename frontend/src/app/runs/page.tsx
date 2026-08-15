@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
 import { readableFailure } from "@/lib/failure";
+import { matchesAny, needle } from "@/lib/search";
 import {
   isActive,
   statusLabel,
@@ -121,14 +122,14 @@ export default function RunsPage() {
   const matched = useMemo(() => {
     const rows = data?.items ?? [];
     const test = FILTERS.find((f) => f.id === filter)!.match;
-    const needle = q.trim().toLocaleLowerCase("tr");
+    const n = needle(q);
     return rows.filter(
       (r) =>
         test(r) &&
-        (needle === "" ||
-          [r.task, r.projectName, r.agentSlug, r.modelId, r.workflowName]
-            .filter(Boolean)
-            .some((v) => v!.toLocaleLowerCase("tr").includes(needle))),
+        matchesAny(
+          [r.task, r.projectName, r.agentSlug, r.modelId, r.workflowName],
+          n,
+        ),
     );
   }, [data, filter, q]);
 

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
+import { matchesAny, needle } from "@/lib/search";
 import {
   WorkflowRunBadge,
   isWorkflowActive,
@@ -95,14 +96,11 @@ export default function WorkflowsPage() {
 
   const items = useMemo(() => {
     const rows = workflows.data?.items ?? [];
-    const needle = q.trim().toLocaleLowerCase("tr");
+    const n = needle(q);
     return rows.filter(
       (w) =>
         matches(w, filter) &&
-        (needle === "" ||
-          [w.name, w.description, w.projectName]
-            .filter(Boolean)
-            .some((v) => v.toLocaleLowerCase("tr").includes(needle))),
+        matchesAny([w.name, w.description, w.projectName], n),
     );
   }, [workflows.data, filter, q]);
 

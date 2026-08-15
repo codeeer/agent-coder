@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { Pagination } from "@/components/ui/Pagination";
 import { describeError } from "@/lib/errors";
+import { matchesAny, needle } from "@/lib/search";
 import type { Agent, LLMProvider, Model, ReportGroup, Run } from "@/lib/types";
 import { ModelPicker } from "@/components/models/ModelPicker";
 import { StartRunForm } from "@/components/runs/StartRunForm";
@@ -150,14 +151,11 @@ export default function AgentsPage() {
   });
   const items = useMemo(() => {
     const rows = agents.data?.items ?? [];
-    const needle = q.trim().toLocaleLowerCase("tr");
+    const n = needle(q);
     return rows.filter(
       (a) =>
         matches(a, filter) &&
-        (needle === "" ||
-          [a.name, a.slug, a.description, a.defaultModel]
-            .filter(Boolean)
-            .some((v) => v.toLocaleLowerCase("tr").includes(needle))),
+        matchesAny([a.name, a.slug, a.description, a.defaultModel], n),
     );
   }, [agents.data, filter, q]);
 

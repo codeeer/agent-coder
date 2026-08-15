@@ -1,21 +1,17 @@
+import { fold } from "../../lib/search.ts";
 import type { SettingValue } from "@/lib/types";
 
 /**
  * Ayar araması — eşleştirme mantığı.
  *
- * Bileşenin İÇİNDE DEĞİL: Türkçe büyük/küçük harf katlaması ("IŞIK" ↔ "ışık",
- * "İŞ" ↔ "iş") hataya en açık kısım ve bir React bileşeninin içine gömülseydi
- * doğruluğu ancak tarayıcıda, elle, tek tek denenerek görülebilirdi.
- */
-
-/**
- * Katlama `tr` yerelinde yapılır.
+ * Bileşenin İÇİNDE DEĞİL: doğruluğu ancak tarayıcıda, elle, tek tek denenerek
+ * görülebilirdi.
  *
- * Varsayılan `toLowerCase()` ile "IŞIK" → "ışik" olur: noktasız I doğru
- * katlanmaz ve kullanıcının yazdığı "ışık" hiçbir zaman eşleşmez. Aynı şekilde
- * "İŞ" → "i̇ş" (birleşik nokta) çıkar ve "iş" aramasını kaçırır.
+ * Katlama kuralı `lib/search`'ten geliyor ve gerekçesi orada. Buradaki fark
+ * EŞLEŞTİRME BİÇİMİ: ayar araması çok kelimeli ve VE'li, ürünün geri kalanı
+ * ise tek parça alt dize arıyor. İkisi bilinçli olarak ayrı (aşağıya bakın),
+ * bu yüzden `matchesAny` kullanılmıyor.
  */
-const fold = (s: string) => s.toLocaleLowerCase("tr");
 
 /** Sorguyu aranacak kelimelere ayırır; boş sorgu boş dizi verir. */
 const terms = (q: string) => fold(q).split(/\s+/).filter(Boolean);

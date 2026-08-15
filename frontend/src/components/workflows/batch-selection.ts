@@ -1,3 +1,4 @@
+import { matchesAny, needle } from "../../lib/search.ts";
 import type { Project, RunBatchItem } from "@/lib/types";
 
 /**
@@ -15,13 +16,9 @@ import type { Project, RunBatchItem } from "@/lib/types";
  * ve kullanıcı hangisini seçtiğini ancak adresten ayırt eder.
  */
 export function projeAra(projects: Project[], sorgu: string): Project[] {
-  const q = sorgu.trim().toLocaleLowerCase("tr");
-  if (q === "") return projects;
-  return projects.filter(
-    (p) =>
-      p.name.toLocaleLowerCase("tr").includes(q) ||
-      p.repoUrl.toLocaleLowerCase("tr").includes(q),
-  );
+  const n = needle(sorgu);
+  if (n === "") return projects;
+  return projects.filter((p) => matchesAny([p.name, p.repoUrl], n));
 }
 
 /** Tek bir projenin seçimini açar ya da kapatır. */
