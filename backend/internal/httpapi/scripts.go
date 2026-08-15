@@ -3,9 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
+
+	"github.com/google/uuid"
 
 	"github.com/agent-coder/backend/internal/scripts"
 )
@@ -38,7 +39,33 @@ func (h *Handler) listScripts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page := pageOf(r)
-	list, total, err := h.deps.Scripts.List(r.Context(), page.Limit, page.Offset)
+	f := scripts.Filter{
+		Query:  r.URL.Query().Get("q"),
+		Limit:  page.Limit,
+		Offset: page.Offset,
+	}
+
+	/*
+	 * Klasör süzgeci: kimlik ya da "none".
+	 *
+	 * "Klasörsüz" ayrı bir değer olmak zorunda — boş bırakmak "hepsi" demek ve
+	 * kullanıcının "klasöre girmemiş betiklerim hangileri" sorusu cevapsız
+	 * kalırdı.
+	 */
+	switch raw := r.URL.Query().Get("folder"); raw {
+	case "":
+	case "none":
+		f.Unfiled = true
+	default:
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_folder", "klasör kimliği geçersiz")
+			return
+		}
+		f.FolderID = &id
+	}
+
+	list, total, err := h.deps.Scripts.List(r.Context(), f)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "betikler listelenemedi", "error", err)
 		respondError(w, http.StatusInternalServerError, "internal_error", "betikler okunamadı")

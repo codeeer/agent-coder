@@ -5,7 +5,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import { PROJECT_DIR, scriptPath, type Script } from "@/lib/types";
-import { IconPlus } from "@/components/ui/icons";
+import { IconPlus, IconTrash, IconEdit } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/Pagination";
 import { ScriptFolders } from "./ScriptFolders";
 import {
@@ -13,9 +13,12 @@ import {
   Button,
   PanelCard,
   Input,
+  List,
   Mono,
   Notice,
   Panel,
+  RowAction,
+  SearchField,
   Select,
   Skeleton,
   Textarea,
@@ -23,7 +26,17 @@ import {
   formatDate,
 } from "@/components/ui/primitives";
 
-const PAGE_SIZE = 10;
+/**
+ * Sayfa boyutu.
+ *
+ * 10'du, 20 oldu: yoğun satırla (~44px) yirmi kayıt yaklaşık iki ekran tutuyor,
+ * eskiden on kayıt üç ekran tutuyordu. Sayfalama listeyi değil VERİTABANINI
+ * koruyor; asıl bulma aracı artık arama.
+ */
+const PAGE_SIZE = 20;
+
+/** Klasör süzgecinin "klasörsüz" değeri — boş bırakmak "hepsi" demek. */
+const KLASORSUZ = "none";
 
 /**
  * Betik kütüphanesi — agent'ların çalıştırabileceği hazır prosedürler.
@@ -32,17 +45,42 @@ const PAGE_SIZE = 10;
  * bu davranış, prosedürde (yükseltme, geçiş, kontrol listesi) risktir. Betik bir
  * kez yazılır ve her çalıştığında aynı şeyi yapar.
  *
- * Sınır kullanıcıya da anlatılır: model betiği NE ZAMAN çağıracağına karar
- * verir, NE YAPACAĞINA betik karar verir.
+ * EKRANIN ANA GÖREVİ ARAMAKTIR, eklemek değil: kütüphane büyüdükçe kullanıcı
+ * buraya çoğunlukla "şu betiği düzenleyeceğim" diye geliyor. Bu yüzden üstte
+ * araç çubuğu (arama + kampanya süzgeci), altında yoğun satırlar var; arama
+ * SUNUCUDA yapılıyor, yoksa yalnızca açık sayfayı arar ve var olan bir betiğe
+ * "yok" derdi.
  */
 export function ScriptSection() {
   const [adding, setAdding] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [sorgu, setSorgu] = useState("");
+  const [klasor, setKlasor] = useState("");
+
+  const folders = useQuery({
+    queryKey: ["script-folders"],
+    queryFn: api.scriptFolders.list,
+  });
 
   const scripts = useQuery({
-    queryKey: ["scripts", offset],
-    queryFn: () => api.scripts.list({ limit: PAGE_SIZE, offset }),
+    queryKey: ["scripts", offset, sorgu, klasor],
+    queryFn: () =>
+      api.scripts.list({
+        limit: PAGE_SIZE,
+        offset,
+        q: sorgu.trim() || undefined,
+        folder: klasor || undefined,
+      }),
   });
+
+  // Süzgeç değişince sayfa başa döner: üçüncü sayfadayken süzmek, sonuç varken
+  // boş bir sayfa göstermek olurdu.
+  const suz = (yeni: () => void) => {
+    yeni();
+    setOffset(0);
+  };
+
+  const suzuluyor = sorgu.trim() !== "" || klasor !== "";
 
   return (
     <Panel
@@ -61,10 +99,46 @@ export function ScriptSection() {
       }
     >
       <div className="space-y-3">
-        <ScriptFolders />
+        {/*
+          Kampanyalar betiklerin ÜSTÜNDE değil, yanında: klasör satırına
+          basmak listeyi o kampanyaya süzüyor. İki liste artık birbirine
+          bağlı — eskiden aynı kampanyanın adımları iki ayrı yerde duruyordu.
+        */}
+        <ScriptFolders
+          seciliKlasor={klasor}
+          onSelect={(id) => suz(() => setKlasor(id === klasor ? "" : id))}
+        />
 
-        <div className="border-t border-line pt-3">
-          <p className="text-sm font-medium">Betikler</p>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <div className="min-w-52 flex-1">
+            <SearchField
+              value={sorgu}
+              placeholder="Betik ara — ad veya açıklama"
+              aria-label="Betik ara"
+              onChange={(e) => suz(() => setSorgu(e.target.value))}
+            />
+          </div>
+
+          <Select
+            className="w-52"
+            aria-label="Kampanya süzgeci"
+            value={klasor}
+            onChange={(e) => suz(() => setKlasor(e.target.value))}
+          >
+            <option value="">Tüm betikler</option>
+            <option value={KLASORSUZ}>Klasörsüz (ortak)</option>
+            {folders.data?.items.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </Select>
+
+          {suzuluyor && (
+            <Button size="sm" variant="ghost" onClick={() => suz(() => { setSorgu(""); setKlasor(""); })}>
+              Süzgeci temizle
+            </Button>
+          )}
         </div>
 
         {adding && <ScriptForm onDone={() => setAdding(false)} />}
@@ -74,21 +148,43 @@ export function ScriptSection() {
           <Notice tone="error">{describeError(scripts.error).message}</Notice>
         )}
 
+        {/*
+          İki ayrı boşluk, iki ayrı cümle: hiç betik olmaması ile aramanın
+          sonuç vermemesi aynı şey değil. İkisine de "henüz betik yok" demek,
+          süzgeci açık unutmuş kullanıcıya kütüphanesinin silindiğini
+          düşündürürdü.
+        */}
         {scripts.data?.total === 0 && !adding && (
           <PanelCard>
-            <p className="text-sm text-ink-2">
-              Henüz betik yok. Bir agent standart bir işi &mdash; bağımlılık
-              yükseltme, geçiş uygulama, kontrol listesi &mdash; her seferinde
-              biraz farklı yapabilir. Betik bunu sabitler:{" "}
-              <strong>model ne zaman çağıracağına karar verir, ne yapacağına
-              betik karar verir.</strong>
-            </p>
+            {suzuluyor ? (
+              <p className="text-sm text-ink-2">
+                Bu süzgece uyan betik yok.{" "}
+                <button
+                  className="underline underline-offset-2 hover:text-ink"
+                  onClick={() => suz(() => { setSorgu(""); setKlasor(""); })}
+                >
+                  Süzgeci temizle
+                </button>
+              </p>
+            ) : (
+              <p className="text-sm text-ink-2">
+                Henüz betik yok. Bir agent standart bir işi &mdash; bağımlılık
+                yükseltme, geçiş uygulama, kontrol listesi &mdash; her seferinde
+                biraz farklı yapabilir. Betik bunu sabitler:{" "}
+                <strong>model ne zaman çağıracağına karar verir, ne yapacağına
+                betik karar verir.</strong>
+              </p>
+            )}
           </PanelCard>
         )}
 
-        {scripts.data?.items.map((s) => (
-          <ScriptCard key={s.id} script={s} />
-        ))}
+        {scripts.data && scripts.data.items.length > 0 && (
+          <List>
+            {scripts.data.items.map((s) => (
+              <ScriptRow key={s.id} script={s} />
+            ))}
+          </List>
+        )}
 
         {scripts.data && (
           <Pagination
@@ -112,7 +208,14 @@ export function ScriptSection() {
   );
 }
 
-function ScriptCard({ script }: { script: Script }) {
+/**
+ * Tek satır — eski kartın üçte biri kadar yer tutar.
+ *
+ * Ne gitti: "Güncellendi" satırı üstveriye indi (yol ile aynı satırda), iki
+ * düğme hover'a çekildi. Her satırda duran bir "Sil", listenin asıl işinin
+ * (bulmak) önüne geçiyordu.
+ */
+function ScriptRow({ script }: { script: Script }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -121,68 +224,104 @@ function ScriptCard({ script }: { script: Script }) {
     mutationFn: () => api.scripts.remove(script.id),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["scripts"] });
+      void qc.invalidateQueries({ queryKey: ["script-folders"] });
       void qc.invalidateQueries({ queryKey: ["agents"] });
     },
   });
 
   if (editing) {
-    return <ScriptForm script={script} onDone={() => setEditing(false)} />;
+    return (
+      <div className="p-3">
+        <ScriptForm script={script} onDone={() => setEditing(false)} />
+      </div>
+    );
   }
 
   return (
-    <PanelCard>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{script.name}</span>
+    <div className="group px-4 py-2.5">
+      <div className="flex items-start gap-3">
+        {/*
+          İKİ SATIR, üç değil: ad + kampanya üstte, açıklama ve üstveri altta.
+          Üçüncü satır (ayrı duran yol) satır yüksekliğini 76px'e çıkarıyordu;
+          aynı bilgi burada 52px'e sığıyor ve ekranda iki katı satır görünüyor.
+
+          Yol GİZLENMİYOR, sağa alınıyor: kullanıcı agent talimatında ona atıfta
+          bulunuyor. Dar ekranda kırpılır, tamamı `title`da durur.
+        */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{script.name}</span>
             {script.folderName && <Badge tone="neutral">{script.folderName}</Badge>}
           </div>
-          {script.description && (
-            <p className="mt-1 text-sm text-ink-2">{script.description}</p>
-          )}
-          {/* Agent'ın göreceği yol: kullanıcı talimatında ona atıfta bulunmak
-              isterse aynı metni kullanabilmeli. */}
-          <p className="mt-1 font-mono text-xs break-all text-ink-3">
-            {scriptPath(script)}
-          </p>
-          <p className="mt-1 text-2xs text-ink-3">
-            Güncellendi: {formatDate(script.updatedAt)}
-          </p>
+
+          {/*
+            ÖNCELİK AÇIKLAMADA: yol `shrink-0` iken uzun bir yol açıklamayı
+            sıfıra sıkıştırıyordu — üstveri, ikincil bilgiyi ekrandan siliyordu.
+            İkisi de kırpılabilir; açıklama `flex-1` ile önce yer alır.
+          */}
+          <div className="mt-0.5 flex items-center gap-2 text-2xs">
+            <span className="min-w-0 flex-1 truncate text-ink-2" title={script.description}>
+              {script.description || "açıklama yok"}
+            </span>
+            <span
+              /*
+                ÜST SINIR ŞART: `flex-1`in temeli 0 olduğu için, sınırsız bir
+                yol yanındaki açıklamayı sıfıra indiriyordu — ölçüldü, beş
+                satırda açıklama genişliği 0px'ti. Yol satırın en fazla
+                %45'ini alır, gerisi açıklamanın.
+              */
+              className="hidden max-w-[45%] min-w-0 shrink truncate font-mono text-ink-3 md:inline"
+              title={scriptPath(script)}
+            >
+              {scriptPath(script)}
+            </span>
+            <span className="shrink-0 text-ink-3">{formatDate(script.updatedAt)}</span>
+          </div>
         </div>
 
-        {!confirming ? (
-          <div className="flex shrink-0 gap-2">
-            <Button size="sm" onClick={() => setEditing(true)}>
+        {!confirming && (
+          <RowAction className="gap-1.5">
+            <Button size="sm" icon={<IconEdit />} onClick={() => setEditing(true)}>
               Düzenle
             </Button>
-            <Button size="sm" variant="danger" onClick={() => setConfirming(true)}>
-              Sil
-            </Button>
-          </div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="text-xs text-ink-2">
-              Agent&apos;lardan da kaldırılacak.
-            </span>
             <Button
               size="sm"
               variant="danger"
-              onClick={() => remove.mutate()}
-              disabled={remove.isPending}
+              icon={<IconTrash />}
+              onClick={() => setConfirming(true)}
             >
-              {remove.isPending ? "Siliniyor…" : "Evet, sil"}
+              Sil
             </Button>
-            <Button size="sm" onClick={() => setConfirming(false)}>
-              Vazgeç
-            </Button>
-          </div>
+          </RowAction>
         )}
       </div>
 
-      {remove.isError && (
-        <Notice tone="error">{describeError(remove.error).message}</Notice>
+      {confirming && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-2">
+            <strong>{script.name}</strong> silinsin mi? Agent&apos;lardan da
+            kaldırılacak.
+          </span>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => remove.mutate()}
+            disabled={remove.isPending}
+          >
+            {remove.isPending ? "Siliniyor…" : "Evet, sil"}
+          </Button>
+          <Button size="sm" onClick={() => setConfirming(false)}>
+            Vazgeç
+          </Button>
+        </div>
       )}
-    </PanelCard>
+
+      {remove.isError && (
+        <div className="mt-2">
+          <Notice tone="error">{describeError(remove.error).message}</Notice>
+        </div>
+      )}
+    </div>
   );
 }
 

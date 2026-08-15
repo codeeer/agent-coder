@@ -342,7 +342,14 @@ export const api = {
 
   /** Agent'ların çalıştırabileceği hazır kabuk betikleri (spec 012). */
   scripts: {
-    list: (page: PageQuery = {}) =>
+    /**
+     * Betikleri süzerek listeler.
+     *
+     * ARAMA SUNUCUDA: liste sayfalı ve ekranda arama yalnızca açık sayfayı
+     * arardı — kullanıcı var olan bir betik için "yok" cevabı alırdı.
+     * `folder: "none"` klasörsüzleri verir; boş bırakmak "hepsi" demektir.
+     */
+    list: (page: PageQuery & { q?: string; folder?: string } = {}) =>
       apiFetch<Paged<Script>>(`/api/scripts${pageQuery(page)}`),
 
     create: (body: CreateScriptRequest) =>

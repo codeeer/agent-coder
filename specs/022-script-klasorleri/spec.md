@@ -234,3 +234,42 @@ Kabul kriterleri:
 
 - Script kütüphanesi ve agent'a atama (spec 012). Bu spec onun üzerine
   kuruluyor; kurallarını değiştirmiyor.
+
+---
+
+## Karar geçmişi
+
+### 2026-08-15 — Ekran ölçüldü ve yeniden kuruldu
+
+Spec 023'ün canlı testinde beş betiklik bir kampanya açılınca ekranın ölçeği
+sorgulandı. Ölçüm (ayarlar panelinin penceresi 617px):
+
+| Durum | Eski | Yeni |
+| --- | --- | --- |
+| 1 kampanya + 7 betik | 1562px · 2,5 ekran | 833px · **1,4 ekran** |
+| 7 kampanya + 7 betik | ~2200px · 3,6 ekran | 1105px · **1,8 ekran** |
+| Betik satırı | 83–103px | **58px** |
+| Kampanya satırı | 124px | **58px** |
+
+Üç kusur bulundu ve kapatıldı:
+
+1. **Arama yoktu.** Liste 10'arlı sayfalıydı; otuz betikte "şu betiği
+   düzenleyeceğim" diyen kullanıcı üç sayfayı körlemesine geziyordu. Arama
+   eklendi ve **sunucuda** yapılıyor (`?q=`) — ekranda yapılsaydı yalnızca açık
+   sayfayı arar ve var olan bir betik için sessizce "yok" derdi.
+
+2. **Kampanya listesi sınırsızdı.** `GET /api/script-folders` limitsiz dönüyor
+   ve hepsi çiziliyordu: altı kampanya, betiklere ulaşmadan önce 848px'lik bir
+   duvar demekti. Artık ilk beşi görünüyor, gerisi tek tıkla — ve kaçının
+   gizlendiği düğmenin üzerinde yazıyor (sessiz kesme yok).
+
+3. **İki liste birbirini tanımıyordu.** Klasör ile içindeki adımlar iki ayrı
+   yerde duruyordu. Artık kampanya satırına basmak betik listesini o kampanyaya
+   süzüyor; süzgeç bir de açılır listede duruyor ("Tüm betikler / Klasörsüz /
+   <kampanya>"). **Klasörsüz** ayrı bir seçenek: "hangi betiğim hiçbir
+   kampanyaya girmemiş" sorusunun başka cevabı yok.
+
+Satır yoğunluğu üç satırdan ikiye indi ve eylemler hover'a çekildi (`RowAction`).
+Bir tuzak ölçümle yakalandı: `flex-1`in temeli 0 olduğu için uzun bir yol
+yanındaki açıklamayı **sıfır piksele** indiriyordu — beş satırda açıklama hiç
+görünmüyordu. Yol artık satırın en fazla %45'ini alıyor.

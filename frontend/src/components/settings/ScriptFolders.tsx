@@ -12,8 +12,10 @@ import {
   Button,
   ConfirmStrip,
   Input,
+  List,
   Notice,
   PanelCard,
+  RowAction,
 } from "@/components/ui/primitives";
 
 /**
@@ -24,15 +26,37 @@ import {
  * o klasörü kullanan agent'larda kendiliğinden geçerli olur — atama
  * tazelenmez.
  */
-export function ScriptFolders() {
+export function ScriptFolders({
+  seciliKlasor,
+  onSelect,
+}: {
+  /** O an süzgeçte olan klasör; satır seçili görünür. */
+  seciliKlasor?: string;
+  /** Satıra basınca betik listesini bu kampanyaya süzer. */
+  onSelect?: (id: string) => void;
+}) {
   const [adding, setAdding] = useState(false);
+  const [hepsi, setHepsi] = useState(false);
 
   const folders = useQuery({
     queryKey: ["script-folders"],
     queryFn: api.scriptFolders.list,
   });
 
-  const liste = folders.data?.items ?? [];
+  const tumu = folders.data?.items ?? [];
+
+  /*
+   * KAMPANYA DUVARI — ölçülmüş bir sorun.
+   *
+   * Klasör listesi sunucuda sayfalanmıyor ve altı kampanyada 848px'lik bir blok
+   * oluyordu: tek bir betiğe ulaşmak için 1,5 ekran kampanya kartı geçmek
+   * gerekiyordu. Artık ilk beşi görünüyor, gerisi tek tıkla açılıyor.
+   *
+   * SESSİZ KESME YOK: kaçının gizlendiği düğmenin üzerinde yazıyor.
+   */
+  const ESIK = 5;
+  const liste = hepsi ? tumu : tumu.slice(0, ESIK);
+  const gizli = tumu.length - liste.length;
 
   return (
     <div className="space-y-3">
@@ -68,14 +92,48 @@ export function ScriptFolders() {
         </p>
       )}
 
-      {liste.map((f) => (
-        <FolderCard key={f.id} folder={f} />
-      ))}
+      {liste.length > 0 && (
+        <List>
+          {liste.map((f) => (
+            <FolderCard
+              key={f.id}
+              folder={f}
+              secili={seciliKlasor === f.id}
+              onSelect={onSelect}
+            />
+          ))}
+        </List>
+      )}
+
+      {gizli > 0 && (
+        <Button size="sm" variant="ghost" onClick={() => setHepsi(true)}>
+          {gizli} kampanya daha göster
+        </Button>
+      )}
+      {hepsi && tumu.length > ESIK && (
+        <Button size="sm" variant="ghost" onClick={() => setHepsi(false)}>
+          Listeyi kısalt
+        </Button>
+      )}
     </div>
   );
 }
 
-function FolderCard({ folder }: { folder: ScriptFolder }) {
+/**
+ * Kampanya satırı — kartın yarısı kadar yer tutar ve TIKLANABİLİR.
+ *
+ * Satıra basmak betik listesini o kampanyaya süzer: eskiden klasör ile
+ * içindeki adımlar iki ayrı listede duruyordu ve aralarında hiçbir bağ yoktu.
+ */
+function FolderCard({
+  folder,
+  secili,
+  onSelect,
+}: {
+  folder: ScriptFolder;
+  secili?: boolean;
+  onSelect?: (id: string) => void;
+}) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -90,36 +148,49 @@ function FolderCard({ folder }: { folder: ScriptFolder }) {
   });
 
   if (editing) {
-    return <FolderForm folder={folder} onDone={() => setEditing(false)} />;
+    return (
+      <div className="p-3">
+        <FolderForm folder={folder} onDone={() => setEditing(false)} />
+      </div>
+    );
   }
 
   return (
-    <PanelCard>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className={`group px-4 py-2.5 ${secili ? "bg-raised" : ""}`}>
+      <div className="flex items-start gap-3">
+        <button
+          className="min-w-0 flex-1 text-left"
+          aria-pressed={secili}
+          onClick={() => onSelect?.(folder.id)}
+        >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{folder.name}</span>
+            <span className="truncate text-sm font-medium">{folder.name}</span>
             <Badge tone="neutral">{folder.scriptCount} betik</Badge>
             {folder.agentCount > 0 && (
               <Badge tone="info">{folder.agentCount} agent</Badge>
             )}
+            {secili && <Badge tone="accent">süzülüyor</Badge>}
           </div>
-          {folder.description && (
-            <p className="mt-1 text-sm text-ink-2">{folder.description}</p>
-          )}
-          {/* Dizin yolu: kullanıcı agent talimatında ona atıfta bulunmak
-              isterse aynı metni kullanabilmeli. */}
-          <p className="mt-1 font-mono text-xs break-all text-ink-3">
-            {SCRIPT_DIR}/{folder.name}
-          </p>
-        </div>
+          {/* Açıklama ve yol tek satırda — betik satırlarındaki düzenin aynısı;
+              iki liste yan yana duruyor ve farklı ritimde olmamalılar. */}
+          <div className="mt-0.5 flex items-center gap-2 text-2xs">
+            <span className="min-w-0 flex-1 truncate text-ink-2" title={folder.description}>
+              {folder.description || "açıklama yok"}
+            </span>
+            <span className="hidden max-w-[45%] min-w-0 shrink truncate font-mono text-ink-3 md:inline">
+              {SCRIPT_DIR}/{folder.name}
+            </span>
+          </div>
+        </button>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <Button onClick={() => setEditing(true)}>Düzenle</Button>
-          <Button variant="danger" onClick={() => setConfirming(true)}>
-            Sil
-          </Button>
-        </div>
+        {!confirming && (
+          <RowAction className="gap-1.5">
+            <Button size="sm" onClick={() => setEditing(true)}>Düzenle</Button>
+            <Button size="sm" variant="danger" onClick={() => setConfirming(true)}>
+              Sil
+            </Button>
+          </RowAction>
+        )}
       </div>
 
       {/*
@@ -128,6 +199,7 @@ function FolderCard({ folder }: { folder: ScriptFolder }) {
       */}
       {confirming && (
         <ConfirmStrip
+          className="mt-2 rounded-lg border border-danger/30"
           question={`"${folder.name}" klasörü silinsin mi?`}
           consequence={
             folder.scriptCount > 0
@@ -144,8 +216,7 @@ function FolderCard({ folder }: { folder: ScriptFolder }) {
           onCancel={() => setConfirming(false)}
         />
       )}
-
-    </PanelCard>
+    </div>
   );
 }
 

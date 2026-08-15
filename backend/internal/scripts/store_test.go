@@ -61,7 +61,7 @@ func TestStore_CRUD(t *testing.T) {
 	})
 
 	t.Run("listede görünür", func(t *testing.T) {
-		items, total, err := store.List(ctx, 25, 0)
+		items, total, err := store.List(ctx, scripts.Filter{Limit: 25})
 		require.NoError(t, err)
 		require.Equal(t, 1, total)
 		require.Len(t, items, 1)
@@ -124,4 +124,95 @@ func TestStore_AgentAtama(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, list)
 	})
+}
+
+/*
+ * ARAMA SUNUCUDA YAPILIR (spec 022 kapanışı, ölçümle eklendi).
+ *
+ * Liste 10'arlı sayfalı. Arama ekranda yapılsaydı yalnızca AÇIK SAYFAYI arardı
+ * ve otuz betiklik bir kütüphanede kullanıcı, var olan bir betik için "yok"
+ * cevabını alırdı — hem de sessizce, üçüncü sayfada durduğunu bilmeden.
+ */
+func TestList_AramaAdVeAciklamadaCalisir(t *testing.T) {
+	s := newFolderStore(t)
+	ctx := context.Background()
+
+	_, err := s.Create(ctx, scripts.CreateInput{
+		Name: "node-yukselt", Description: "Node sürümünü 24'e çeker", Content: "echo a"})
+	require.NoError(t, err)
+	_, err = s.Create(ctx, scripts.CreateInput{
+		Name: "pom-duzelt", Description: "Maven parent sürümünü sabitler", Content: "echo b"})
+	require.NoError(t, err)
+
+	adla, total, err := s.List(ctx, scripts.Filter{Query: "node", Limit: 25})
+	require.NoError(t, err)
+	require.Equal(t, 1, total, "total SÜZGECE UYAN toplamdır — sayfalama ona göre çizilir")
+	require.Equal(t, "node-yukselt", adla[0].Name)
+
+	// Kullanıcı betiği çoğu zaman ne yaptığıyla hatırlıyor, adıyla değil.
+	aciklamayla, _, err := s.List(ctx, scripts.Filter{Query: "maven parent", Limit: 25})
+	require.NoError(t, err)
+	require.Len(t, aciklamayla, 1)
+	require.Equal(t, "pom-duzelt", aciklamayla[0].Name)
+
+	bos, total, err := s.List(ctx, scripts.Filter{Query: "hiçbir şey", Limit: 25})
+	require.NoError(t, err)
+	require.Empty(t, bos)
+	require.Zero(t, total)
+}
+
+// Klasör süzgeci: "hepsi", "şu klasör" ve "KLASÖRSÜZ" üç ayrı sorudur.
+func TestList_KlasorSuzgeci(t *testing.T) {
+	s := newFolderStore(t)
+	ctx := context.Background()
+	f := klasor(t, s, "node-24")
+
+	_, err := s.Create(ctx, scripts.CreateInput{
+		Name: "01-baslat", Content: "echo a", FolderID: &f.ID})
+	require.NoError(t, err)
+	_, err = s.Create(ctx, scripts.CreateInput{Name: "tekil", Content: "echo b"})
+	require.NoError(t, err)
+
+	hepsi, total, err := s.List(ctx, scripts.Filter{Limit: 25})
+	require.NoError(t, err)
+	require.Equal(t, 2, total)
+	require.Len(t, hepsi, 2)
+
+	klasorde, _, err := s.List(ctx, scripts.Filter{FolderID: &f.ID, Limit: 25})
+	require.NoError(t, err)
+	require.Len(t, klasorde, 1)
+	require.Equal(t, "01-baslat", klasorde[0].Name)
+
+	// "Klasörsüz" boş bırakmakla aynı şey DEĞİL: kullanıcının "hangi betiğim
+	// hiçbir kampanyaya girmemiş" sorusunun tek cevabı bu.
+	klasorsuz, total, err := s.List(ctx, scripts.Filter{Unfiled: true, Limit: 25})
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.Equal(t, "tekil", klasorsuz[0].Name)
+}
+
+// Arama ile klasör süzgeci BİRLİKTE çalışır ve sayfalamayı bozmaz.
+func TestList_AramaVeSuzgecSayfalamayiBozmaz(t *testing.T) {
+	s := newFolderStore(t)
+	ctx := context.Background()
+	f := klasor(t, s, "kampanya")
+
+	for _, ad := range []string{"01-adim", "02-adim", "03-adim", "baska"} {
+		id := &f.ID
+		if ad == "baska" {
+			id = nil
+		}
+		_, err := s.Create(ctx, scripts.CreateInput{Name: ad, Content: "echo x", FolderID: id})
+		require.NoError(t, err)
+	}
+
+	ilk, total, err := s.List(ctx, scripts.Filter{Query: "adim", FolderID: &f.ID, Limit: 2, Offset: 0})
+	require.NoError(t, err)
+	require.Equal(t, 3, total, "toplam süzgece uyanları sayar, tabloyu değil")
+	require.Len(t, ilk, 2)
+
+	ikinci, _, err := s.List(ctx, scripts.Filter{Query: "adim", FolderID: &f.ID, Limit: 2, Offset: 2})
+	require.NoError(t, err)
+	require.Len(t, ikinci, 1)
+	require.NotEqual(t, ilk[0].ID, ikinci[0].ID)
 }

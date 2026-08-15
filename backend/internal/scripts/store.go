@@ -57,14 +57,65 @@ func collect(rows pgx.Rows) ([]Script, error) {
 	return out, rows.Err()
 }
 
-// List, betikleri sayfalı olarak döner. total, sayfalamadan bağımsız toplam.
-func (s *Store) List(ctx context.Context, limit, offset int) (items []Script, total int, err error) {
-	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM scripts`).Scan(&total); err != nil {
+/*
+Filter, betik listesinin süzgeci.
+
+ARAMA SUNUCUDA YAPILIR, ekranda değil: liste sayfalı ve yalnızca açık sayfada
+aramak kullanıcıya var olan bir betik için "yok" dedirtirdi — hem de sessizce.
+*/
+type Filter struct {
+	// Query, ad ve açıklamada geçen metin. Boşsa süzmez.
+	Query string
+
+	// FolderID, klasör süzgeci. nil süzmez.
+	FolderID *uuid.UUID
+	// Unfiled true ise YALNIZCA klasörsüz betikler döner (FolderID yok sayılır).
+	Unfiled bool
+
+	Limit, Offset int
+}
+
+// where, süzgecin SQL karşılığını ve parametrelerini üretir.
+//
+// Metin `$n` parametresiyle geçer, SQL'e birleştirilmez (AGENTS.md → Go).
+func (f Filter) where() (string, []any) {
+	cond := []string{}
+	args := []any{}
+
+	if q := strings.TrimSpace(f.Query); q != "" {
+		args = append(args, "%"+q+"%")
+		// Açıklama da aranır: kullanıcı betiği çoğu zaman ne yaptığıyla
+		// hatırlıyor, adıyla değil.
+		cond = append(cond, fmt.Sprintf("(s.name ILIKE $%d OR s.description ILIKE $%d)", len(args), len(args)))
+	}
+	switch {
+	case f.Unfiled:
+		cond = append(cond, "s.folder_id IS NULL")
+	case f.FolderID != nil:
+		args = append(args, *f.FolderID)
+		cond = append(cond, fmt.Sprintf("s.folder_id = $%d", len(args)))
+	}
+
+	if len(cond) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(cond, " AND "), args
+}
+
+// List, betikleri süzerek ve sayfalayarak döner. total, SÜZGECE UYAN toplam —
+// sayfalama ondan bağımsız.
+func (s *Store) List(ctx context.Context, f Filter) (items []Script, total int, err error) {
+	where, args := f.where()
+
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM scripts s`+where, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("betik sayısı okunamadı: %w", err)
 	}
 
-	rows, err := s.pool.Query(ctx,
-		`SELECT `+columns+kaynak+` ORDER BY COALESCE(f.name, ''), s.name LIMIT $1 OFFSET $2`, limit, offset)
+	args = append(args, f.Limit, f.Offset)
+	rows, err := s.pool.Query(ctx, `SELECT `+columns+kaynak+where+
+		fmt.Sprintf(` ORDER BY COALESCE(f.name, ''), s.name LIMIT $%d OFFSET $%d`,
+			len(args)-1, len(args)), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("betikler listelenemedi: %w", err)
 	}

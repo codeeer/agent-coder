@@ -302,7 +302,7 @@ func TestForAgent_Sira(t *testing.T) {
 	require.NoError(t, s.SetAgentScripts(ctx, agentID, nil))
 
 	// Klasörsüz olanı da ekleyelim.
-	hepsi, _, err := s.List(ctx, 100, 0)
+	hepsi, _, err := s.List(ctx, scripts.Filter{Limit: 100})
 	require.NoError(t, err)
 	for _, sc := range hepsi {
 		if sc.Name == "ortak" {
