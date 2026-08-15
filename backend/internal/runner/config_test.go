@@ -560,3 +560,46 @@ func TestBuildConfigFiles_OpenRouterModelsBlogunuAlmaz(t *testing.T) {
 	)
 	require.NoError(t, err)
 }
+
+/*
+MCPEnvVar — ADIN İKİ TARAFTA DA AYNI ÜRETİLDİĞİNİN kaydı.
+
+Bu ad iki yerde kullanılıyor ve birebir tutmak zorunda: `opencode.Runner`
+anahtarı container'ın ortamına bu adla yazıyor, `BuildConfigFiles` ise
+yapılandırma dosyasından ona `{env:...}` ile referans veriyor. Ayrıştıkları an
+agent var olmayan bir değişkene bakar ve MCP sunucusu sessizce anahtarsız
+kalır — hiçbir yerde hata görünmez.
+
+Vakalar `internal/mcp` paketindeki ikinci bir uygulamadan taşındı; o uygulama
+üretimde hiç çağrılmıyordu ve kaldırıldı (bkz. mcp/server.go).
+*/
+func TestMCPEnvVar_AdBiciminiKilitler(t *testing.T) {
+	require.Equal(t, "AGENT_CODER_MCP_SENTRY", MCPEnvVar("sentry"))
+
+	// Tire KORUNUR, alt çizgiye çevrilmez: ortam değişkeni adı olarak geçerli
+	// ve kullanıcının yazdığı adla eşleşmesi izin kurallarının okunmasını
+	// kolaylaştırıyor.
+	require.Equal(t, "AGENT_CODER_MCP_MY-DB", MCPEnvVar("my-db"))
+	require.Equal(t, "AGENT_CODER_MCP_A_B", MCPEnvVar("a_b"))
+}
+
+/*
+Dosyadaki referans ile ortama yazılan ad AYNI OLMALI.
+
+İkisi de `MCPEnvVar`'dan geliyor; bu test o bağı ölçüyor — yapılandırma
+dosyasındaki `{env:...}` ifadesi, çalıştırıcının ortama koyacağı anahtarın
+adını içermeli.
+*/
+func TestBuildConfigFiles_OrtamDegiskeniReferansiEslesir(t *testing.T) {
+	const ad = "my-db"
+
+	files, err := BuildConfigFiles(
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
+		mcpAgent(MCPServerSpec{
+			Name: ad, Transport: "http", URL: "https://x.dev/mcp", Secret: "s3cret-uzun-anahtar",
+		}), "model-x", PackageRegistry{})
+	require.NoError(t, err)
+
+	require.Contains(t, string(files[0].Content), "{env:"+MCPEnvVar(ad)+"}",
+		"dosya, çalıştırıcının ortama yazacağı adla referans vermeli")
+}

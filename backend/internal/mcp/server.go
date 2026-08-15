@@ -88,19 +88,26 @@ type Server struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// ToolPattern, bu sunucunun araçlarını kapsayan yetki deseni.
-//
-// Çalıştırma motoru araçları `{sunucu}_{araç}` biçiminde adlandırıyor; yetki
-// kuralları da bu desenle yazılır.
-func (s Server) ToolPattern() string { return sanitizeName(s.Name) + "_*" }
+/*
+ARAÇ DESENİ VE ORTAM DEĞİŞKENİ ADI BURADA ÜRETİLMEZ — ikisi de `runner`'ın işi
+(`runner.MCPEnvVar`, `BuildPermissions`).
 
-// EnvVar, erişim anahtarının container içinde taşınacağı ortam değişkeni.
-//
-// Anahtar yapılandırma DOSYASINA yazılmaz (spec 011 K5); dosya yalnızca bu
-// değişkene referans verir.
-func (s Server) EnvVar() string {
-	return "AGENT_CODER_MCP_" + strings.ToUpper(sanitizeName(s.Name))
-}
+Bu paketin kendi `ToolPattern()` ve `EnvVar()` metotları vardı ve üretimde hiç
+çağrılmıyordu; yalnızca kendi testleri tutuyordu. İkinci bir uygulama olarak
+durmaları tehlikeliydi:
+
+  - `ToolPattern()` adı temizleyip desen üretiyordu, canlı olan
+    (`runner.mcpToolPattern`) temizlemiyor. Bugün fark görünmüyor çünkü
+    `Validate` geçersiz adı zaten reddediyor — yani ayrışma açık değil, gizli.
+  - `EnvVar()` ile `runner.MCPEnvVar` aynı dizeyi ÜRETMEK ZORUNDA: biri
+    anahtarı container'ın ortamına yazıyor, diğeri yapılandırma dosyasından ona
+    referans veriyor. Ayrıştıkları an agent, var olmayan bir değişkene bakar ve
+    MCP sunucusu sessizce anahtarsız kalır.
+
+İki tarafın uyumunu sağlayan şey ortak kod değil `Validate`: ad yalnızca
+harf, rakam, `-` ve `_` içerebildiği için her iki uygulama da aynı sonucu
+veriyor. Kuralın sahibi o.
+*/
 
 // Validate, kaydedilmeye uygun mu diye sınar.
 func (s Server) Validate() error {
@@ -138,16 +145,4 @@ func validName(s string) bool {
 		}
 	}
 	return true
-}
-
-func sanitizeName(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if validName(string(r)) {
-			b.WriteRune(r)
-			continue
-		}
-		b.WriteRune('_')
-	}
-	return b.String()
 }

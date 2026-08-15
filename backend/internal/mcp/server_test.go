@@ -43,14 +43,3 @@ func TestValidate_AdresSemasi(t *testing.T) {
 		require.ErrorIs(t, srv("a", u).Validate(), mcp.ErrInvalidURL, u)
 	}
 }
-
-func TestToolPattern_YetkiKurallarindaKullanilir(t *testing.T) {
-	require.Equal(t, "sentry_*", srv("sentry", "https://x.dev").ToolPattern())
-}
-
-// TestEnvVar_AnahtarOrtamDegiskeniyleTasinir — anahtar yapılandırma dosyasına
-// yazılmaz; dosya yalnızca bu değişkene referans verir (spec 011 K5).
-func TestEnvVar_AnahtarOrtamDegiskeniyleTasinir(t *testing.T) {
-	require.Equal(t, "AGENT_CODER_MCP_SENTRY", srv("sentry", "https://x.dev").EnvVar())
-	require.Equal(t, "AGENT_CODER_MCP_MY-DB", srv("my-db", "https://x.dev").EnvVar())
-}
