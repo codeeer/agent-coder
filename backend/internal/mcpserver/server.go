@@ -164,8 +164,35 @@ func (s *Server) runWorkflow(ctx context.Context, _ *sdk.CallToolRequest, in run
 			"geçersiz akış kimliği — akislari_listele ile alınan kimliği kullanın")
 	}
 
-	// Mevcut tek başlatma kapısı. Duraklatılmış akış, tanımsız akış ve
-	// eşzamanlılık sınırı kontrolleri burada zaten var.
+	/*
+		DURAKLATILMIŞ AKIŞ BAŞLATILMAZ — ve bu kontrol burada olmak zorunda.
+
+		`Launcher` yalnızca tanımsız akışı ve eşzamanlılık sınırını görüyor;
+		duraklatılmış olmayı görmüyor. Bu bilinçli: elle başlatma ve toplu
+		çalıştırma kullanıcının O AN verdiği bir karar ve duraklatılmış bir akışı
+		bilerek çalıştırabilmeli.
+
+		MCP çağıranı ise bir insan değil, bir agent — yani dışarıdan gelen bir
+		yol. Diğer dış yolların hepsi engelliyor: webhook ve tetikleme adresi
+		"akış pasif durumda" ile reddediyor, Jira taraması duraklatılmış akışı
+		hiç okumuyor.
+
+		Kontrol edilmezse sunucu kendi söylediğinin tersini yapar: aynı sunucu
+		`akislari_listele` çağrısında bu akış için "çalıştırılamaz —
+		duraklatıldı" diyor, sonra kimliği doğrudan verilince başlatıyordu.
+	*/
+	wf, err := s.store.Get(ctx, id)
+	if err != nil {
+		return nil, runOutput{}, err
+	}
+	if !wf.IsActive {
+		return nil, runOutput{}, fmt.Errorf(
+			"akış duraklatılmış durumda ve başlatılamaz — " +
+				"Agent Coder arayüzünden etkinleştirilmeli")
+	}
+
+	// Tanımsız akış ve eşzamanlılık sınırı kontrolleri `Launcher`'da; elle,
+	// webhook ve Jira tetiklemesi de aynı kapıdan geçiyor.
 	run, err := s.launcher.Launch(ctx, workflow.LaunchInput{
 		WorkflowID: id,
 		Trigger:    workflow.TriggerMCP,
