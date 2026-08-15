@@ -147,21 +147,42 @@ func (b *Builder) RepoAccess(ctx context.Context, projectID uuid.UUID) (
 		return "", nil, runs.ErrNoGitAccess
 	}
 
-	gp, err := b.git.Get(ctx, *project.GitProviderID)
+	username, secret, err := b.gitCredentials(ctx, *project.GitProviderID)
 	if err != nil {
 		return "", nil, err
 	}
-	secret, err := b.git.Reveal(ctx, gp.ID)
+	return project.RepoURL, &projects.Credentials{Username: username, Secret: secret}, nil
+}
+
+/*
+gitCredentials, bir git erişiminin kullanıcı adını ve gizli değerini çözer.
+
+TEK YERDE olmasının sebebi bu paketin var olma sebebiyle aynı (bkz.
+`RepoAccess`): aynı çözüm hem çalıştırma girdisinde hem gönderme/PR yolunda
+gerekiyor ve iki kopya hâlinde duruyordu.
+
+Kullanıcı adı BOŞSA `x-access-token` yazılır: token ile klonlarken kullanıcı
+adı zorunlu ve GitHub token'ı o alanda bekliyor. Boş bırakılsaydı klonlama
+kimlik doğrulama hatasıyla düşer ve sebebi "erişim tanımlı değil" gibi
+görünürdü — oysa tanımlıdır.
+*/
+func (b *Builder) gitCredentials(ctx context.Context, providerID uuid.UUID) (
+	username, secret string, err error,
+) {
+	gp, err := b.git.Get(ctx, providerID)
 	if err != nil {
-		return "", nil, err
+		return "", "", err
+	}
+	secret, err = b.git.Reveal(ctx, gp.ID)
+	if err != nil {
+		return "", "", err
 	}
 
-	username := gp.Username
-	// Token ile klonlarken kullanıcı adı zorunlu; GitHub bunu bekler.
+	username = gp.Username
 	if username == "" {
 		username = "x-access-token"
 	}
-	return project.RepoURL, &projects.Credentials{Username: username, Secret: secret}, nil
+	return username, secret, nil
 }
 
 // Request, çözümlenecek çalıştırma isteği.
@@ -232,21 +253,13 @@ func (b *Builder) Build(ctx context.Context, req Request) (runs.StartInput, erro
 	nodeVersion := resolveNodeVersion(req.NodeVersion, project.DefaultNodeVersion)
 
 	repo := runner.RepoSpec{URL: project.RepoURL, Branch: branch}
+	// Erişimi olmayan proje KİMLİKSİZ klonlanır: açık bir depo için kimlik
+	// gerekmiyor ve zorunlu tutmak, yalnızca okuyan bir agent'ı da durdururdu.
 	if project.GitProviderID != nil {
-		gp, err := b.git.Get(ctx, *project.GitProviderID)
+		repo.Username, repo.Secret, err = b.gitCredentials(ctx, *project.GitProviderID)
 		if err != nil {
 			return runs.StartInput{}, err
 		}
-		secret, err := b.git.Reveal(ctx, gp.ID)
-		if err != nil {
-			return runs.StartInput{}, err
-		}
-		repo.Username = gp.Username
-		// Token ile klonlarken kullanıcı adı zorunlu; GitHub bunu bekler.
-		if repo.Username == "" {
-			repo.Username = "x-access-token"
-		}
-		repo.Secret = secret
 	}
 
 	mcpServers, err := b.mcpServers(ctx, agent.ID)
