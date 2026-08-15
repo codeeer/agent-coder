@@ -8,14 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// safetyInterval, emniyet turunun aralığı.
-//
-// Bu bir MEKANİZMA DEĞİL, sigorta: uyandırma sinyali her nasılsa kaçarsa kuyruk
-// sonsuza kadar donmasın diye. Dakikada bir tur sistemin fark etmeyeceği bir
-// maliyet; sessizce donmuş bir kuyruk ise kullanıcının ancak "neden hiç
-// başlamadı" diye sorarak fark edeceği bir arıza.
-const safetyInterval = time.Minute
-
 // Starter, bir öğenin akış çalışmasını başlatan şey.
 //
 // `workflow.Launcher` yerine dar bir arayüz: zamanlayıcının sıra ve sınır
@@ -69,24 +61,46 @@ type Scheduler struct {
 	// zamanlayıcı o an meşgulse sinyal kaybolmaz, birikmez de.
 	wake chan struct{}
 
-	// interval, emniyet turu aralığı. Testler kısaltır.
-	interval time.Duration
+	/*
+		interval, emniyet turunun aralığı — AYARDAN, koddan değil.
+
+		Fonksiyon olarak taşınıyor çünkü her turda yeniden okunuyor: kullanıcı
+		değeri değiştirince sunucuyu yeniden başlatmak gerekmesin (projedeki
+		diğer çalışma parametrelerinin aynısı).
+	*/
+	interval func() time.Duration
 }
 
 // NewScheduler yeni zamanlayıcı üretir.
-func NewScheduler(store *Store, starter Starter, tracker Tracker, slots Slots) *Scheduler {
+//
+// interval, emniyet turu aralığını her çağrıda yeniden okur (ayardan).
+func NewScheduler(store *Store, starter Starter, tracker Tracker, slots Slots,
+	interval func() time.Duration,
+) *Scheduler {
 	return &Scheduler{
 		store: store, starter: starter, tracker: tracker, slots: slots,
 		wake:     make(chan struct{}, 1),
-		interval: safetyInterval,
+		interval: interval,
 	}
 }
 
-// SetInterval, emniyet turu aralığını değiştirir. `Run`'dan ÖNCE çağrılmalı.
-//
-// Varsayılan bir dakika; testler kısaltır. Ayardan okunmuyor çünkü bu bir
-// davranış parametresi değil, sigortanın gerilimi.
-func (s *Scheduler) SetInterval(d time.Duration) { s.interval = d }
+/*
+tur, bir sonraki emniyet turuna kalan süre.
+
+Sıfır ya da eksi bir değer buraya GELMEMELİ — ayar katmanı bozuk değeri zaten
+varsayılana düşürüyor. Yine de korunuyor: sıfırlık bir bekleme, kuyruğu boşuna
+dönen sıcak bir döngüye çevirirdi.
+*/
+func (s *Scheduler) tur() time.Duration {
+	if s.interval == nil {
+		return time.Minute
+	}
+	d := s.interval()
+	if d <= 0 {
+		return time.Minute
+	}
+	return d
+}
 
 /*
 Wake, zamanlayıcıyı uyandırır. BLOKLAMAZ.
@@ -107,23 +121,26 @@ func (s *Scheduler) Wake() {
 
 // Run, zamanlayıcıyı çalıştırır. Kapatma sinyaline kadar döner.
 func (s *Scheduler) Run(ctx context.Context) {
-	ticker := time.NewTicker(s.interval)
-	defer ticker.Stop()
-
-	slog.InfoContext(ctx, "toplu çalıştırma kuyruğu başladı",
-		"emniyet_turu", s.interval)
+	slog.InfoContext(ctx, "toplu çalıştırma kuyruğu başladı", "emniyet_turu", s.tur())
 
 	// İlk tur hemen: açılışta bekleyen bir kuyruk varsa ilk uyandırmayı
 	// beklemesin — o uyandırma hiç gelmeyebilir.
 	s.Tick(ctx)
 
 	for {
+		// Ticker DEĞİL timer: aralık ayardan geliyor ve değişebiliyor. Ticker
+		// kurulduğu andaki değere sabitlenirdi, yani ayar değişikliği ancak
+		// yeniden başlatmayla geçerli olurdu.
+		timer := time.NewTimer(s.tur())
+
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return
 		case <-s.wake:
+			timer.Stop()
 			s.Tick(ctx)
-		case <-ticker.C:
+		case <-timer.C:
 			s.Tick(ctx)
 		}
 	}

@@ -147,10 +147,16 @@ Bu yüzden `workflow.Executor`'a ikinci bir kanca eklendi — `OnRunFinished`,
 son durum YAZILDIKTAN sonra çağrılır (üç kapanış yolunun hepsinden: başarı,
 hata, iptal). Bağımlılık yönü yine korunuyor; bağ `main.go`'da.
 
-**Bir de dakikalık emniyet turu var.** Bu MEKANİZMA DEĞİL, sigorta: bir
-uyandırma her nasılsa kaçarsa kuyruk sonsuza kadar durmasın diye. Dakikada bir
-tur, sistemin fark etmeyeceği bir maliyet; sessizce donmuş bir kuyruk ise
-kullanıcının ancak "neden hiç başlamadı" diye sorarak fark edeceği bir arıza.
+**Bir de emniyet turu var (varsayılan bir dakika).** Bu MEKANİZMA DEĞİL,
+sigorta: bir uyandırma her nasılsa kaçarsa kuyruk sonsuza kadar durmasın diye.
+Dakikada bir tur, sistemin fark etmeyeceği bir maliyet; sessizce donmuş bir
+kuyruk ise kullanıcının ancak "neden hiç başlamadı" diye sorarak fark edeceği
+bir arıza.
+
+Süre **ayardan** okunur (`runner.batch_safety_interval_minutes`), koddan değil —
+kodda gömülü davranış parametresi bırakılmaz. Her turda yeniden okunduğu için
+değişiklik yeniden başlatma istemez; süren beklemeyi kesmez ama her uyandırma
+zaten yeni turu yeni değerle kurar.
 
 ### Tuzak: `ErrTooManyRuns` alan öğe BAŞARISIZ SAYILMAZ
 

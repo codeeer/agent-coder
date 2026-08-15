@@ -101,6 +101,7 @@ const (
 	KeyJiraPollMinutes    = "jira.poll_interval_minutes"
 	KeyJiraScanLimit      = "jira.scan_limit"
 	KeyMCPTimeoutSeconds  = "mcp.timeout_seconds"
+	KeyBatchSafetyMinutes = "runner.batch_safety_interval_minutes"
 )
 
 // Gruplar — arayüzde başlık olarak kullanılır.
@@ -142,9 +143,28 @@ var Registry = []Definition{
 	{
 		Key: KeyMaxConcurrentRuns, Group: GroupRunner, Kind: KindInt,
 		Label: "Aynı anda çalışabilecek iş", Unit: "iş",
-		Help: "Sınır doluyken başlatılan yeni işler beklemeye alınmaz, reddedilir. " +
-			"Sınırı düşürmek çalışan işleri kesmez.",
+		Help: "Sınır doluyken elle başlatılan yeni işler beklemeye alınmaz, reddedilir. " +
+			"Toplu çalıştırma bunun istisnasıdır: sıraya alınan işler bekler ve " +
+			"slot boşaldıkça başlar. Sınırı düşürmek çalışan işleri kesmez.",
 		Default: "3", Min: p(1), Max: p(20),
+	},
+	{
+		/*
+		 * Toplu iş kuyruğunun SİGORTASI — mekanizması değil.
+		 *
+		 * Kuyruk olay güdümlü çalışıyor: iş bitince ve slot boşalınca
+		 * kendiliğinden ilerliyor. Bu tur yalnızca bir sinyalin her nasılsa
+		 * kaçtığı durum için var ve kuyruğun donmuş kalabileceği AZAMİ süreyi
+		 * belirliyor.
+		 */
+		Key: KeyBatchSafetyMinutes, Group: GroupRunner, Kind: KindInt,
+		Label: "Toplu iş kuyruğu emniyet turu", Unit: "dakika",
+		Help: "Toplu çalıştırma kuyruğu normalde olay güdümlüdür — bir iş bitince " +
+			"sıradaki anında başlar. Bu tur yalnızca bir sinyalin kaçtığı duruma " +
+			"karşı sigortadır ve kuyruğun en fazla ne kadar durabileceğini söyler. " +
+			"Düşürmek boşta birkaç sorgu daha demek. Değişiklik SÜREN turu kesmez, " +
+			"bir sonrakinden itibaren geçerli olur.",
+		Default: "1", Min: p(1), Max: p(60),
 	},
 	{
 		Key: KeyRunnerCPULimit, Group: GroupRunner, Kind: KindInt,

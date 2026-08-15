@@ -470,7 +470,7 @@ Sınır nettir ve **kodda gömülü davranış parametresi bırakılmaz**:
 | Nerede | Ne |
 |--------|-----|
 | Ortam değişkeni (`.env`) | Veritabanına bağlanmak için gerekenler ve **dağıtım topolojisi**: `DATABASE_URL`, `SECRET_ENCRYPTION_KEY`, portlar, `RUNNER_IMAGE`, `RUNNER_NETWORK`, `OPENCODE_SERVER_PASSWORD` |
-| Veritabanı (`settings` tablosu) | **Davranış**: süre sınırı, eşzamanlılık, CPU/bellek, klonlama derinliği, talimat boyutu, katalog tazeleme aralığı, rapor dönemi ve saat dilimi, **Jira tarama aralığı ve tarama başına task sınırı** |
+| Veritabanı (`settings` tablosu) | **Davranış**: süre sınırı, eşzamanlılık, CPU/bellek, klonlama derinliği, talimat boyutu, katalog tazeleme aralığı, rapor dönemi ve saat dilimi, **Jira tarama aralığı ve tarama başına task sınırı**, toplu iş kuyruğunun emniyet turu |
 
 Mekanizma `internal/settings`:
 

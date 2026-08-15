@@ -178,6 +178,23 @@ Karşılığı `workflow.Executor.OnRunFinished`: son durum YAZILDIKTAN sonra
 kilitliyor ve boş olmadıkları ölçüldü — kanca `FinishRun`'dan öne alınınca test
 `running` görüp kırmızıya döndü.
 
+**Emniyet turu koddan ayara taşındı (kullanıcı uyarısıyla).** `safetyInterval`
+sabiti bir davranış parametresiydi ve `AGENTS.md` kuralı nettir: kodda gömülü
+davranış parametresi bırakılmaz. Artık kayıt defterinde
+(`runner.batch_safety_interval_minutes`, varsayılan 1, aralık 1–60) ve Ayarlar →
+Çalıştırma'da "Aynı anda çalışabilecek iş"in hemen altında — kuyruk tam da o
+sınıra uyduğu için oraya ait.
+
+Değer her turda yeniden okunuyor: `Ticker` yerine her döngüde kurulan `Timer`,
+çünkü ticker kurulduğu andaki değere sabitlenir ve ayar değişikliği ancak
+yeniden başlatmayla geçerli olurdu. Sınırı da testle yazılı: değişiklik SÜREN
+beklemeyi kesmez, sonraki turda geçerli olur — ama her uyandırma zaten süren
+beklemeyi bitirip yeni turu yeni değerle kurar.
+
+Aynı sırada bir belge hatası da düzeltildi: "Aynı anda çalışabilecek iş"
+ayarının yardım metni "sınır doluyken yeni işler beklemeye alınmaz, reddedilir"
+diyordu. Toplu çalıştırma bunun istisnası oldu; metin artık ikisini ayırıyor.
+
 **Arayüzde üç şey ölçümle değişti.** (1) Bitmiş bir toplu işte "0 bekliyor ·
 0 çalışıyor" yazıyordu; sıfır kovalar artık yalnızca iş SÜRERKEN duruyor —
 orada kuyruğun boşalışını izlemek haber, bittikten sonra gürültü. (2) "Backend

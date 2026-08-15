@@ -347,11 +347,16 @@ func run() error {
 
 	batchStore := runbatch.NewStore(database.Pool)
 	batchBridge := runbatch.NewBridge(workflowLauncher, workflowStore)
-	batchScheduler = runbatch.NewScheduler(batchStore, batchBridge, batchBridge, runbatch.Slots{
-		// Sınır SORULUR, kopyalanmaz: kuyruğun kendi paralellik ayarı yok.
-		Max:    func() int { return settingsSvc.Int(settings.KeyMaxConcurrentRuns) },
-		Active: runManager.Active,
-	})
+	batchScheduler = runbatch.NewScheduler(batchStore, batchBridge, batchBridge,
+		runbatch.Slots{
+			// Sınır SORULUR, kopyalanmaz: kuyruğun kendi paralellik ayarı yok.
+			Max:    func() int { return settingsSvc.Int(settings.KeyMaxConcurrentRuns) },
+			Active: runManager.Active,
+		},
+		// Emniyet turu da ayardan: kodda gömülü davranış parametresi bırakılmaz.
+		func() time.Duration {
+			return time.Duration(settingsSvc.Int(settings.KeyBatchSafetyMinutes)) * time.Minute
+		})
 
 	// Backend kapandığında 'running' kalan öğeler var; container'ları gitti.
 	// Kendiliğinden denenmezler — kullanıcı "kaldığı yerden devam et" der.

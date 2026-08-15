@@ -130,7 +130,9 @@ func (f fixture) scheduler(t *testing.T, sinir int) (*runbatch.Scheduler, *sahte
 		sonuc: map[uuid.UUID]runbatch.Outcome{},
 		yeni:  f.yeniCalisma,
 	}
-	return runbatch.NewScheduler(f.store, b, b, sabitSinir(b, sinir)), b
+	// Testte tur çok kısa: emniyet turunun ölçülebilmesi için.
+	return runbatch.NewScheduler(f.store, b, b, sabitSinir(b, sinir),
+		func() time.Duration { return 20 * time.Millisecond }), b
 }
 
 // T10 — boş slot varken sıradaki başlar.
@@ -354,7 +356,7 @@ func TestZamanlayici_SinirDegisince_YeniSiniraUyar(t *testing.T) {
 			defer b.mu.Unlock()
 			return b.acik + b.disAktif
 		},
-	})
+	}, func() time.Duration { return time.Minute })
 
 	s.Tick(ctx)
 	require.Len(t, b.baslatilan, 1, "sınır 1 iken tek öğe çalışır")
@@ -405,7 +407,6 @@ func TestZamanlayici_EmniyetTuruKuyruguIlerletir(t *testing.T) {
 	f.create(t, f.projects[0])
 
 	s, sahte := f.scheduler(t, 1)
-	s.SetInterval(20 * time.Millisecond)
 
 	// Kuyruk oluşturulduktan sonra HİÇ uyandırma gönderilmiyor.
 	go s.Run(ctx)
@@ -416,6 +417,67 @@ func TestZamanlayici_EmniyetTuruKuyruguIlerletir(t *testing.T) {
 		return len(sahte.baslatilan) == 1
 	}, 3*time.Second, 20*time.Millisecond,
 		"uyandırma gelmese de emniyet turu bekleyeni başlatmalı")
+}
+
+/*
+EMNİYET TURU AYARDAN OKUNUR — her turda yeniden.
+
+Aralık kurulum anında sabitlenseydi (ticker), kullanıcı ayarı değiştirdiğinde
+hiçbir şey olmaz ve bunu ancak "değiştirdim ama fark etmedi" diye sorarak fark
+ederdi.
+
+ÖLÇÜLEN SINIR: değer SÜREN beklemeyi kesmez, bir SONRAKİ turda geçerli olur.
+Burada tur önce kısa (kuyruk ilerliyor), sonra uzatılıyor ve kuyruğun gerçekten
+beklemeye geçtiği görülüyor — yani değer her turda yeniden okunuyor.
+*/
+func TestZamanlayici_EmniyetTuruAyardanOkunur(t *testing.T) {
+	f := setup(t, "alfa", "beta")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	b := &sahteBaslatici{sonuc: map[uuid.UUID]runbatch.Outcome{}, yeni: f.yeniCalisma}
+
+	var mu sync.Mutex
+	sure := 20 * time.Millisecond
+	s := runbatch.NewScheduler(f.store, b, b, sabitSinir(b, 2), func() time.Duration {
+		mu.Lock()
+		defer mu.Unlock()
+		return sure
+	})
+
+	go s.Run(ctx)
+
+	// Kısa turda kuyruk kendiliğinden ilerliyor.
+	f.create(t, f.projects[0])
+	require.Eventually(t, func() bool {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return len(b.baslatilan) == 1
+	}, 3*time.Second, 20*time.Millisecond, "kısa turda bekleyen başlamalı")
+
+	// Kullanıcı turu uzattı — yeniden başlatma YOK.
+	mu.Lock()
+	sure = time.Hour
+	mu.Unlock()
+	time.Sleep(100 * time.Millisecond) // süren kısa bekleme bitsin, yenisi uzun kurulsun
+
+	f.create(t, f.projects[1])
+	time.Sleep(400 * time.Millisecond)
+
+	b.mu.Lock()
+	baslayan := len(b.baslatilan)
+	b.mu.Unlock()
+	require.Equal(t, 1, baslayan,
+		"tur uzatıldıysa kuyruk emniyet turuyla ilerlememeli — değer her turda okunuyor")
+
+	// Ve uyandırma geldiğinde (gerçekte: toplu iş oluşturma ucu) hemen ilerliyor:
+	// uzun tur kuyruğu kilitlemiyor.
+	s.Wake()
+	require.Eventually(t, func() bool {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return len(b.baslatilan) == 2
+	}, 3*time.Second, 20*time.Millisecond, "uyandırma uzun turu keser")
 }
 
 // batchID, testteki tek toplu işin kimliği.
