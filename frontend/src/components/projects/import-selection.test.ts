@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  etkinProvider,
   secilebilir,
   varsayilanSecim,
   secimAcKapa,
@@ -66,4 +67,28 @@ test("tümünü seç yalnızca seçilebilirleri alır", () => {
   ];
 
   assert.deepEqual(tumunuSec(liste).sort(), ["api", "eski"]);
+});
+
+/*
+ * Git erişimi seçimi.
+ *
+ * Panel, git erişimleri sorgusu çözülmeden AÇILABİLİYOR. Varsayılan yalnızca
+ * mount anında tohumlansaydı boş listeyle "" olarak donardı ve istek geçersiz
+ * bir kimlikle giderdi.
+ */
+
+test("liste sonradan gelse de ilk kayıt varsayılan olur", () => {
+  assert.equal(etkinProvider("", []), "");
+  assert.equal(etkinProvider("", [{ id: "a" }, { id: "b" }]), "a");
+});
+
+test("kullanıcının elle seçimi listedeki ilk kaydı yener", () => {
+  assert.equal(etkinProvider("b", [{ id: "a" }, { id: "b" }]), "b");
+});
+
+test("seçim listeden düşerse ilk kayda dönülür", () => {
+  // Erişim silinmiş olabilir: var olmayan bir kimliği göndermektense
+  // görünen ilk kayda dönmek doğru.
+  assert.equal(etkinProvider("silinmis", [{ id: "a" }]), "a");
+  assert.equal(etkinProvider("silinmis", []), "");
 });

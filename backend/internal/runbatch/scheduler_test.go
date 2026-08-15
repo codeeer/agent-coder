@@ -488,3 +488,63 @@ func (f fixture) batchID(t *testing.T) uuid.UUID {
 	require.Len(t, list, 1)
 	return list[0].ID
 }
+
+/*
+ÇALIŞMA BAŞLADI AMA BAĞLANAMADI: ÖĞE ASILI KALMAZ.
+
+`Attach` düştüğünde öğenin `workflow_run_id` alanı NULL kalır. Öğe `running`
+bırakılsaydı `harvest` onu her turda "başlıyor" sayardı: yuva sonsuza kadar
+dolu kalır, toplu iş hiç `done` olmaz ve ne `Cancel` (yalnızca bekleyenler) ne
+`Resume` (yalnızca kesilenler) o öğeye erişebilirdi.
+
+Bağlanamama GERÇEK YOLDAN üretiliyor: `workflow_run_id` yabancı anahtar,
+kaydı olmayan bir çalışma kimliğini veritabanı reddediyor.
+*/
+func TestZamanlayici_BaglanamayanOgeAsiliKalmaz(t *testing.T) {
+	f := setup(t, "alfa", "beta")
+	ctx := context.Background()
+	f.create(t, f.projects[0], f.projects[1])
+
+	s, b := f.scheduler(t, 2)
+
+	// İlk öğe kaydı olmayan bir çalışmaya bağlanmaya çalışacak, ikincisi
+	// gerçek bir kayda: kuyruğun DEVAM ettiği de ölçülüyor.
+	gercek := b.yeni
+	var hayaliID uuid.UUID
+	ilk := true
+	b.yeni = func(ctx context.Context, projectID uuid.UUID) (uuid.UUID, error) {
+		if ilk {
+			ilk = false
+			hayaliID = uuid.New()
+			return hayaliID, nil
+		}
+		return gercek(ctx, projectID)
+	}
+
+	s.Tick(ctx)
+
+	_, items, err := f.store.Get(ctx, f.batchID(t))
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	require.Equal(t, runbatch.ItemFailed, items[0].Status,
+		"bağlanamayan öğe `running` kalmamalı — yuvayı sonsuza kadar tutardı")
+	require.Nil(t, items[0].WorkflowRunID)
+	require.Contains(t, items[0].Error, hayaliID.String(),
+		"çalışma sürüyor: kullanıcı onu bulabilmek için kimliği görmeli")
+
+	require.Equal(t, runbatch.ItemRunning, items[1].Status,
+		"bir öğenin bağlanamaması kuyruğu durdurmaz")
+	require.NotNil(t, items[1].WorkflowRunID)
+
+	// ASIL ÖLÇÜ: toplu iş gerçekten bitebiliyor mu.
+	b.bitir(t, f.store, runbatch.Outcome{Finished: true, Status: runbatch.ItemSucceeded})
+	s.Tick(ctx)
+
+	batch, _, err := f.store.Get(ctx, f.batchID(t))
+	require.NoError(t, err)
+	require.Equal(t, runbatch.StatusDone, batch.Status,
+		"bağlanamayan öğe yüzünden toplu iş sonsuza kadar açık kalmamalı")
+	require.Equal(t, 1, batch.Counts.Failed)
+	require.Equal(t, 1, batch.Counts.Succeeded)
+}

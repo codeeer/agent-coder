@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/cgi"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -424,9 +426,14 @@ func TestImportEt_EsZamanlilikSiniriAsilmaz(t *testing.T) {
 		basla = make(chan struct{})
 	)
 
+	// Adresler AYRI: aynı adres tekrarlansaydı istek içi eleme 39'unu atlar ve
+	// ölçülen şey eşzamanlılık olmaktan çıkardı.
 	var repos []importRepo
 	for i := 0; i < 40; i++ {
-		repos = append(repos, importRepo{Slug: "d", Name: "d", CloneURL: "https://x/y.git"})
+		repos = append(repos, importRepo{
+			Slug: fmt.Sprintf("d%d", i), Name: "d",
+			CloneURL: fmt.Sprintf("https://x/y%d.git", i),
+		})
 	}
 
 	// İş, aynı anda kaç kopyasının koştuğunu sayıyor ve HEPSİ girene kadar
@@ -460,4 +467,82 @@ func TestImportEt_EsZamanlilikSiniriAsilmaz(t *testing.T) {
 	require.Equal(t, 40, ozet.Failed, "hiçbir iş kaybolmamalı")
 	require.LessOrEqual(t, int(tepe.Load()), esZamanliSinama,
 		"aynı anda sınırdan fazla iş koşmamalı")
+}
+
+/*
+AYNI İSTEKTE İKİ KEZ GEÇEN ADRES BİR KEZ İŞLENİR.
+
+`mevcut` döngüden ÖNCE okunan bir anlık görüntü: bu çağrıda oluşturulanları
+görmüyor. `projects.repo_url` üzerinde unique kısıt da olmadığı için
+veritabanı ikinci kaydı reddetmiyordu ve kullanıcı aynı repository'i iki ayrı
+proje olarak görüyordu.
+
+Mükerrer giriş BİREBİR AYNI OLMAK ZORUNDA DEĞİL: normalize edilince eşleşen
+büyük/küçük harf ve `.git` farkı da aynı adrestir.
+*/
+func TestImportEt_AyniIstektekiMukerrerAdresBirKezIslenir(t *testing.T) {
+	h := &Handler{}
+
+	repos := []importRepo{
+		{Slug: "odeme", Name: "Ödeme", CloneURL: "https://git.sirket.com/odeme.git"},
+		{Slug: "odeme-kopya", Name: "Ödeme", CloneURL: "https://git.sirket.com/ODEME"},
+		{Slug: "kargo", Name: "Kargo", CloneURL: "https://git.sirket.com/kargo.git"},
+	}
+
+	var (
+		kilit    sync.Mutex
+		islenen  []string
+		satirlar []importSatir
+	)
+	isle := func(rp importRepo) importSatir {
+		kilit.Lock()
+		islenen = append(islenen, rp.Slug)
+		kilit.Unlock()
+		return importSatir{Slug: rp.Slug, Name: rp.Name, Result: sonucCreated}
+	}
+	yaz := func(s importSatir) {
+		kilit.Lock()
+		satirlar = append(satirlar, s)
+		kilit.Unlock()
+	}
+
+	ozet := h.importEt(importRunRequest{Repos: repos}, map[string]uuid.UUID{}, isle, yaz)
+
+	require.ElementsMatch(t, []string{"odeme", "kargo"}, islenen,
+		"aynı adres ikinci kez oluşturulmamalı")
+	require.Equal(t, 2, ozet.Created)
+	require.Equal(t, 1, ozet.Skipped)
+
+	// Atlanan satır SEBEBİNİ söyler: kullanıcı neden iki değil bir proje
+	// gördüğünü ekrandan anlayabilmeli.
+	var atlanan importSatir
+	for _, s := range satirlar {
+		if s.Result == sonucSkipped {
+			atlanan = s
+		}
+	}
+	require.Equal(t, "odeme-kopya", atlanan.Slug)
+	require.Contains(t, atlanan.Reason, "birden fazla")
+}
+
+// Zaten kayıtlı olanın gerekçesi DEĞİŞMEZ: istek içi tekrar ile karıştırılmamalı.
+func TestImportEt_ZatenKayitliOlaninGerekcesiKorunur(t *testing.T) {
+	h := &Handler{}
+
+	repos := []importRepo{
+		{Slug: "odeme", Name: "Ödeme", CloneURL: "https://git.sirket.com/odeme.git"},
+	}
+	mevcut := map[string]uuid.UUID{"https://git.sirket.com/odeme": uuid.New()}
+
+	var satirlar []importSatir
+	ozet := h.importEt(importRunRequest{Repos: repos}, mevcut,
+		func(importRepo) importSatir {
+			t.Fatal("kayıtlı repository sınanmamalı")
+			return importSatir{}
+		},
+		func(s importSatir) { satirlar = append(satirlar, s) })
+
+	require.Equal(t, 1, ozet.Skipped)
+	require.Len(t, satirlar, 1)
+	require.Equal(t, "bu repository zaten kayıtlı", satirlar[0].Reason)
 }

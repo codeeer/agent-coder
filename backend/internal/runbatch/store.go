@@ -417,16 +417,25 @@ func (s *Store) Resume(ctx context.Context, id uuid.UUID) (int, error) {
 		return 0, fmt.Errorf("kesilen öğeler sıraya alınamadı: %w", err)
 	}
 
-	// Toplu işin durumu da geri gelmeli: 'done' ya da 'cancelled' kalsaydı
-	// NextPending bu öğeleri hiç görmez ve kuyruk sessizce donardı.
-	if err := refreshStatus(ctx, tx, id, true); err != nil {
+	dirilen := int(tag.RowsAffected())
+
+	/*
+		Toplu işin durumu da geri gelmeli: 'done' ya da 'cancelled' kalsaydı
+		NextPending bu öğeleri hiç görmez ve kuyruk sessizce donardı.
+
+		Ama iptal koruması YALNIZCA gerçekten diriltilen öğe varsa kaldırılır.
+		Koşulsuz kaldırıldığında, iptal edilmiş bir toplu işte "kaldığı yerden
+		devam et" sıfır öğe diriltip durumu 'cancelled' → 'done' diye yeniden
+		yazıyordu: hiçbir şey değişmeden iptal kaydı siliniyordu.
+	*/
+	if err := refreshStatus(ctx, tx, id, dirilen > 0); err != nil {
 		return 0, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return 0, fmt.Errorf("toplu iş sürdürülemedi: %w", err)
 	}
-	return int(tag.RowsAffected()), nil
+	return dirilen, nil
 }
 
 /*

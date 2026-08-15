@@ -18,7 +18,13 @@ import {
 } from "@/components/ui/primitives";
 import { IconCheck, IconAlert, IconFolder } from "@/components/ui/icons";
 import { repoLabel } from "./repo-url";
-import { secilebilir, secimAcKapa, tumunuSec, varsayilanSecim } from "./import-selection";
+import {
+  etkinProvider,
+  secilebilir,
+  secimAcKapa,
+  tumunuSec,
+  varsayilanSecim,
+} from "./import-selection";
 
 /**
  * Kurumsal Bitbucket grubundan toplu proje ekleme (spec 021).
@@ -43,7 +49,11 @@ export function ImportGroupPanel({
   const bitbucketler = gitProviders.filter((p) => p.type === "bitbucket");
 
   const [groupUrl, setGroupUrl] = useState("");
-  const [providerId, setProviderId] = useState(bitbucketler[0]?.id ?? "");
+
+  // Durum yalnızca ELLE yapılan seçimi tutar; görünen değer türetilir.
+  // Gerekçe ve sınır durumları: import-selection.ts → etkinProvider.
+  const [providerSecimi, setProviderSecimi] = useState("");
+  const providerId = etkinProvider(providerSecimi, bitbucketler);
   const [repos, setRepos] = useState<ImportRepo[] | null>(null);
   const [secili, setSecili] = useState<Set<string>>(new Set());
 
@@ -117,7 +127,7 @@ export function ImportGroupPanel({
               <Label>Git erişimi</Label>
               <Select
                 value={providerId}
-                onChange={(e) => setProviderId(e.target.value)}
+                onChange={(e) => setProviderSecimi(e.target.value)}
               >
                 {bitbucketler.map((p) => (
                   <option key={p.id} value={p.id}>

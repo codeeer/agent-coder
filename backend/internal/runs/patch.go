@@ -83,7 +83,16 @@ func stripUnappliableBinary(diff string) (string, []string) {
 func ikiliDosyaAdi(satir string) string {
 	s := strings.TrimSuffix(strings.TrimPrefix(satir, "Binary files "), " differ")
 
-	// Son " and " ayracından sonrası hedef taraftır; öncesi kaynak.
+	// Ayraç " and " DEĞİL " and b/": hedef tarafın öneki ayracın parçası
+	// sayılmazsa dizi yolun İÇİNDE de eşleşiyor ve yol kırpılıyor —
+	// "a/Search and Replace/app.jar and b/Search and Replace/app.jar"
+	// satırından geriye "Replace/app.jar" kalıyordu.
+	if i := strings.LastIndex(s, " and b/"); i >= 0 {
+		return s[i+len(" and b/"):]
+	}
+
+	// Hedefte "b/" öneki yoksa (silinen dosyada git "/dev/null" yazar) eski
+	// davranış: son " and " ayracı.
 	if i := strings.LastIndex(s, " and "); i >= 0 {
 		s = s[i+len(" and "):]
 	}

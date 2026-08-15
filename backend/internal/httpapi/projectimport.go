@@ -239,10 +239,26 @@ func (h *Handler) importEt(req importRunRequest, mevcut map[string]uuid.UUID,
 	)
 	kapi := make(chan struct{}, esZamanliSinama)
 
+	/*
+		Bu istekte üstlenilen adresler.
+
+		`mevcut` döngüden ÖNCE okunan bir anlık görüntü: bu çağrıda oluşturulan
+		kayıtları görmüyor. `projects.repo_url` üzerinde unique kısıt da yok,
+		yani veritabanı ikinci kaydı reddetmiyor — aynı adrese normalize olan
+		iki giriş (birebir aynı, ya da yalnızca büyük/küçük harf veya `.git`
+		ile ayrılan) iki ayrı proje oluşturuyordu.
+
+		Kilit gerekmiyor: eleme, goroutine'ler açılmadan bu sıralı döngüde
+		yapılıyor.
+	*/
+	ustlenilen := make(map[string]struct{}, len(req.Repos))
+
 	for _, rp := range req.Repos {
+		norm := projects.NormalizeRepoURL(rp.CloneURL)
+
 		// Zaten kayıtlı olan sınanmadan atlanır: hem gereksiz ağ trafiği hem
 		// de mevcut kaydın erişimini değiştirme riski olurdu.
-		if _, kayitli := mevcut[projects.NormalizeRepoURL(rp.CloneURL)]; kayitli {
+		if _, kayitli := mevcut[norm]; kayitli {
 			sayacKilidi.Lock()
 			ozet.Skipped++
 			sayacKilidi.Unlock()
@@ -250,6 +266,16 @@ func (h *Handler) importEt(req importRunRequest, mevcut map[string]uuid.UUID,
 				Reason: "bu repository zaten kayıtlı"})
 			continue
 		}
+
+		if _, tekrar := ustlenilen[norm]; tekrar {
+			sayacKilidi.Lock()
+			ozet.Skipped++
+			sayacKilidi.Unlock()
+			yaz(importSatir{Slug: rp.Slug, Name: rp.Name, Result: sonucSkipped,
+				Reason: "bu adres seçimde birden fazla kez var"})
+			continue
+		}
+		ustlenilen[norm] = struct{}{}
 
 		wg.Add(1)
 		go func(rp importRepo) {

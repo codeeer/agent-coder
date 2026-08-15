@@ -2,6 +2,7 @@ package runbatch
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -286,8 +287,31 @@ func (s *Scheduler) startItem(ctx context.Context, p Pending) bool {
 	}
 
 	if err := s.store.Attach(ctx, p.ID, runID); err != nil {
+		/*
+			Çalışma BAŞLADI ama öğeye bağlanamadı: sonucunu toplayacak kimlik
+			artık yok.
+
+			Öğe `running` bırakılsaydı `harvest` onu çalışma kimliği NULL
+			olduğu için her turda "başlıyor" sayar; yuva sonsuza kadar dolu
+			kalır ve toplu iş hiç `done` olmazdı. Ne `Cancel` (yalnızca
+			bekleyenler) ne `Resume` (yalnızca kesilenler) o öğeye erişebilir —
+			tek çıkış yeniden başlatıp `Reconcile`'a düşmek olurdu.
+
+			Bu yüzden öğe başarısız yazılır ve çalışma kimliği mesaja konur:
+			çalışmanın kendisi sürüyor ve Çalıştırmalar ekranında görünüyor,
+			kullanıcı ona bakabilmeli.
+		*/
 		slog.ErrorContext(ctx, "öğe çalışmaya bağlanamadı",
 			"item_id", p.ID, "workflow_run_id", runID, "error", err)
+
+		msg := fmt.Sprintf("çalışma başlatıldı (%s) ama öğeye bağlanamadı: %v", runID, err)
+		if merr := s.store.MarkFinished(ctx, p.ID, ItemFailed, msg); merr != nil {
+			slog.ErrorContext(ctx, "bağlanamayan öğe başarısız işaretlenemedi",
+				"item_id", p.ID, "error", merr)
+		}
+		// Kuyruk DEVAM eder ve sınır aşılmaz: süren çalışmayı makinenin kendi
+		// ölçüsü (`slots.Active`) zaten sayıyor.
+		return true
 	}
 	slog.InfoContext(ctx, "toplu iş öğesi başlatıldı",
 		"item_id", p.ID, "proje", p.ProjectName, "workflow_run_id", runID)

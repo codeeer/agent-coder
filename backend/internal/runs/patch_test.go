@@ -147,3 +147,35 @@ func TestCanPush_BosBranchEngelDegil(t *testing.T) {
 	bos := ""
 	require.NoError(t, CanPush(Run{Diff: "diff", PushedBranch: &bos}, true))
 }
+
+/*
+YOLUN İÇİNDE " and " GEÇEBİLİR.
+
+Ayraç yalnızca " and " sayılsaydı `LastIndex` hedef yolun İÇİNDEKİ eşleşmeyi
+bulur ve yol oradan kırpılırdı: kullanıcı "atlanan ikili dosyalar" listesinde
+var olmayan bir yol görürdü. Ayracın "b/" öneki de parçasıdır.
+*/
+func TestBinariAyikla_YolunIcindeAndGecer(t *testing.T) {
+	diff := `diff --git a/Search and Replace/target/app.jar b/Search and Replace/target/app.jar
+new file mode 100644
+index 0000000..091cb04
+Binary files /dev/null and b/Search and Replace/target/app.jar differ
+`
+
+	_, atlanan := stripUnappliableBinary(diff)
+
+	require.Equal(t, []string{"Search and Replace/target/app.jar"}, atlanan)
+}
+
+// Aynısı DEĞİŞTİRİLEN ikili dosyada: iki taraf da yazılı ve ikisi de " and "
+// içeriyor.
+func TestBinariAyikla_IkiTaraftaDaAndGecer(t *testing.T) {
+	diff := `diff --git a/Search and Replace/logo.png b/Search and Replace/logo.png
+index 1111111..2222222 100644
+Binary files a/Search and Replace/logo.png and b/Search and Replace/logo.png differ
+`
+
+	_, atlanan := stripUnappliableBinary(diff)
+
+	require.Equal(t, []string{"Search and Replace/logo.png"}, atlanan)
+}

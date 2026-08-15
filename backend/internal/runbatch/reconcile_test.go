@@ -247,3 +247,71 @@ func TestCancelResume_OlmayanTopluIs(t *testing.T) {
 	_, err = f.store.Resume(ctx, f.workflowID)
 	require.ErrorIs(t, err, runbatch.ErrNotFound)
 }
+
+/*
+İPTAL EDİLMİŞ TOPLU İŞTE "DEVAM ET" İPTALİ SİLMEZ.
+
+Sürdürme yalnızca `interrupted` öğeleri diriltir; iptal edilmiş bir işte öyle
+öğe yoktur. Durum yine de koşulsuz yeniden hesaplansaydı 'cancelled' → 'done'
+olurdu: hiçbir şey değişmeden iptal kaydı kaybolur ve kullanıcı işi kendisinin
+durdurduğunu bir daha göremezdi.
+
+İptal korumasının kaldırılması SÜRDÜRMEYE BAĞLI, çağrıya değil.
+*/
+func TestResume_IptalEdilmisIsteIptalKorunur(t *testing.T) {
+	f := setup(t, "alfa", "beta")
+	ctx := context.Background()
+	b := f.create(t, f.projects...)
+
+	dusen, err := f.store.Cancel(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, dusen)
+
+	dirilen, err := f.store.Resume(ctx, b.ID)
+	require.NoError(t, err)
+	require.Zero(t, dirilen, "iptal edilmiş öğeler sürdürmeye konu değil")
+
+	batch, items, err := f.store.Get(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, runbatch.StatusCancelled, batch.Status,
+		"sıfır öğe dirilmişken iptal silinmemeli")
+	for _, it := range items {
+		require.Equal(t, runbatch.ItemCancelled, it.Status)
+	}
+
+	// Kuyruk da bu işi görmemeli: durum korunuyorsa öğeler de `cancelled`.
+	_, ok, err := f.store.NextPending(ctx)
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
+/*
+AMA GERÇEKTEN DİRİLTİLEN ÖĞE VARSA İPTAL BOZULUR — ve bozulmalı.
+
+İptal edilmiş bir işte kesilmiş bir öğe de varsa (önce çalışan bir öğe
+kesilmiş, sonra iş iptal edilmiş) sürdürme onu sıraya alır; toplu iş
+'cancelled' kalsaydı `NextPending` o öğeyi hiç görmez ve kuyruk sessizce
+donardı.
+*/
+func TestResume_KesilenVarsaIptalliIsYineSirayaGirer(t *testing.T) {
+	f := setup(t, "alfa", "beta")
+	ctx := context.Background()
+	b := f.create(t, f.projects...)
+
+	_, items, err := f.store.Get(ctx, b.ID)
+	require.NoError(t, err)
+
+	// 0: çalışıp kesildi · 1: bekliyorken iptal edildi
+	f.baslat(t, items[0].ID, items[0].ProjectID)
+	require.NoError(t, f.store.MarkFinished(ctx, items[0].ID, runbatch.ItemInterrupted, "kesildi"))
+	_, err = f.store.Cancel(ctx, b.ID)
+	require.NoError(t, err)
+
+	dirilen, err := f.store.Resume(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, 1, dirilen)
+
+	batch, _, err := f.store.Get(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, runbatch.StatusQueued, batch.Status)
+}
