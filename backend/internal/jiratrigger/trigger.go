@@ -44,11 +44,35 @@ func New(store *workflow.Store, launcher *workflow.Launcher, creds *credentials.
 	}
 }
 
+/*
+tarama, bir sonraki taramaya kalan süre.
+
+Sıfır ya da eksi bir değer buraya GELMEMELİ — ayar `Min: 1` ile doğrulanıyor.
+Yine de korunuyor ve sebebi bu paket için daha sert: sıfırlık bir bekleme
+zamanlayıcıyı anında ateşler ve tarama, DIŞARIDAKİ bir servisi aralıksız
+dövmeye başlar. Kendi kuyruğunu boşuna döndürmek gibi değil; karşı taraf
+istekleri sayıyor.
+
+Sıfır gerçekten gelebiliyor: `settings.Int` bilinmeyen anahtar için sıfır
+dönüyor, yani ayar anahtarı bir gün registry'den düşerse tetikleyici sessizce
+sıcak döngüye girer.
+*/
+func (t *Trigger) tarama() time.Duration {
+	if t.interval == nil {
+		return time.Minute
+	}
+	d := t.interval()
+	if d <= 0 {
+		return time.Minute
+	}
+	return d
+}
+
 // Run, tarama döngüsünü çalıştırır. ctx iptal edilene kadar sürer.
 func (t *Trigger) Run(ctx context.Context) {
 	// İlk tarama açılışta değil, bir aralık sonra: sunucu her yeniden
 	// başladığında anında Jira'ya yüklenmek istemiyoruz.
-	timer := time.NewTimer(t.interval())
+	timer := time.NewTimer(t.tarama())
 	defer timer.Stop()
 
 	for {
@@ -57,7 +81,7 @@ func (t *Trigger) Run(ctx context.Context) {
 			return
 		case <-timer.C:
 			t.ScanAll(ctx)
-			timer.Reset(t.interval())
+			timer.Reset(t.tarama())
 		}
 	}
 }
