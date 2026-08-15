@@ -621,6 +621,27 @@ func collectEngineLogs(ctx context.Context, ct *sandbox.Container, cli *client, 
 	out := []runner.EngineLog{}
 
 	/*
+	 * MASKELEME TEK KAPIDA.
+	 *
+	 * Üç kaynağın her biri `Redact`'i ayrı ayrı çağırıyordu ve doğruluk
+	 * tamamen disipline bağlıydı: dördüncü kaynağı ekleyen kişinin çağrıyı
+	 * hatırlaması gerekiyordu. Unutulduğunda ortaya çıkan şey geri alınamaz —
+	 * `Redact`'in kendi yorumunun dediği gibi, bir kez yazılmış sırrı sonradan
+	 * temizlemek onu geri almaz.
+	 *
+	 * Boş içerik de burada eleniyor: aynı kontrol üç kez tekrarlanıyordu.
+	 */
+	ekle := func(kaynak runner.EngineLogSource, icerik string) {
+		if icerik == "" {
+			return
+		}
+		out = append(out, runner.EngineLog{
+			Source:  kaynak,
+			Content: runner.Redact(icerik, sirlar),
+		})
+	}
+
+	/*
 	 * Oturum geçmişi İLK toplanır: motor hâlâ ayakta ve API cevap veriyor.
 	 * Dosya kopyalama container'ı durdurmasa da, en kırılgan adımı sona
 	 * bırakmak için sebep yok.
@@ -632,27 +653,17 @@ func collectEngineLogs(ctx context.Context, ct *sandbox.Container, cli *client, 
 		gecmisCtx, iptal := context.WithTimeout(ctx, transcriptTimeout)
 		gecmis, err := cli.sessionTranscript(gecmisCtx, sessionID)
 		iptal()
-		if err == nil && gecmis != "" {
-			out = append(out, runner.EngineLog{
-				Source:  runner.EngineLogSession,
-				Content: runner.Redact(gecmis, sirlar),
-			})
+		if err == nil {
+			ekle(runner.EngineLogSession, gecmis)
 		}
 	}
 
-	if ham, err := ct.Logs(ctx, "all"); err == nil && ham != "" {
-		out = append(out, runner.EngineLog{
-			Source:  runner.EngineLogStdout,
-			Content: runner.Redact(ham, sirlar),
-		})
+	if ham, err := ct.Logs(ctx, "all"); err == nil {
+		ekle(runner.EngineLogStdout, ham)
 	}
 
-	if icerik := dizinMetni(ctx, ct, engineLogDir); icerik != "" {
-		out = append(out, runner.EngineLog{
-			Source:  runner.EngineLogFile,
-			Content: runner.Redact(icerik, sirlar),
-		})
-	}
+	ekle(runner.EngineLogFile, dizinMetni(ctx, ct, engineLogDir))
+
 	return out
 }
 
