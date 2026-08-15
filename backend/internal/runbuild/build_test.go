@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/agent-coder/backend/internal/agentreg"
@@ -32,6 +33,7 @@ type buildFixture struct {
 	agents   *agentreg.Store
 	git      *gitprovider.Store
 	llm      *llm.Store
+	scripts  *scripts.Store
 }
 
 func buildSetup(t *testing.T) buildFixture {
@@ -39,7 +41,7 @@ func buildSetup(t *testing.T) buildFixture {
 
 	pool := testutil.TestDB(t)
 	testutil.Truncate(t, pool, "runs", "workflows", "projects", "agents",
-		"llm_providers", "git_providers", "mcp_servers", "scripts")
+		"llm_providers", "git_providers", "mcp_servers", "scripts", "script_folders")
 
 	cipher, err := secrets.NewCipher(base64.StdEncoding.EncodeToString(make([]byte, secrets.KeySize)))
 	require.NoError(t, err)
@@ -49,9 +51,10 @@ func buildSetup(t *testing.T) buildFixture {
 	lm := llm.NewStore(pool, cipher)
 	gp := gitprovider.NewStore(pool, cipher)
 
+	sc := scripts.NewStore(pool)
 	return buildFixture{
-		b:        New(pr, ag, lm, gp, mcp.NewStore(pool, cipher), scripts.NewStore(pool)),
-		projects: pr, agents: ag, git: gp, llm: lm,
+		b:        New(pr, ag, lm, gp, mcp.NewStore(pool, cipher), sc),
+		projects: pr, agents: ag, git: gp, llm: lm, scripts: sc,
 	}
 }
 
@@ -325,4 +328,104 @@ func TestBuild_NodeSurumuKaydaVeContainerAAyniGider(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "24.13.0", in.Create.NodeVersion)
 	require.Equal(t, "24.13.0", in.NodeVersion)
+}
+
+// ── Betikler ve klasörler ───────────────────────────────────────────────────
+
+/*
+BETİK İÇERİĞİ ÇALIŞTIRMA ANINDA OKUNUR.
+
+Ürünün sözü şu: betik bir kez yazılır, kütüphaneden güncellenir ve SONRAKİ
+çalıştırma yeni içerikle koşar (spec 012 hikâye 2). İçerik agent'a atandığı
+anda kopyalansaydı bu söz sessizce bozulurdu — kullanıcı betiği düzeltir,
+akış eskisini çalıştırmaya devam ederdi ve farkı ancak çıktıdan anlardı.
+*/
+func TestBuild_BetikIcerigiCalistirmaAnindaOkunur(t *testing.T) {
+	f := buildSetup(t)
+	f.saglayici(t)
+	ctx := context.Background()
+
+	p := f.proje(t, projects.Input{})
+	a := f.agent(t, agentreg.CreateInput{DefaultModel: "m", AllowBash: true})
+
+	sc, err := f.scripts.Create(ctx, scripts.CreateInput{
+		Name: "surum-yukselt", Description: "sürüm yükseltir", Content: "echo eski",
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.scripts.SetAgentScripts(ctx, a.ID, []uuid.UUID{sc.ID}))
+
+	ilk, err := f.b.Build(ctx, Request{ProjectID: p.ID, AgentID: a.ID, Task: "iş"})
+	require.NoError(t, err)
+	require.Len(t, ilk.Agent.Scripts, 1)
+	// Sondaki satır sonu betik deposunun normalleştirmesinden geliyor (CRLF
+	// temizliği ile birlikte); burada ölçülen şey İÇERİĞİN GÜNCELLİĞİ.
+	require.Equal(t, "echo eski\n", ilk.Agent.Scripts[0].Content)
+
+	yeni := "echo yeni"
+	_, err = f.scripts.Update(ctx, sc.ID, scripts.UpdateInput{Content: &yeni}, false)
+	require.NoError(t, err)
+
+	sonraki, err := f.b.Build(ctx, Request{ProjectID: p.ID, AgentID: a.ID, Task: "iş"})
+	require.NoError(t, err)
+	require.Equal(t, "echo yeni\n", sonraki.Agent.Scripts[0].Content,
+		"kütüphane güncellendiyse sonraki çalıştırma yenisini görmeli")
+}
+
+/*
+KLASÖR ADI BETİKLE BİRLİKTE TAŞINIR.
+
+Taşınmazsa dosya köke yazılır ama talimatta alt dizin yazar; model var olmayan
+bir yolu dener ve neden bulamadığını söyleyemez.
+*/
+func TestBuild_BetiginKlasorAdiTasinir(t *testing.T) {
+	f := buildSetup(t)
+	f.saglayici(t)
+	ctx := context.Background()
+
+	p := f.proje(t, projects.Input{})
+	a := f.agent(t, agentreg.CreateInput{DefaultModel: "m", AllowBash: true})
+
+	kl, err := f.scripts.CreateFolder(ctx, scripts.FolderInput{
+		Name: "node-24", Description: "Node 24 kampanyası",
+	})
+	require.NoError(t, err)
+
+	sc, err := f.scripts.Create(ctx, scripts.CreateInput{
+		Name: "adim-1", Content: "echo bir", FolderID: &kl.ID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.scripts.SetAgentScripts(ctx, a.ID, []uuid.UUID{sc.ID}))
+
+	in, err := f.b.Build(ctx, Request{ProjectID: p.ID, AgentID: a.ID, Task: "iş"})
+	require.NoError(t, err)
+	require.Len(t, in.Agent.Scripts, 1)
+	require.Equal(t, "node-24", in.Agent.Scripts[0].Folder)
+}
+
+/*
+KLASÖR AÇIKLAMASI BETİK LİSTESİNDEN TÜRETİLEMEZ.
+
+Kampanyanın ne olduğunu model yalnızca klasör açıklamasından öğreniyor; betik
+listesi yalnızca adımları söylüyor, neden yapıldığını değil.
+*/
+func TestBuild_KlasorAciklamasiAyricaTasinir(t *testing.T) {
+	f := buildSetup(t)
+	f.saglayici(t)
+	ctx := context.Background()
+
+	p := f.proje(t, projects.Input{})
+	a := f.agent(t, agentreg.CreateInput{DefaultModel: "m", AllowBash: true})
+
+	kl, err := f.scripts.CreateFolder(ctx, scripts.FolderInput{
+		Name: "node-24", Description: "Node 24 kampanyası",
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.scripts.SetAgentFolders(ctx, a.ID, []uuid.UUID{kl.ID}))
+
+	in, err := f.b.Build(ctx, Request{ProjectID: p.ID, AgentID: a.ID, Task: "iş"})
+	require.NoError(t, err)
+	require.Len(t, in.Agent.ScriptFolders, 1)
+	require.Equal(t, "node-24", in.Agent.ScriptFolders[0].Name)
+	require.Equal(t, "Node 24 kampanyası", in.Agent.ScriptFolders[0].Description,
+		"açıklama olmadan model kampanyanın ne olduğunu bilemez")
 }
