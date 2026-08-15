@@ -2,6 +2,10 @@ package jiratrigger
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -9,7 +13,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/agent-coder/backend/internal/credentials"
 	"github.com/agent-coder/backend/internal/integrations/jira"
+	"github.com/agent-coder/backend/internal/secrets"
 	"github.com/agent-coder/backend/internal/testutil"
 	"github.com/agent-coder/backend/internal/workflow"
 )
@@ -221,4 +227,201 @@ func TestProcess_GuncellenenTaskYenidenDenenir(t *testing.T) {
 	_, err = tr.Process(ctx, wfID,
 		jira.Issue{Key: "SCRUM-1", UpdatedAt: "2026-08-11T09:30:00"})
 	require.Error(t, err, "güncellenmiş task atlanmamalı, başlatmaya kalkışmalı")
+}
+
+// ── Tarama: sayaçlar ve hata kaydı ──────────────────────────────────────────
+
+// sessizBus, akış olaylarını yutan yayıncı. Testte kimse dinlemiyor.
+type sessizBus struct{}
+
+func (sessizBus) Publish(uuid.UUID, string, string) {}
+
+/*
+sahteJira, arama ucuna sabit bir sonuç kümesi döndüren sunucu.
+
+Atlassian'ın gerçek yanıtı değil KENDİ kodumuz doğrulanıyor: kaç task
+bulunduğu, kaçının başladığı ve hatanın kaydedilip kaydedilmediği.
+*/
+func sahteJira(t *testing.T, anahtarlar []string, durum int) *httptest.Server {
+	t.Helper()
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if durum != http.StatusOK {
+			w.WriteHeader(durum)
+			return
+		}
+		var issues []map[string]any
+		for _, k := range anahtarlar {
+			issues = append(issues, map[string]any{
+				"key": k,
+				"fields": map[string]any{
+					"summary": k + " özeti",
+					"updated": "2026-08-10T00:00:00.000+0300",
+				},
+			})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"issues": issues})
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
+type taramaFixture struct {
+	tr    *Trigger
+	store *workflow.Store
+	wf    workflow.Workflow
+	node  workflow.Node
+}
+
+/*
+scanFixture, taranabilir bir akış kurar.
+
+`baslatilabilir` false ise akışın etkin sürümü olmaz ve her başlatma düşer —
+"bulundu ama başlamadı" durumunu üretmenin yolu bu.
+
+Handler kümesi BOŞ: başlatma başarılı olsa bile arka plandaki çalışma ilk
+adımda "bu türü çalıştıramıyorum" diyip duruyor. Böylece sayaçlar gerçek
+başlatma yolundan geçerek ölçülüyor ama tek bir container açılmıyor.
+*/
+func scanFixture(t *testing.T, jiraURL string, kimlikVar, baslatilabilir bool) taramaFixture {
+	t.Helper()
+
+	pool := testutil.TestDB(t)
+	testutil.Truncate(t, pool, "workflows", "runs", "projects", "agents", "credentials")
+
+	ctx := context.Background()
+	var projectID, agentID uuid.UUID
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO projects (name, repo_url) VALUES ('Deneme','https://example.com/r.git')
+		 RETURNING id`).Scan(&projectID))
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO agents (slug, name, prompt, source) VALUES ('coder','Coder','p','builtin')
+		 RETURNING id`).Scan(&agentID))
+
+	store := workflow.NewStore(pool)
+	wf, err := store.Create(ctx, workflow.CreateInput{ProjectID: projectID, Name: "Jira akışı"})
+	require.NoError(t, err)
+
+	node := workflow.Node{ID: "t1", Kind: workflow.KindTriggerJira,
+		Config: workflow.NodeConfig{JQL: "project = SCRUM"}}
+
+	if baslatilabilir {
+		_, err = store.SaveVersion(ctx, wf.ID, workflow.Graph{
+			Nodes: []workflow.Node{node,
+				{ID: "a1", Kind: workflow.KindAgent, Name: "Analiz",
+					Config: workflow.NodeConfig{AgentID: agentID.String(), Model: "m1",
+						Prompt: "{{ input }}"}}},
+			Edges: []workflow.Edge{{From: "t1", To: "a1"}},
+		})
+		require.NoError(t, err)
+	}
+	wf, err = store.Get(ctx, wf.ID)
+	require.NoError(t, err)
+
+	cipher, err := secrets.NewCipher(base64.StdEncoding.EncodeToString(make([]byte, secrets.KeySize)))
+	require.NoError(t, err)
+	creds := credentials.NewStore(pool, cipher)
+	if kimlikVar {
+		require.NoError(t, creds.Put(ctx, credentials.KindJira, "token",
+			map[string]string{"base_url": jiraURL, "email": "u@e.com"}))
+	}
+
+	launcher := workflow.NewLauncher(store,
+		workflow.NewExecutor(store, workflow.Handlers{}, sessizBus{}))
+
+	return taramaFixture{
+		tr:    New(store, launcher, creds, jira.New(nil), nil, func() int { return 20 }),
+		store: store, wf: wf, node: node,
+	}
+}
+
+/*
+BULUNAN İLE BAŞLAYAN AYRI SAYILIR.
+
+Panelde tek görünür iz bu iki sayı: "N task eşleşti, M akış başlatıldı".
+Aynı sayı olsalardı kullanıcı, JQL'in hiç eşleşmediği durumla hepsinin daha
+önce işlendiği durumu ayırt edemezdi.
+*/
+func TestScanOne_BulunanVeBaslayanAyriSayilir(t *testing.T) {
+	f := scanFixture(t, sahteJira(t, []string{"SCRUM-1", "SCRUM-2", "SCRUM-3"}, 200).URL, true, true)
+	ctx := context.Background()
+
+	f.tr.scanOne(ctx, f.wf, f.node)
+
+	st, err := f.store.ScanState(ctx, f.wf.ID)
+	require.NoError(t, err)
+	require.Equal(t, 3, st.Found)
+	require.Equal(t, 3, st.Started)
+	require.Nil(t, st.Error)
+}
+
+// Zaten işlenmiş task BULUNANA dahildir, BAŞLAYANA değil: JQL onu hâlâ
+// eşleştiriyor ve kullanıcı sorgusunun kapsamını bu sayıdan okuyor.
+func TestScanOne_ZatenIslenmisTaskBaslayanaSayilmaz(t *testing.T) {
+	f := scanFixture(t, sahteJira(t, []string{"SCRUM-1", "SCRUM-2", "SCRUM-3"}, 200).URL, true, true)
+	ctx := context.Background()
+
+	fresh, err := f.store.MarkProcessed(ctx, f.wf.ID, "SCRUM-2", "2026-08-10T00:00:00.000+0300")
+	require.NoError(t, err)
+	require.True(t, fresh)
+
+	f.tr.scanOne(ctx, f.wf, f.node)
+
+	st, err := f.store.ScanState(ctx, f.wf.ID)
+	require.NoError(t, err)
+	require.Equal(t, 3, st.Found, "eşleşen task sayısı değişmez")
+	require.Equal(t, 2, st.Started, "daha önce işlenmiş olan yeniden başlatılmaz")
+}
+
+/*
+BAŞLATILAMAYAN TASK'LAR SESSİZ KALMAZ.
+
+Bulundu ama hiçbiri başlamadıysa kullanıcı sebebini görebilmeli; sayılar tek
+başına "0 başladı" diyor ama NEDEN demiyor.
+*/
+func TestScanOne_BaslatmaDusersaHataKaydedilir(t *testing.T) {
+	f := scanFixture(t, sahteJira(t, []string{"SCRUM-1", "SCRUM-2"}, 200).URL, true, false)
+	ctx := context.Background()
+
+	f.tr.scanOne(ctx, f.wf, f.node)
+
+	st, err := f.store.ScanState(ctx, f.wf.ID)
+	require.NoError(t, err)
+	require.Equal(t, 2, st.Found)
+	require.Equal(t, 0, st.Started)
+	require.NotNil(t, st.Error, "başlatılamayan task sessizce kaybolmamalı")
+}
+
+/*
+JIRA ERİŞİMİ YOKKEN TARAMA DURUMU YİNE YAZILIR.
+
+Sessizce dönülseydi panel "henüz taranmadı" derdi ve kullanıcı eksik olanın
+kimlik bilgisi olduğunu hiçbir yerden öğrenemezdi.
+*/
+func TestScanOne_KimlikYokkenSebepYazilir(t *testing.T) {
+	f := scanFixture(t, "http://kullanilmayacak.local", false, true)
+	ctx := context.Background()
+
+	f.tr.scanOne(ctx, f.wf, f.node)
+
+	st, err := f.store.ScanState(ctx, f.wf.ID)
+	require.NoError(t, err)
+	require.NotNil(t, st.Error)
+	require.Contains(t, *st.Error, "Jira erişimi")
+	require.Equal(t, 0, st.Started, "kimlik yokken hiçbir şey başlatılmamalı")
+}
+
+// Arama düşerse sebep kaydedilir ve bulunan sayısı sıfır kalır — yarım bir
+// sonuç, tam sonuç gibi gösterilmemeli.
+func TestScanOne_AramaDusersaSebepYazilir(t *testing.T) {
+	f := scanFixture(t, sahteJira(t, nil, http.StatusInternalServerError).URL, true, true)
+	ctx := context.Background()
+
+	f.tr.scanOne(ctx, f.wf, f.node)
+
+	st, err := f.store.ScanState(ctx, f.wf.ID)
+	require.NoError(t, err)
+	require.NotNil(t, st.Error)
+	require.Equal(t, 0, st.Found)
+	require.Equal(t, 0, st.Started)
 }
