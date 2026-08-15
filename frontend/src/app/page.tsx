@@ -18,11 +18,11 @@ import { Donut } from "@/components/charts/Donut";
 import {
   formatCompact,
   formatCount,
-  formatDuration,
   formatMoney,
   formatPercent,
 } from "@/components/charts/format";
 import { StatCard, type StatCardProps } from "@/components/ui/StatCard";
+import { kpi, type KpiKey } from "@/lib/kpi";
 import {
   IconAgent,
   IconCheck,
@@ -255,6 +255,18 @@ export default function DashboardPage() {
 
 /* ── Rakam şeridi ────────────────────────────────────────────────────────── */
 
+/** Panonun şerit sırası — rapor ekranınınkinden farklı ve bu bilinçli. */
+const KPI_SIRASI: KpiKey[] = [
+  "runs",
+  "succeeded",
+  "success",
+  "prsOpened",
+  "tokens",
+  "cost",
+  "avgDuration",
+  "filesChanged",
+];
+
 /**
  * Dönemin sekiz rakamı — her biri yönüyle birlikte.
  *
@@ -263,83 +275,15 @@ export default function DashboardPage() {
  * izlenimini verirdi.
  */
 function KpiStrip({ data }: { data: ReportSummary }) {
-  const t = data.totals;
-  const p = data.previous;
-
-  const finished = t.runs - t.active;
-  const prevFinished = p.runs - p.active;
-
-  const note = "öncekine göre";
-
-  const cards: StatCardProps[] = [
-    {
-      label: "Çalıştırma",
-      value: formatCount(t.runs),
-      current: t.runs,
-      previous: p.runs,
-      upIsGood: true,
-      periodNote: note,
-    },
-    {
-      label: "Tamamlanan",
-      value: formatCount(t.succeeded),
-      current: t.succeeded,
-      previous: p.succeeded,
-      upIsGood: true,
-      periodNote: note,
-    },
-    {
-      label: "Başarı",
-      value: formatPercent(t.succeeded, finished),
-      current: finished > 0 ? t.succeeded / finished : 0,
-      previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
-      upIsGood: true,
-      periodNote: note,
-    },
-    {
-      label: "Açılan PR",
-      value: formatCount(t.prsOpened),
-      current: t.prsOpened,
-      previous: p.prsOpened,
-      upIsGood: true,
-      periodNote: note,
-    },
-    {
-      label: "Token",
-      value: formatCompact(t.promptTokens + t.completionTokens),
-      current: t.promptTokens + t.completionTokens,
-      previous: p.promptTokens + p.completionTokens,
-      upIsGood: null,
-      periodNote: note,
-    },
-    {
-      label: "Maliyet",
-      value: formatMoney(t.costUsd),
-      current: t.costUsd,
-      previous: p.costUsd,
-      // Şeridin TEK "aşağısı iyi" kartı: ölçek büyürken maliyetin artması
-      // normaldir, yönetilebilir olan birim maliyettir.
-      upIsGood: false,
-      periodNote: note,
-    },
-    {
-      label: "Ort. süre",
-      value: formatDuration(t.avgDurationSec),
-      current: t.avgDurationSec,
-      previous: p.avgDurationSec,
-      upIsGood: false,
-      periodNote: note,
-    },
-    {
-      label: "Değişen dosya",
-      value: formatCompact(t.filesChanged),
-      current: t.filesChanged,
-      previous: p.filesChanged,
-      // Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
-      upIsGood: null,
-      periodNote: note,
-    },
-  ];
+  /*
+   * Sekiz rakam SİMGESİZ: dört-sekiz kartlık bir şeritte simge ayırt etmeye
+   * yardım etmiyor, gürültü ekliyor. Rapor ekranındaki on kartlık şeritte
+   * durum tersi ve orada simge var.
+   */
+  const cards: StatCardProps[] = KPI_SIRASI.map((key) => ({
+    ...kpi(key, data),
+    periodNote: "öncekine göre",
+  }));
 
   return (
     /* Dar ekranda 2, orta ekranda 4, geniş ekranda sekizi tek sıra. Sabit

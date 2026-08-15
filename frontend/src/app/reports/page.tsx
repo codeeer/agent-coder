@@ -55,7 +55,9 @@ import {
   Toolbar,
   formatRelative,
   panelLinkClass,
+  type TileTone,
 } from "@/components/ui/primitives";
+import { kpi, type KpiKey } from "@/lib/kpi";
 
 /**
  * Rapor — yönetici özeti.
@@ -350,6 +352,26 @@ export default function ReportsPage() {
 /* ── Rakam şeridi ────────────────────────────────────────────────────────── */
 
 /**
+ * Şeridin sırası ve GÖRÜNÜMÜ — rakamın kendisi değil.
+ *
+ * Simge süs değil: on kart yan yana dizildiğinde göz aradığı rakamı etiketi
+ * okuyarak değil simgesinden buluyor. Panoda sekiz kart var ve orada aynı
+ * simgeler kazanç sağlamadığı için hiç konmuyor.
+ */
+const SERIT: { key: KpiKey; icon: React.ReactNode; tone: TileTone }[] = [
+  { key: "runs", icon: <IconPlay className="size-3.5" />, tone: "accent" },
+  { key: "prsOpened", icon: <IconPullRequest className="size-3.5" />, tone: "success" },
+  { key: "jiraTasks", icon: <IconComment className="size-3.5" />, tone: "info" },
+  { key: "tokens", icon: <IconChip className="size-3.5" />, tone: "series" },
+  { key: "cost", icon: <IconCost className="size-3.5" />, tone: "warning" },
+  { key: "success", icon: <IconCheck className="size-3.5" />, tone: "success" },
+  { key: "avgDuration", icon: <IconPlay className="size-3.5" />, tone: "info" },
+  { key: "filesChanged", icon: <IconEdit className="size-3.5" />, tone: "series" },
+  { key: "linesChanged", icon: <IconEdit className="size-3.5" />, tone: "accent" },
+  { key: "pushedBranches", icon: <IconFolder className="size-3.5" />, tone: "info" },
+];
+
+/**
  * Dönemin on rakamı — her biri yönüyle birlikte.
  *
  * ÖLÇÜLMEYEN HİÇBİR ŞEY YOK. Referans tasarımda "Jira yorum" ve "aktif
@@ -359,123 +381,12 @@ export default function ReportsPage() {
  * rakam kondu: gönderilen branch ve değişen satır.
  */
 function KpiStrip({ data }: { data: ReportSummary }) {
-  const t = data.totals;
-  const p = data.previous;
-
-  const finished = t.runs - t.active;
-  const prevFinished = p.runs - p.active;
-  const note = "öncekine göre";
-
-  const cards: StatCardProps[] = [
-    {
-      label: "Çalıştırma",
-      value: formatCount(t.runs),
-      current: t.runs,
-      previous: p.runs,
-      upIsGood: true,
-      periodNote: note,
-      icon: <IconPlay className="size-3.5" />,
-      tone: "accent",
-    },
-    {
-      label: "Açılan PR",
-      value: formatCount(t.prsOpened),
-      current: t.prsOpened,
-      previous: p.prsOpened,
-      upIsGood: true,
-      periodNote: note,
-      icon: <IconPullRequest className="size-3.5" />,
-      tone: "success",
-    },
-    {
-      label: "Jira'dan",
-      value: formatCount(t.jiraTasks),
-      current: t.jiraTasks,
-      previous: p.jiraTasks,
-      upIsGood: true,
-      periodNote: note,
-      icon: <IconComment className="size-3.5" />,
-      tone: "info",
-    },
-    {
-      label: "Token",
-      value: formatCompact(t.promptTokens + t.completionTokens),
-      current: t.promptTokens + t.completionTokens,
-      previous: p.promptTokens + p.completionTokens,
-      upIsGood: null,
-      periodNote: note,
-      icon: <IconChip className="size-3.5" />,
-      tone: "series",
-    },
-    {
-      label: "Maliyet",
-      value: formatMoney(t.costUsd),
-      current: t.costUsd,
-      previous: p.costUsd,
-      // Şeridin TEK "aşağısı iyi" kartı: ölçek büyürken maliyetin artması
-      // normaldir, yönetilebilir olan birim maliyettir (aşağıdaki denge
-      // panosunda).
-      upIsGood: false,
-      periodNote: note,
-      icon: <IconCost className="size-3.5" />,
-      tone: "warning",
-    },
-    {
-      label: "Başarı",
-      value: formatPercent(t.succeeded, finished),
-      current: finished > 0 ? t.succeeded / finished : 0,
-      previous: prevFinished > 0 ? p.succeeded / prevFinished : 0,
-      upIsGood: true,
-      periodNote: note,
-      icon: <IconCheck className="size-3.5" />,
-      tone: "success",
-    },
-    {
-      label: "Ort. süre",
-      value: formatDuration(t.avgDurationSec),
-      current: t.avgDurationSec,
-      previous: p.avgDurationSec,
-      upIsGood: false,
-      periodNote: note,
-      icon: <IconPlay className="size-3.5" />,
-      tone: "info",
-    },
-    {
-      label: "Değişen dosya",
-      value: formatCompact(t.filesChanged),
-      current: t.filesChanged,
-      previous: p.filesChanged,
-      // Yön nötr: çok dosya değiştirmek ne iyi ne kötü, bağlama bağlı.
-      upIsGood: null,
-      periodNote: note,
-      icon: <IconEdit className="size-3.5" />,
-      tone: "series",
-    },
-    {
-      label: "Değişen kod satırı",
-      value: formatCompact(t.additions + t.deletions),
-      current: t.additions + t.deletions,
-      previous: p.additions + p.deletions,
-      upIsGood: null,
-      periodNote: note,
-      icon: <IconEdit className="size-3.5" />,
-      tone: "accent",
-      // Kırılım, komşu "değişen dosya" kartından ayırt edilmesini sağlıyor:
-      // ikisi tesadüfen aynı sayıya düştüğünde (her çalıştırma bir dosyada
-      // bir satır değiştirdiğinde) aynı şeyi sayıyorlar sanılıyor.
-      detail: `+${formatCompact(t.additions)} −${formatCompact(t.deletions)}`,
-    },
-    {
-      label: "Gönderilen branch",
-      value: formatCount(t.pushedBranches),
-      current: t.pushedBranches,
-      previous: p.pushedBranches,
-      upIsGood: true,
-      periodNote: note,
-      icon: <IconFolder className="size-3.5" />,
-      tone: "info",
-    },
-  ];
+  const cards: StatCardProps[] = SERIT.map(({ key, icon, tone }) => ({
+    ...kpi(key, data),
+    periodNote: "öncekine göre",
+    icon,
+    tone,
+  }));
 
   return (
     /* İki sıra beşli. Onunu tek sıraya dizmek karta ~130px bırakırdı ve
