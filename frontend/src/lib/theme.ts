@@ -60,7 +60,13 @@ export function applyMode(mode: ThemeMode): void {
 export const themeBootstrapScript = `
 (function(){
   try{
-    var m = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}) || "system";
+    var m = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+    // Doğrulama \`readMode\` ile AYNI olmak zorunda. Önceden yalnızca
+    // \`|| "system"\` vardı ve o sadece BOŞ değeri yakalıyordu: depoda tanınmayan
+    // bir değer varken betik "açık" boyuyor, React ise \`readMode\` sayesinde
+    // sisteme düşüp koyu uyguluyordu. Yani betik, tam olarak önlemek için
+    // yazıldığı sıçramayı kendisi üretiyordu.
+    if (m !== "light" && m !== "dark") m = "system";
     var dark = m === "dark" || (m === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
