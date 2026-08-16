@@ -348,3 +348,25 @@ func (h *Handler) jiraHook(w http.ResponseWriter, r *http.Request) {
 		"issue": body.Issue.Key, "started": started,
 	})
 }
+
+// deleteWorkflowRun, bitmiş bir akış çalışmasını adım çalıştırmalarıyla siler.
+//
+// Adım çalıştırmaları çalıştırmalar ekranından TEK TEK silinemiyor (bir akışa
+// bağlılar); silinebilecekleri tek yer burası.
+func (h *Handler) deleteWorkflowRun(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Workflows == nil {
+		respondError(w, http.StatusServiceUnavailable, "db_unavailable", "veritabanı hazır değil")
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.deps.Workflows.DeleteRun(r.Context(), id); err != nil {
+		h.respondWorkflowError(w, r, err)
+		return
+	}
+	slog.InfoContext(r.Context(), "akış çalışması silindi", "workflow_run_id", id)
+	w.WriteHeader(http.StatusNoContent)
+}

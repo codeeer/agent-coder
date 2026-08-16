@@ -297,6 +297,7 @@ func (h *Handler) Routes() http.Handler {
 			r.Get("/{id}", h.getRunBatch)
 			r.Post("/{id}/cancel", h.cancelRunBatch)
 			r.Post("/{id}/resume", h.resumeRunBatch)
+			r.Delete("/{id}", h.deleteRunBatch)
 		})
 
 		r.Route("/workflow-runs", func(r chi.Router) {
@@ -304,6 +305,7 @@ func (h *Handler) Routes() http.Handler {
 			r.Get("/{id}", h.getWorkflowRun)
 			r.Get("/{id}/events", h.workflowRunEvents)
 			r.Post("/{id}/cancel", h.cancelWorkflowRun)
+			r.Delete("/{id}", h.deleteWorkflowRun)
 		})
 
 		r.Get("/reports/summary", h.reportSummary)

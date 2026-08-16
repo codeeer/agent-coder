@@ -565,3 +565,74 @@ func isForeignKeyViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
+
+// RunDeleter, bir akış çalışmasını ve altındaki adım çalıştırmalarını silen şey.
+//
+// `Starter` ile aynı gerekçe: `workflow` paketine bağlanmadan dar bir arayüz.
+// Kaskadın nasıl işlediği — `workflow_steps.run_id` SET NULL olduğu için adım
+// çalıştırmalarının AÇIKÇA silinmesi gerektiği — tek bir yerde, `workflow`
+// paketinde durur. Buraya kopyalansaydı iki kopya er geç ayrışırdı.
+//
+// SÖZLEŞME: var olmayan çalışmayı silmek hata DEĞİLDİR. Yarıda kalmış bir
+// silme tekrar denenebilsin diye böyle.
+type RunDeleter interface {
+	DeleteRun(ctx context.Context, id uuid.UUID) error
+}
+
+/*
+Delete, bitmiş bir toplu işi ve ürettiği tüm geçmişi siler.
+
+SÜREN İŞ SİLİNMEZ: kuyruk hâlâ iş başlatıyorsa ya da bir öğe çalışıyorsa
+`ErrRunning` döner. Kullanıcı önce iptal eder. (Bir toplu iş iptal edilmiş ama
+o sırada çalışan öğesi henüz bitmemiş olabilir — durum 'cancelled' iken bile
+canlı bir çalışma kalabildiği için öğelere ayrıca bakılır.)
+
+SIRA ÖNEMLİ: önce akış çalışmaları, sonra toplu iş. `run_batch_items` toplu işle
+birlikte kaskadla gidiyor ve çalışmalara giden tek işaretçi orada duruyor. Toplu
+iş önce silinseydi, arada bir hata çıktığında geri kalan çalışmalara ulaşmanın
+hiçbir yolu kalmazdı; bu sırayla yarıda kalan silme tekrar denenebilir.
+
+ATOMİK DEĞİL: çalışmalar tek tek, kendi işlemlerinde siliniyor. Ortada bir hata
+çıkarsa bir kısmı gitmiş olur ve toplu iş yerinde kalır — kullanıcı aynı silmeyi
+tekrar çalıştırıp tamamlar.
+*/
+func (s *Store) Delete(ctx context.Context, id uuid.UUID, deleter RunDeleter) error {
+	var status string
+	var canli int
+	err := s.pool.QueryRow(ctx, `
+		SELECT b.status,
+		       (SELECT count(*) FROM run_batch_items
+		         WHERE batch_id = b.id AND status IN ('pending','running'))
+		  FROM run_batches b WHERE b.id = $1`, id).Scan(&status, &canli)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("toplu iş okunamadı: %w", err)
+	}
+	if status == StatusQueued || status == StatusRunning || canli > 0 {
+		return ErrRunning
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT workflow_run_id FROM run_batch_items
+		 WHERE batch_id = $1 AND workflow_run_id IS NOT NULL`, id)
+	if err != nil {
+		return fmt.Errorf("toplu işin çalışmaları okunamadı: %w", err)
+	}
+	runIDs, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return fmt.Errorf("toplu işin çalışmaları okunamadı: %w", err)
+	}
+
+	for _, runID := range runIDs {
+		if err := deleter.DeleteRun(ctx, runID); err != nil {
+			return fmt.Errorf("akış çalışması silinemedi: %w", err)
+		}
+	}
+
+	if _, err := s.pool.Exec(ctx, `DELETE FROM run_batches WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("toplu iş silinemedi: %w", err)
+	}
+	return nil
+}

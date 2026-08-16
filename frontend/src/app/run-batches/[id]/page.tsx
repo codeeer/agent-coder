@@ -2,13 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { RunBatchDetail, RunBatchItem } from "@/lib/types";
-import { IconExternal, IconFolder } from "@/components/ui/icons";
+import { IconExternal, IconFolder, IconTrash } from "@/components/ui/icons";
 import {
   Button,
   Card,
@@ -26,7 +26,12 @@ import {
   isBatchActive,
 } from "@/components/workflows/RunBatchBadges";
 import { CountStrip } from "@/components/workflows/CountStrip";
-import { devamEtiketi, iptalSonucu, ogeCalismaYolu } from "@/components/workflows/batch-selection";
+import {
+  devamEtiketi,
+  iptalSonucu,
+  ogeCalismaYolu,
+  silmeSonucu,
+} from "@/components/workflows/batch-selection";
 
 /**
  * Toplu işin ilerleme ekranı (spec 023 H3).
@@ -40,8 +45,10 @@ import { devamEtiketi, iptalSonucu, ogeCalismaYolu } from "@/components/workflow
 export default function RunBatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [iptalOnayi, setIptalOnayi] = useState(false);
+  const [silmeOnayi, setSilmeOnayi] = useState(false);
 
   const batch = useQuery({
     queryKey: ["run-batch", id],
@@ -68,6 +75,16 @@ export default function RunBatchDetailPage() {
     onSuccess: tazele,
   });
 
+  // Silinen işin detay sayfası artık yok: kullanıcı listeye döner. Burada
+  // kalsaydı sonraki tazeleme "bulunamadı" hatasıyla düşerdi.
+  const sil = useMutation({
+    mutationFn: () => api.runBatches.remove(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["run-batches"] });
+      router.push("/run-batches");
+    },
+  });
+
   if (batch.isPending) return <Skeleton rows={4} />;
   if (batch.isError) {
     return <Notice tone="error">{describeError(batch.error).message}</Notice>;
@@ -77,6 +94,18 @@ export default function RunBatchDetailPage() {
   const items = b.items ?? [];
   const devamMetni = devamEtiketi(b.counts.interrupted);
   const iptalEdilebilir = b.counts.pending > 0;
+
+  /*
+    SİLME YALNIZCA GERÇEKTEN SİLİNEBİLİYORKEN ÇIKAR.
+
+    Sunucudaki koruma ile birebir aynı koşul: kuyruk durmuş VE ortada canlı öğe
+    kalmamış olmalı. (İptal edilmiş bir işin o sırada çalışan öğesi bitene kadar
+    sürer — durum 'cancelled' iken bile canlı çalışma kalabiliyor.)
+
+    Tıklanmayan bir çöp kutusu göstermek, bu işin baştaki hatasıydı.
+  */
+  const silinebilir =
+    !isBatchActive(b.status) && b.counts.pending === 0 && b.counts.running === 0;
 
   return (
     <div className="space-y-6">
@@ -133,6 +162,29 @@ export default function RunBatchDetailPage() {
                 : "Bu toplu işte yapılacak bir şey kalmadı."}
             </p>
           )}
+
+          {/*
+            SİLME SAĞA AYRILIR ve KENARLIKLIDIR.
+
+            Sağda: soldaki eylemler işi ilerletir ("devam et", "iptal et"),
+            silme ise işi ortadan kaldırır — aynı öbekte durursa yanlışlıkla
+            tıklanacak sıradaki düğme olur.
+
+            `danger`: durgunken sessiz, hover'da kırmızı — projenin yıkıcı
+            eylem kalıbı. ghost olarak da denendi ve satırdaki düz metnin
+            yanında düğme olduğu anlaşılmıyordu; `danger` ölçülmüş
+            `control-line` sınırını taşıyor.
+          */}
+          {silinebilir && !silmeOnayi && (
+            <Button
+              className="ml-auto"
+              variant="danger"
+              icon={<IconTrash />}
+              onClick={() => setSilmeOnayi(true)}
+            >
+              Sil
+            </Button>
+          )}
         </div>
 
         {iptalOnayi && (
@@ -151,6 +203,24 @@ export default function RunBatchDetailPage() {
               error={iptal.isError ? describeError(iptal.error).message : undefined}
               onConfirm={() => iptal.mutate()}
               onCancel={() => setIptalOnayi(false)}
+            />
+          </div>
+        )}
+
+        {silmeOnayi && (
+          <div className="mt-3 overflow-hidden rounded-lg border border-danger/30">
+            {/*
+              Sonuç YAZILIR ve sayı verilir: silinen şey yalnızca bu kayıt değil,
+              altındaki bütün geçmiş. Kullanıcı neyi kaybettiğini tıklamadan
+              önce bilmeli.
+            */}
+            <ConfirmStrip
+              question="Toplu iş silinsin mi?"
+              consequence={silmeSonucu(b.counts.total)}
+              busy={sil.isPending}
+              error={sil.isError ? describeError(sil.error).message : undefined}
+              onConfirm={() => sil.mutate()}
+              onCancel={() => setSilmeOnayi(false)}
             />
           </div>
         )}

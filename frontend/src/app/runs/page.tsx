@@ -20,7 +20,13 @@ import {
   formatDuration,
   formatMoney,
 } from "@/components/charts/format";
-import { IconAgent, IconAlert, IconEdit, IconTrash } from "@/components/ui/icons";
+import {
+  IconAgent,
+  IconAlert,
+  IconEdit,
+  IconExternal,
+  IconTrash,
+} from "@/components/ui/icons";
 import {
   Badge,
   Button,
@@ -588,6 +594,11 @@ function saatOf(iso: string): string {
  * `title`'da yazıyor. Gizlemek kullanıcıya "böyle bir eylem yok" derdi;
  * oysa eylem var, o satırda geçerli değil.
  *
+ * AKIŞ ADIMINDA İSE PASİF DÜĞME DEĞİL, BAĞLANTI ÇIKAR. Önce yalnızca "akış
+ * çalışmasını silin" yazan bir ipucu vardı ve gidilecek yerde silme YOKTU;
+ * kullanıcı imkânsız bir eyleme yönlendiriliyordu. Silme artık orada var ve
+ * satır oraya doğrudan götürüyor — tarif etmek yerine.
+ *
  * Onay satırın kendisinde açılamaz (bir `<tr>` içine şerit sığmaz), bu yüzden
  * düğme iki adımlı: birinci tık soruyu, ikinci tık silmeyi yapar. Aradaki
  * "Vazgeç" için satırın dışına tıklamak yeterli değil, bu yüzden soru
@@ -607,11 +618,23 @@ function DeleteRunButton({ run }: { run: Run }) {
     onSettled: () => setAsking(false),
   });
 
-  const engel = isActive(run.status)
-    ? "Çalıştırma sürüyor — önce iptal edin"
-    : run.workflowRunId !== null
-      ? "Bu çalıştırma bir akışın adımı — akış çalışmasını silin"
-      : null;
+  if (run.workflowRunId !== null && run.workflowId !== null) {
+    const ipucu = `Bu çalıştırma "${run.workflowName}" akışının bir adımı — akış çalışmasıyla birlikte silinir`;
+    return (
+      <RowAction>
+        <Link
+          href={`/workflows/${run.workflowId}/runs/${run.workflowRunId}`}
+          title={ipucu}
+          aria-label={ipucu}
+          className="inline-flex size-7 items-center justify-center rounded-md border border-line text-ink-3 transition-colors hover:border-line-strong hover:text-ink"
+        >
+          <IconExternal className="size-4" />
+        </Link>
+      </RowAction>
+    );
+  }
+
+  const engel = isActive(run.status) ? "Çalıştırma sürüyor — önce iptal edin" : null;
 
   if (engel) {
     return (

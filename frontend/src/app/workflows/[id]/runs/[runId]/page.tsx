@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
@@ -11,6 +11,7 @@ import { autoLayout } from "@/lib/flow-layout";
 import { graphToFlow } from "@/lib/workflow-graph";
 import { formatDuration, formatMoney } from "@/components/charts/format";
 import { FlowCanvas } from "@/components/flow/FlowCanvas";
+import { IconTrash } from "@/components/ui/icons";
 import {
   WorkflowRunBadge,
   WorkflowStepBadge,
@@ -20,6 +21,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmStrip,
   Field,
   Mono,
   Notice,
@@ -32,6 +34,8 @@ import {
 export default function WorkflowRunPage() {
   const { id, runId } = useParams<{ id: string; runId: string }>();
   const qc = useQueryClient();
+  const router = useRouter();
+  const [silmeOnayi, setSilmeOnayi] = useState(false);
 
   const run = useQuery({
     queryKey: ["workflow-run", runId],
@@ -58,6 +62,23 @@ export default function WorkflowRunPage() {
   const cancel = useMutation({
     mutationFn: () => api.workflowRuns.cancel(runId),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["workflow-run", runId] }),
+  });
+
+  /*
+    SİLME BURADA, ÇÜNKÜ BAŞKA YERDE OLAMAZ.
+
+    Bir akışın adım çalıştırmaları çalıştırmalar ekranından tek tek silinemiyor
+    (akışın izini yarım bırakırdı). Silinebilecekleri tek yer, onları toplayan
+    bu kayıt.
+
+    Silinen çalışmanın sayfası artık yok: kullanıcı akışa döner.
+  */
+  const sil = useMutation({
+    mutationFn: () => api.workflowRuns.remove(runId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflow-runs"] });
+      router.push(`/workflows/${id}`);
+    },
   });
 
   if (run.isPending) return <Skeleton rows={4} />;
@@ -89,12 +110,40 @@ export default function WorkflowRunPage() {
               {cancel.isPending ? "Durduruluyor…" : "Durdur"}
             </Button>
           ) : (
-            <Link href={`/workflows/${id}`}>
-              <Button>Akışa dön</Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              {/* Süren çalışmada silme YOK: canlı container'ı sahipsiz bırakırdı
+                  ve sunucu da reddederdi. Tıklanmayan düğme göstermek yerine
+                  önce "Durdur" duruyor. */}
+              {/* `danger`: durgunken sessiz, hover'da kırmızı. ghost olarak
+                  denendi ve yanındaki kenarlıklı "Akışa dön"ün yanında düğme
+                  değil, etiket gibi duruyordu. */}
+              <Button
+                variant="danger"
+                icon={<IconTrash />}
+                onClick={() => setSilmeOnayi(true)}
+              >
+                Sil
+              </Button>
+              <Link href={`/workflows/${id}`}>
+                <Button>Akışa dön</Button>
+              </Link>
+            </div>
           )
         }
       />
+
+      {silmeOnayi && (
+        <div className="mb-4 overflow-hidden rounded-lg border border-danger/30">
+          <ConfirmStrip
+            question="Bu akış çalışması silinsin mi?"
+            consequence={`Adımların çalıştırmaları, günlükleri ve çıktıları da silinir (${r.steps.length} adım); geri alınamaz.`}
+            busy={sil.isPending}
+            error={sil.isError ? describeError(sil.error).message : undefined}
+            onConfirm={() => sil.mutate()}
+            onCancel={() => setSilmeOnayi(false)}
+          />
+        </div>
+      )}
 
       {r.error && (
         <Notice tone="error" title="Akış durdu">

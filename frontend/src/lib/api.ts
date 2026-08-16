@@ -620,6 +620,14 @@ export const api = {
     /** Yalnızca KESİLMİŞ öğeleri yeniden sıraya alır. */
     resume: (id: string) =>
       apiFetch<RunBatchActionResult>(`/api/run-batches/${id}/resume`, { method: "POST" }),
+
+    /**
+     * Toplu işi, ürettiği akış çalışmaları ve adım çalıştırmalarıyla siler.
+     *
+     * Süren iş silinmez (409): önce iptal edilir.
+     */
+    remove: (id: string) =>
+      apiFetch<null>(`/api/run-batches/${id}`, { method: "DELETE" }),
   },
 
   workflowRuns: {
@@ -630,6 +638,15 @@ export const api = {
 
     cancel: (id: string) =>
       apiFetch<null>(`/api/workflow-runs/${id}/cancel`, { method: "POST" }),
+
+    /**
+     * Akış çalışmasını adım çalıştırmalarıyla birlikte siler.
+     *
+     * Adım çalıştırmalarının silinebileceği TEK yer burası: çalıştırmalar
+     * ekranından tek tek silinemiyorlar, bir akışa bağlılar.
+     */
+    remove: (id: string) =>
+      apiFetch<null>(`/api/workflow-runs/${id}`, { method: "DELETE" }),
 
     /** Canlı ilerleme akışının adresi. */
     eventsUrl: (id: string) => `${apiBase()}/api/workflow-runs/${id}/events`,

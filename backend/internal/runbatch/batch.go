@@ -57,6 +57,12 @@ var (
 
 	ErrWorkflowNotFound = errors.New("akış bulunamadı")
 	ErrProjectNotFound  = errors.New("proje bulunamadı")
+
+	// ErrRunning: süren bir toplu iş silinemez, önce iptal edilir.
+	//
+	// Kaydı silmek zamanlayıcıyı var olmayan bir işin öğelerini işlerken
+	// bırakır ve çalışan container'lar sahipsiz kalır.
+	ErrRunning = errors.New("süren toplu iş silinemez")
 )
 
 // Counts, bir toplu işin öğe sayıları.

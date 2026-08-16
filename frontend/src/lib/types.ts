@@ -552,6 +552,8 @@ export interface Run extends RunPushState {
 
   /** Bu çalıştırma bir akış adımıysa dolu. */
   workflowRunId: string | null;
+  /** Akış çalışmasının adresini kurmak için — ad tek başına yol tarif etmez. */
+  workflowId: string | null;
   workflowName: string;
   stepName: string;
 

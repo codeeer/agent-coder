@@ -374,3 +374,57 @@ func (s *Store) StepByNode(ctx context.Context, runID uuid.UUID, nodeID string) 
 	}
 	return Step{}, ErrNotFound
 }
+
+/*
+DeleteRun, bitmiş bir akış çalışmasını ve ondan doğan her şeyi siler.
+
+ADIMLARIN ÇALIŞTIRMALARI AÇIKÇA SİLİNİYOR. Şemada `workflow_steps.run_id`
+SET NULL: adım satırları çalışmayla birlikte kaskadla gidiyor ama adımın
+ÇALIŞTIRMA kaydı yerinde kalıyor. Temizlenmezse otuz projelik bir kampanyayı
+silen kullanıcı Çalıştırmalar ekranında otuz yetim satırla kalırdı — üstelik
+onları tek tek de silemezdi, çünkü tekil silme "bu bir akış adımı" diyerek
+reddediyor.
+
+Sıra önemli: önce çalıştırmalar (olayları ve motor logları onlarla kaskad),
+sonra çalışmanın kendisi. Ters sırada adım satırları gider ve hangi
+çalıştırmaların silineceği bilgisi kaybolurdu.
+
+SÜREN ÇALIŞMA SİLİNMEZ: container ve goroutine hâlâ canlı, kaydı silmek
+onları sahipsiz bırakırdı. Kullanıcı önce iptal eder.
+*/
+func (s *Store) DeleteRun(ctx context.Context, id uuid.UUID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("akış çalışması silinemedi: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var status RunStatus
+	err = tx.QueryRow(ctx,
+		`SELECT status FROM workflow_runs WHERE id = $1 FOR UPDATE`, id).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("akış çalışması okunamadı: %w", err)
+	}
+	if !status.Terminal() {
+		return ErrRunning
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM runs WHERE id IN (
+			SELECT run_id FROM workflow_steps
+			 WHERE workflow_run_id = $1 AND run_id IS NOT NULL)`, id); err != nil {
+		return fmt.Errorf("adım çalıştırmaları silinemedi: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM workflow_runs WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("akış çalışması silinemedi: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("akış çalışması silinemedi: %w", err)
+	}
+	return nil
+}

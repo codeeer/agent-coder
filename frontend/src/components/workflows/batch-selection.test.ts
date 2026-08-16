@@ -9,6 +9,7 @@ import {
   ogeCalismaYolu,
   projeAra,
   secimAcKapa,
+  silmeSonucu,
   tumunuSec,
 } from "./batch-selection.ts";
 import type { Project, RunBatchItem } from "@/lib/types";
@@ -137,4 +138,29 @@ test("öğe yalnızca çalışması varken bağlantı olur", () => {
   assert.equal(ogeCalismaYolu("w1", oge("r1")), "/workflows/w1/runs/r1");
   assert.equal(ogeCalismaYolu("w1", oge(null)), null,
     "başlatılmamış öğe boş bir sayfaya bağlanmamalı");
+});
+
+/*
+ * Silmenin sonucu.
+ *
+ * Silme GERİ ALINAMAZ ve yalnızca toplu işin kaydını değil, altındaki bütün
+ * geçmişi götürüyor. Kullanıcının neyi kaybettiğini tıklamadan ÖNCE bilmesi
+ * gerek; "emin misiniz?" bunu söylemez.
+ */
+test("silmeSonucu, gidecek iş sayısını ve geri alınamazlığı yazar", () => {
+  const metin = silmeSonucu(30);
+  assert.match(metin, /30/, "kaç işin geçmişinin gideceği yazılmalı");
+  assert.match(metin, /geri alınamaz/i, "geri alınamazlık söylenmeli");
+});
+
+/*
+TEK İŞTE "1 iş" DEĞİL.
+
+Sayı çoğul kalıba sokulduğunda ("1 işin geçmişi") Türkçede kulağı tırmalıyor;
+daha önemlisi, tek öğeli bir toplu iş yaygın (tek proje seçilerek de
+başlatılabiliyor) ve o cümle her seferinde okunuyor.
+*/
+test("silmeSonucu, tek işte sayı saymaz", () => {
+  assert.match(silmeSonucu(1), /geri alınamaz/i);
+  assert.doesNotMatch(silmeSonucu(1), /\b1 iş/);
 });

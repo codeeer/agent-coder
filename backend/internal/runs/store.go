@@ -84,8 +84,12 @@ type Run struct {
 	// Kolon olarak DEĞİL, workflow_steps üzerinden birleştirilerek geliyor:
 	// aynı bilgiyi iki yerde tutmak ikisinin ayrışması demek olurdu.
 	WorkflowRunID *uuid.UUID `json:"workflowRunId"`
-	WorkflowName  string     `json:"workflowName"`
-	StepName      string     `json:"stepName"`
+	// WorkflowID: adım çalıştırması TEK BAŞINA silinemiyor ve silinebileceği
+	// tek yer akış çalışmasının ekranı. Kullanıcıyı oraya yönlendirmek için
+	// adres gerekiyor; yalnızca ad, "şu ekrana git" deyip yolu söylememektir.
+	WorkflowID   *uuid.UUID `json:"workflowId"`
+	WorkflowName string     `json:"workflowName"`
+	StepName     string     `json:"stepName"`
 
 	PushedBranch *string    `json:"pushedBranch"`
 	CreatedAt    time.Time  `json:"createdAt"`
@@ -113,7 +117,7 @@ const runColumns = `
 	r.branch, r.task, r.node_version,
 	r.status, r.error, r.output, r.diff, r.files,
 	r.prompt_tokens, r.completion_tokens, r.cost_usd,
-	ws.workflow_run_id, coalesce(wf.name, ''),
+	ws.workflow_run_id, wr.workflow_id, coalesce(wf.name, ''),
 	coalesce(nullif(ws.node_name, ''), ws.node_id, ''),
 	r.pushed_branch, r.created_at, r.started_at, r.finished_at`
 
@@ -135,7 +139,7 @@ func scanRun(row pgx.Row) (Run, error) {
 		&r.Branch, &r.Task, &r.NodeVersion,
 		&r.Status, &r.Error, &r.Output, &r.Diff, &rawFile,
 		&r.PromptTokens, &r.CompletionTokens, &r.CostUSD,
-		&r.WorkflowRunID, &r.WorkflowName, &r.StepName,
+		&r.WorkflowRunID, &r.WorkflowID, &r.WorkflowName, &r.StepName,
 		&r.PushedBranch, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
 	if err != nil {
 		return Run{}, err
@@ -238,7 +242,7 @@ func (s *Store) List(ctx context.Context, f ListFilter) ([]Run, int, error) {
 		       r.branch, r.task, r.node_version,
 		       r.status, r.error, '', '', r.files,
 		       r.prompt_tokens, r.completion_tokens, r.cost_usd,
-		       ws.workflow_run_id, coalesce(wf.name, ''),
+		       ws.workflow_run_id, wr.workflow_id, coalesce(wf.name, ''),
 		       coalesce(nullif(ws.node_name, ''), ws.node_id, ''),
 		       r.pushed_branch, r.created_at, r.started_at, r.finished_at
 		FROM runs r JOIN projects p ON p.id = r.project_id

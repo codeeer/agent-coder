@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -207,6 +208,9 @@ func (h *Handler) respondBatchError(w http.ResponseWriter, r *http.Request, err 
 			"aynı proje birden fazla kez seçilmiş")
 	case errors.Is(err, runbatch.ErrWorkflowNotFound):
 		respondError(w, http.StatusNotFound, "workflow_not_found", "akış bulunamadı")
+	case errors.Is(err, runbatch.ErrRunning):
+		respondError(w, http.StatusConflict, "batch_running",
+			"toplu iş sürüyor — önce iptal edin")
 	case errors.Is(err, runbatch.ErrProjectNotFound):
 		respondError(w, http.StatusNotFound, "project_not_found",
 			"seçilen projelerden biri bulunamadı")
@@ -216,4 +220,43 @@ func (h *Handler) respondBatchError(w http.ResponseWriter, r *http.Request, err 
 		slog.ErrorContext(r.Context(), "toplu iş işlemi başarısız", "error", err)
 		respondError(w, http.StatusInternalServerError, "internal_error", "işlem tamamlanamadı")
 	}
+}
+
+/*
+deleteRunBatch, bitmiş bir toplu işi geçmişiyle birlikte siler.
+
+Toplu iş listesi birikip temizlenemiyordu: otuz projelik bir kampanya bitince
+listede kalıyor ve kaldırmanın hiçbir yolu yoktu.
+*/
+func (h *Handler) deleteRunBatch(w http.ResponseWriter, r *http.Request) {
+	if h.deps.RunBatches == nil || h.deps.Workflows == nil {
+		respondError(w, http.StatusServiceUnavailable, "db_unavailable", "veritabanı hazır değil")
+		return
+	}
+	id, ok := parseUUIDParam(w, r, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.deps.RunBatches.Delete(r.Context(), id, calismaSilici{h.deps.Workflows}); err != nil {
+		h.respondBatchError(w, r, err)
+		return
+	}
+	slog.InfoContext(r.Context(), "toplu iş silindi", "batch_id", id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// calismaSilici, `workflow.Store`u `runbatch.RunDeleter` sözleşmesine uydurur.
+//
+// Tek işi var: ZATEN SİLİNMİŞ çalışmayı hata saymamak. Yarıda kalmış bir silme
+// tekrar denendiğinde ilk turda gidenler `ErrNotFound` döndürür ve bu, işlemi
+// bir daha asla tamamlanamaz hâle getirirdi.
+type calismaSilici struct{ store *workflow.Store }
+
+func (c calismaSilici) DeleteRun(ctx context.Context, id uuid.UUID) error {
+	err := c.store.DeleteRun(ctx, id)
+	if errors.Is(err, workflow.ErrNotFound) {
+		return nil
+	}
+	return err
 }

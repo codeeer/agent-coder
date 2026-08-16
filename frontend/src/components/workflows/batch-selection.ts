@@ -94,6 +94,22 @@ export function iptalSonucu(bekleyen: number, calisan: number): string {
 }
 
 /**
+ * Silmenin SONUCU — onaydan önce yazılır.
+ *
+ * Silme yalnızca toplu işin kaydını değil, her öğenin akış çalışmasını ve o
+ * çalışmaların adım çalıştırmalarını da götürüyor: kampanyanın bütün izi. Bunu
+ * söylemeyen bir onay kutusu, kullanıcıya kararını verecek bilgiyi vermiyor
+ * demektir.
+ *
+ * Tek öğeli işte sayı SAYILMAZ ("1 işin geçmişi" hem kulağı tırmalar hem de
+ * bilgi eklemez); tek proje seçilerek başlatılan toplu iş yaygın.
+ */
+export function silmeSonucu(toplam: number): string {
+  const kapsam = toplam > 1 ? `${toplam} işin geçmişi` : "İşin geçmişi";
+  return `${kapsam} ve tüm adım çalıştırmaları silinir; geri alınamaz.`;
+}
+
+/**
  * Öğenin kendi akış çalışmasının adresi — yoksa null.
  *
  * Başlatılmamış bir öğenin çalışması yoktur; satır o zaman bağlantı DEĞİL düz
