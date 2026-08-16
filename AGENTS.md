@@ -85,6 +85,7 @@ make migrate-status   # migration durumu
 make psql             # Postgres kabuğu
 make test             # birim testleri (veritabanı gerekmez)
 make test-integration # gerçek Postgres'e karşı testler (stack ayakta olmalı)
+make mutasyon         # korumasız emniyet kurallarını bul (uzun sürer)
 make lint             # gofmt + go vet + eslint
 make runner           # opencode-runner imajı — taban VE sürümlü varyantlar
 make ps               # servis durumları
@@ -93,6 +94,23 @@ make ps               # servis durumları
 `make test` veritabanı olmadan çalışır — entegrasyon testleri `TEST_DATABASE_URL`
 tanımlı değilse atlanır. Bunlar `make test-integration` ile ayrı çalıştırılır ve
 tek veritabanını paylaştıkları için `-p 1` ile sırayla koşarlar.
+
+### Testin geçmesi, koruduğunu kanıtlamaz
+
+Kod yazıldıktan sonra eklenen bir test ilk denemede geçer ve bu "çalışıyor" gibi
+görünür. Gerçek ölçüt, **üretim kodunu bozunca kırmızıya dönmesidir.** Yeni bir
+emniyet kuralı (`return Err...`) yazdığınızda testini de yazın ve o testin
+gerçekten koruduğunu bir kez kodu bozarak görün.
+
+`make mutasyon` bu soruyu tüm pakete sorar: her bekçiyi tek tek koddan kaldırır
+ve testler hâlâ geçiyorsa "korunmuyor" der. Elle tetiklenir, dağıtım üreten bir
+işe bağlanmaz — betik kaynağı (kendi tek kullanımlık kopyasında) değiştiriyor.
+Tek paket için: `make mutasyon PAKET="internal/workflow"`.
+
+Gerçekten test edilemeyen bir bekçi varsa (örn. sözleşme gereği ulaşılamayan bir
+dal) üstündeki yoruma `mutasyon:atla` yazılır — gerekçesiyle birlikte. Araç
+sürekli kırmızı yanarsa insanlar bakmayı bırakır ve gerçek bir boşluk gürültünün
+içinde kaybolur.
 
 **`runner/Dockerfile` değiştiyse `docker build` YETMEZ, `make runner` gerekir.**
 Koşular çoğu zaman taban imajı değil, projenin varsayılan Node sürümüne ait

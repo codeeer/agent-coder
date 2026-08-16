@@ -248,6 +248,31 @@ test-integration: ## Gerçek Postgres'e karşı entegrasyon testleri (stack ayak
 test-backend: ## Go testleri (race detector ile)
 	$(GO_RUN) env CGO_ENABLED=1 go test ./... -race -count=1
 
+# Mutasyon taraması, "testler geçiyor" ile "kural korunuyor" arasındaki farkı
+# ölçer. Bir testin geçmesi bir şeyi koruduğunu kanıtlamaz: kod yazıldıktan
+# sonra eklenen testler ilk denemede geçerler. Gerçek ölçüt, kodu bozunca
+# kırmızıya dönmeleridir.
+#
+# ELLE TETİKLENİR ve dağıtım üreten hiçbir işe bağlanmamalıdır: betik kaynağı
+# (kendi tek kullanımlık kopyasında) değiştiriyor. Ayrıntı ve emniyet kuralları
+# scripts/mutasyon/mutasyon.py başındaki nottadır.
+#
+# Tam tur uzun sürer (her bekçi için testler yeniden koşulur). Tek paket için:
+#   make mutasyon PAKET="internal/workflow"
+.PHONY: mutasyon
+mutasyon: ## Korumasız emniyet kurallarını bul (stack ayakta olmalı, uzun sürer)
+	@docker network inspect agent-coder_internal >/dev/null 2>&1 \
+		|| { echo "HATA: stack ayakta değil. Önce 'make up' çalıştırın."; exit 1; }
+	@$(COMPOSE) exec -T postgres psql -U $${POSTGRES_USER:-agentcoder} -d postgres \
+		-c "CREATE DATABASE agentcoder_test" >/dev/null 2>&1 || true
+	docker run --rm --network agent-coder_internal \
+		-v "$(CURDIR)/backend":/src:ro -v "$(CURDIR)/scripts/mutasyon":/mutasyon:ro \
+		-v agent-coder-gomod:/go/pkg/mod \
+		-e TEST_DATABASE_URL="postgres://$${POSTGRES_USER:-agentcoder}:$(call env_or,POSTGRES_PASSWORD,agentcoder_dev)@postgres:5432/agentcoder_test?sslmode=disable" \
+		golang:1.25 python3 /mutasyon/mutasyon.py /src $(PAKET)
+	@# /src BİLEREK salt okunur: betik zaten kendi kopyasını çıkarıyor, bu ikinci
+	@# kilit. Bir hata sonucu çalışma ağacına yazmayı denerse container reddeder.
+
 .PHONY: test-frontend
 test-frontend: ## Frontend birim testleri ve tip kontrolü
 	$(NODE_RUN) npm run test

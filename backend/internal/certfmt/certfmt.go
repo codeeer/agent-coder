@@ -48,6 +48,8 @@ func ToPEM(raw []byte) (string, error) {
 	// onu haklı olarak "korumasız" gösterir. Eksik test değil, ölü savunma:
 	// `parse`'a yeni bir biçim eklendiğinde o sözleşmenin sessizce
 	// bozulmasına karşı duruyor.
+	//
+	// mutasyon:atla — ulaşılamaz olduğu için kapsayan test yazılamaz.
 	if len(certs) == 0 {
 		return "", ErrNoCertificate
 	}
