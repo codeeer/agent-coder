@@ -90,14 +90,27 @@ export function StatCard({
         satırı SÖZLE söylüyor ve günlük seyrin okunur hali "Günlük özet"
         panosunda tam boy duruyor.
       */}
-      <div className="mt-2.5 flex items-baseline gap-2">
+      <div className="mt-2.5">
         <span className="text-xl leading-none font-semibold tabular-nums">
           {value}
         </span>
-        {detail && (
-          <span className="truncate text-2xs tabular-nums text-ink-3">{detail}</span>
-        )}
       </div>
+
+      {/*
+        Kırılım rakamın YANINDA değil ALTINDA.
+
+        Yanında dururken kırpılıyordu: beş sütunlu şeritte karta ~153px kalıyor,
+        rakam ve kırılım yan yana ~158px istiyor. Ölçüldü — ekranda
+        "+428,9 B −…" görünüyordu, yani satır tam da var olma sebebini
+        ("değişen dosya" ile "değişen kod satırı"nı ayırt etmek) yerine
+        getiremiyordu. Kırpılmış bir kırılım, kırılım değildir.
+
+        Kendi satırında tam genişlik buluyor ve yalnızca kırılımı olan kartı
+        bir satır uzatıyor.
+      */}
+      {detail && (
+        <div className="mt-1 text-2xs tabular-nums text-ink-3">{detail}</div>
+      )}
 
       <div className="mt-2.5 truncate text-2xs">
         {ratio === null ? (
