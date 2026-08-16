@@ -362,28 +362,63 @@ func (s *Store) Update(ctx context.Context, id uuid.UUID, in UpdateInput) (Workf
 	return s.Get(ctx, id)
 }
 
-// Delete, akışı ve ona bağlı her şeyi siler: sürümler, çalışmalar, adımlar,
-// hook ve Jira tarama durumu (hepsi CASCADE).
-//
-// SÜREN ÇALIŞMASI OLAN AKIŞ SİLİNMEZ. Silinseydi kayıt giderdi ama motorun
-// goroutine'i yaşamaya devam ederdi: sonraki `MarkStepRunning`/`FinishRun`
-// yazmaları sessizce 0 satır etkiler, container ise kaydı olmayan bir işi
-// çalıştırmayı sürdürürdü. Kullanıcı önce durdurur, sonra siler.
+/*
+Delete, akışı ve ona bağlı her şeyi siler: sürümler, çalışmalar, adımlar,
+hook ve Jira tarama durumu (hepsi CASCADE).
+
+ADIM ÇALIŞTIRMALARI KASKADA GÜVENİLEREK BIRAKILAMAZ. `workflow_steps.run_id`
+şemada SET NULL: adım satırları akışla birlikte gitse de `runs` kayıtları
+yerinde kalırdı. Kaybolmuyorlardı ama bağları koptuğu için Çalıştırmalar
+ekranında SIRADAN çalıştırma gibi görünmeye başlıyorlardı — ve aynı veriyi
+`DeleteRun` ile silmek onları temizliyordu. Kullanıcı hangi kapıdan girdiğine
+göre farklı sonuç alıyordu; buradaki açık silme o tutarsızlığı kapatıyor.
+
+SIRA: önce çalıştırmalar, sonra akış. Akış önce silinseydi `workflow_steps`
+kaskadla gider ve çalıştırmalara giden tek işaretçi ortadan kalkardı.
+
+SÜREN ÇALIŞMASI OLAN AKIŞ SİLİNMEZ. Silinseydi kayıt giderdi ama motorun
+goroutine'i yaşamaya devam ederdi: sonraki `MarkStepRunning`/`FinishRun`
+yazmaları sessizce 0 satır etkiler, container ise kaydı olmayan bir işi
+çalıştırmayı sürdürürdü. Kullanıcı önce durdurur, sonra siler.
+
+Kontrol ve silme AYNI İŞLEMDE: ayrı olsalardı aradaki boşlukta başlayan bir
+çalışma, kontrolü geçmiş bir silmenin altında kalırdı.
+*/
 func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
-	active, err := s.ActiveRuns(ctx, id)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("akış silinemedi: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var active int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM workflow_runs
+		 WHERE workflow_id = $1 AND status IN ('pending','running')`, id).Scan(&active); err != nil {
+		return fmt.Errorf("süren çalışmalar okunamadı: %w", err)
 	}
 	if active > 0 {
 		return ErrRunning
 	}
 
-	tag, err := s.pool.Exec(ctx, `DELETE FROM workflows WHERE id = $1`, id)
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM runs WHERE id IN (
+			SELECT s.run_id FROM workflow_steps s
+			  JOIN workflow_runs r ON r.id = s.workflow_run_id
+			 WHERE r.workflow_id = $1 AND s.run_id IS NOT NULL)`, id); err != nil {
+		return fmt.Errorf("adım çalıştırmaları silinemedi: %w", err)
+	}
+
+	tag, err := tx.Exec(ctx, `DELETE FROM workflows WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("akış silinemedi: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("akış silinemedi: %w", err)
 	}
 	return nil
 }
