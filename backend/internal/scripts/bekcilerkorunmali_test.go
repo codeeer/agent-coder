@@ -92,3 +92,34 @@ func TestUpdate_AyniAdaTasinamaz(t *testing.T) {
 	_, err = s.Update(ctx, ikinci.ID, scripts.UpdateInput{Name: &ad}, false)
 	require.ErrorIs(t, err, scripts.ErrDuplicateName)
 }
+
+/*
+OLMAYAN KLASÖRE BETİK YAZILAMAZ — OLUŞTURMADA DA, GÜNCELLEMEDE DE.
+
+Betik düzenleme ekranı klasörü açılır listeden seçtiriyor. Başka bir sekmede
+silinmiş bir klasör listede kalmışsa yabancı anahtar ihlali oluşuyor; ham
+hâliyle dönseydi kullanıcı 500 görür ve neyi düzelteceğini bilemezdi.
+
+İki bekçi de mutasyon taramasında GÖRÜNMÜYORDU: desen, üstlerindeki
+`ErrDuplicateName` bekçisiyle birlikte tek eşleşmeye düşüyordu.
+*/
+func TestCreate_OlmayanKlasoreYazilamaz(t *testing.T) {
+	s := newFolderStore(t)
+	yok := uuid.New()
+
+	_, err := s.Create(context.Background(), scripts.CreateInput{
+		Name: "01-baslat", Content: "echo bir", FolderID: &yok})
+	require.ErrorIs(t, err, scripts.ErrFolderNotFound)
+}
+
+func TestUpdate_OlmayanKlasoreTasinamaz(t *testing.T) {
+	s := newFolderStore(t)
+	ctx := context.Background()
+
+	sc, err := s.Create(ctx, scripts.CreateInput{Name: "01-baslat", Content: "echo bir"})
+	require.NoError(t, err)
+
+	yok := uuid.New()
+	_, err = s.Update(ctx, sc.ID, scripts.UpdateInput{FolderID: &yok}, false)
+	require.ErrorIs(t, err, scripts.ErrFolderNotFound)
+}

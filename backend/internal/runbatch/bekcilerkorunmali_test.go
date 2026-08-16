@@ -32,3 +32,22 @@ func TestOgeKapisi_OlmayanOgeSessizceGecmez(t *testing.T) {
 	require.ErrorIs(t, f.store.MarkFinished(ctx, yok, runbatch.ItemSucceeded, ""),
 		runbatch.ErrNotFound)
 }
+
+/*
+OLMAYAN PROJE İLE TOPLU İŞ BAŞLATILAMAZ.
+
+Toplu iş ekranı projeleri listeden seçtiriyor; ama seçim yapılırken başka bir
+sekmede silinmiş bir proje listede kalmış olabilir. Yabancı anahtar ihlali ham
+hâliyle dönseydi kullanıcı 500 görürdü — oysa yapması gereken belli: listeyi
+tazeleyip yeniden seçmek.
+
+Bu bekçi mutasyon taramasında GÖRÜNMÜYORDU: desen, üstündeki `ErrDuplicateProject`
+bekçisiyle birlikte tek eşleşmeye düşüyor ve bu satır hiç denenmiyordu.
+*/
+func TestCreate_OlmayanProjeReddedilir(t *testing.T) {
+	f := setup(t, "alfa")
+
+	_, err := f.store.Create(context.Background(), f.workflowID, "iş",
+		[]uuid.UUID{uuid.New()})
+	require.ErrorIs(t, err, runbatch.ErrProjectNotFound)
+}

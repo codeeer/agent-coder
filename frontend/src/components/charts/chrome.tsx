@@ -75,6 +75,11 @@ export function useWidth<T extends HTMLElement>() {
  * (biri dolgu payıyla, diğeri kaydırılmış bir grupla). Ortaklanan şey geometri
  * değil, GÖRÜNÜM — çizgi rengi, etiketin hizası ve puntosu.
  *
+ * TEK İSTİSNA, etiketin eksenden uzaklığı (`x1 - 6`). O da görünümün parçası:
+ * ortaklamadan önce biri 6, diğeri 8 piksel kullanıyordu ve iki grafiğin
+ * etiketleri yan yana konduğunda hizasızlık görünüyordu. Çağırana bırakılsaydı
+ * ayrışma geri gelirdi.
+ *
  * Ayrı ayrı yazıldıklarında gerçekten ayrıştılar: biri jetonun utility
  * karşılığını (`text-2xs`, 11px) kullanırken diğeri `text-[10px]` sabitliyordu
  * ve aynı sayfadaki iki grafik ekseni farklı puntoda çiziyordu.

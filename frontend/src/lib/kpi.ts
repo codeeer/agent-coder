@@ -47,7 +47,7 @@ export interface Kpi {
   previous: number;
   /** true: artış iyi · false: artış kötü · null: yön yorumlanmaz. */
   upIsGood: boolean | null;
-  /** Rakamın yanındaki kırılım — yalnızca gerekli olduğu yerde. */
+  /** Rakamın ALTINDAKİ kırılım — yalnızca gerekli olduğu yerde. */
   detail?: string;
 }
 
@@ -182,3 +182,42 @@ export function kpi(key: KpiKey, data: ReportSummary): Kpi {
       };
   }
 }
+
+/*
+ * İKİ EKRANIN RAKAM SIRASI — burada, ekranların içinde değil.
+ *
+ * Sıralar farklı ve bu bilinçli: pano sekiz, rapor on rakam gösteriyor. Ama
+ * KESİŞİMDEKİ rakamların aynı tanımdan gelmesi zorunlu, yoksa kullanıcı aynı
+ * dönemi iki ekranda iki türlü okur.
+ *
+ * Listeler ekran dosyalarında dururken test onları GÖREMİYORDU: `page.tsx` ve
+ * `reports/page.tsx` React bileşeni olduğu için `node --test` altında
+ * yüklenemiyor, bu yüzden testin içine elle kopyalanmışlardı. Kopya, korumaya
+ * çalıştığı ayrışmanın kendisiydi — ekran değişse test fark etmezdi.
+ *
+ * `as const`: eleman türü on literal anahtar oluyor ve rapor ekranındaki
+ * simge tablosu eksik anahtar bırakırsa TypeScript derlemede duruyor.
+ */
+export const PANO_KPI = [
+  "runs",
+  "succeeded",
+  "success",
+  "prsOpened",
+  "tokens",
+  "cost",
+  "avgDuration",
+  "filesChanged",
+] as const;
+
+export const RAPOR_KPI = [
+  "runs",
+  "prsOpened",
+  "jiraTasks",
+  "tokens",
+  "cost",
+  "success",
+  "avgDuration",
+  "filesChanged",
+  "linesChanged",
+  "pushedBranches",
+] as const;

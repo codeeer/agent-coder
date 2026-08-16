@@ -191,8 +191,15 @@ func (s *Server) runWorkflow(ctx context.Context, _ *sdk.CallToolRequest, in run
 				"Agent Coder arayüzünden etkinleştirilmeli")
 	}
 
-	// Tanımsız akış ve eşzamanlılık sınırı kontrolleri `Launcher`'da; elle,
-	// webhook ve Jira tetiklemesi de aynı kapıdan geçiyor.
+	// Tanımsız akış kontrolü `Launcher`'da; elle, webhook ve Jira tetiklemesi
+	// de aynı kapıdan geçiyor.
+	//
+	// EŞZAMANLILIK SINIRI BURADA DEĞİL — ve bu satır bir zamanlar öyle
+	// olduğunu yazıyordu. `Launcher.Launch` yalnızca `Get` → `ActiveVersion`
+	// → `CreateRun` → `Start` yapıyor; sınır `runs.Manager`'da, yani ADIMLARIN
+	// çalıştırmaları seviyesinde. Bir agent bu aracı arka arkaya çağırırsa her
+	// çağrı anında bir akış çalışması açar; kuyruğa giren şey adımların
+	// container'ları oluyor.
 	run, err := s.launcher.Launch(ctx, workflow.LaunchInput{
 		WorkflowID: id,
 		Trigger:    workflow.TriggerMCP,

@@ -208,7 +208,13 @@ func (h *Handler) respondBatchError(w http.ResponseWriter, r *http.Request, err 
 			"aynı proje birden fazla kez seçilmiş")
 	case errors.Is(err, runbatch.ErrWorkflowNotFound):
 		respondError(w, http.StatusNotFound, "workflow_not_found", "akış bulunamadı")
-	case errors.Is(err, runbatch.ErrRunning):
+	case errors.Is(err, runbatch.ErrRunning),
+		// `workflow.ErrRunning` de buraya düşebiliyor: toplu iş silinirken
+		// öğelerinin akış çalışmaları `calismaSilici` üzerinden siliniyor ve
+		// biri hâlâ sürüyorsa o paketin sentinel'i geliyor. Eşlenmeseydi
+		// kullanıcı 409 "önce iptal edin" yerine 500 "işlem tamamlanamadı"
+		// görürdü — yapabileceği bir şey varken sistemin bozulduğunu sanardı.
+		errors.Is(err, workflow.ErrRunning):
 		respondError(w, http.StatusConflict, "batch_running",
 			"toplu iş sürüyor — önce iptal edin")
 	case errors.Is(err, runbatch.ErrProjectNotFound):

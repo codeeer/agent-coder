@@ -381,8 +381,21 @@ goroutine'i yaşamaya devam ederdi: sonraki `MarkStepRunning`/`FinishRun`
 yazmaları sessizce 0 satır etkiler, container ise kaydı olmayan bir işi
 çalıştırmayı sürdürürdü. Kullanıcı önce durdurur, sonra siler.
 
-Kontrol ve silme AYNI İŞLEMDE: ayrı olsalardı aradaki boşlukta başlayan bir
-çalışma, kontrolü geçmiş bir silmenin altında kalırdı.
+AKIŞ SATIRI KİLİTLENİR (`FOR UPDATE`) — ve bunu yapan `count` DEĞİL, ondan
+önceki satır. Kontrolü ve silmeyi aynı işleme koymak TEK BAŞINA yetmiyordu:
+READ COMMITTED altında `count`, henüz var olmayan satırlar üzerinde kilit
+alamaz. Araya giren bir `Launch` şunu üretiyordu: sayım 0 okur → çalışma
+commit eder ve container başlar → `DELETE` cascade ile o çalışmayı da götürür →
+motorun goroutine'i var olmayan kayda yazmaya devam eder. Tam olarak bu
+fonksiyonun önlemek için var olduğu durum.
+
+`FOR UPDATE` bunu kapatıyor çünkü `workflow_runs`'a insert, ana satırda
+`FOR KEY SHARE` istiyor ve ikisi çakışıyor: eşzamanlı başlatma ya silmeden
+önce biter ya da silme bittikten sonra yabancı anahtarla reddedilir.
+
+Kilit ayrıca `DeleteRun` ile aynı sırayı kuruyor (önce akış/çalışma satırı,
+sonra `runs`); ters sıra iki silmenin birbirini beklediği bir kilitlenme
+üretebilirdi.
 */
 func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
 	tx, err := s.pool.Begin(ctx)
@@ -390,6 +403,17 @@ func (s *Store) Delete(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("akış silinemedi: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Önce akış satırı kilitlenir: sayımın kendisi olmayan satırları
+	// kilitleyemediği için asıl korumayı bu satır sağlıyor.
+	var kilit uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT id FROM workflows WHERE id = $1 FOR UPDATE`, id).Scan(&kilit)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("akış okunamadı: %w", err)
+	}
 
 	var active int
 	if err := tx.QueryRow(ctx, `

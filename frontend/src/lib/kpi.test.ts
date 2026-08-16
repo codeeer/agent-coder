@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { kpi, type KpiKey } from "./kpi.ts";
+import { PANO_KPI, RAPOR_KPI, kpi, type KpiKey } from "./kpi.ts";
 import type { ReportSummary, ReportTotals } from "@/lib/types";
 
 /*
@@ -132,28 +132,10 @@ test("yalnızca maliyet ve süre için artış kötüdür", () => {
  * kullanıcı iki ekranda aynı dönemi görüyor.
  */
 test("pano ve raporun kesişen rakamları birebir aynı", () => {
-  const panoda: KpiKey[] = [
-    "runs",
-    "succeeded",
-    "success",
-    "prsOpened",
-    "tokens",
-    "cost",
-    "avgDuration",
-    "filesChanged",
-  ];
-  const raporda: KpiKey[] = [
-    "runs",
-    "prsOpened",
-    "jiraTasks",
-    "tokens",
-    "cost",
-    "success",
-    "avgDuration",
-    "filesChanged",
-    "linesChanged",
-    "pushedBranches",
-  ];
+  // Listeler ARTIK ÜRÜNDEN geliyor. Önceden teste elle kopyalanmışlardı ve
+  // ekranlar değişse test fark etmezdi — korumaya çalıştığı ayrışmanın kendisi.
+  const kesisim = PANO_KPI.filter((k) => (RAPOR_KPI as readonly string[]).includes(k));
+  assert.ok(kesisim.length >= 7, `kesişim beklenenden küçük: ${kesisim.length}`);
 
   const veri = ozet(
     {
@@ -170,14 +152,32 @@ test("pano ve raporun kesişen rakamları birebir aynı", () => {
     { runs: 30, active: 0, succeeded: 20, costUsd: 2 },
   );
 
-  const kesisim = panoda.filter((k) => raporda.includes(k));
-  assert.ok(kesisim.length >= 7, `kesişim beklenenden küçük: ${kesisim.length}`);
+  /*
+    Beklenen etiketler AÇIKÇA yazılı.
+
+    Önceki hali `kpi(k, veri)` ile yine `kpi(k, veri)`'yi karşılaştırıyordu —
+    aynı fonksiyonun aynı argümanlarla iki çağrısı, yani yalnızca determinizm
+    ölçülüyordu. Ölçüldü: `kpi.ts`'te etiket bozulsa da test geçiyordu.
+  */
+  const beklenen: Record<string, string> = {
+    runs: "Çalıştırma",
+    success: "Başarı",
+    prsOpened: "Açılan PR",
+    tokens: "Token",
+    cost: "Maliyet",
+    avgDuration: "Ort. süre",
+    filesChanged: "Değişen dosya",
+  };
 
   for (const k of kesisim) {
-    const a = kpi(k, veri);
-    const b = kpi(k, veri);
-    assert.deepEqual(a, b, `${k} iki ekranda farklı türüyor`);
-    assert.ok(a.label.length > 0, `${k} etiketsiz`);
-    assert.ok(a.value.length > 0, `${k} değersiz`);
+    const kart = kpi(k, veri);
+    assert.equal(kart.label, beklenen[k], `${k} etiketi değişmiş`);
+    assert.ok(kart.value.length > 0, `${k} değersiz`);
+  }
+
+  // Kesişimdeki her anahtarın beklenen tabloda karşılığı olmalı: yeni bir
+  // rakam iki ekrana birden eklenirse bu test onu görmeden geçmemeli.
+  for (const k of kesisim) {
+    assert.ok(k in beklenen, `${k} için beklenen etiket yazılmamış`);
   }
 });

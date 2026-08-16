@@ -50,8 +50,15 @@ import tempfile
 # dallarını yakalamaz. Geniş bir desen derlenmeyen kod üretir ve her mutasyon
 # "test başarısız" sayılıp yanlış bir güven verirdi — derleme hatası, korumanın
 # kanıtı değildir.
+# Baştaki satır sonu LOOKBEHIND ile eşleşiyor, TÜKETİLMİYOR.
+#
+# Tüketilseydi arka arkaya gelen iki bekçide birincinin eşleşmesi ikincinin
+# ihtiyaç duyduğu `\n`'i yer ve `finditer` ikinciyi HİÇ GÖRMEZDİ. Ölçüldü:
+# depoda 5 bekçi bu yüzden hiç denenmiyordu ve bunlardan biri
+# `runs/store.go`'daki silme kapısıydı — yani araç, kapsamadığı bir kurala
+# kapsıyormuş gibi güven veriyordu. Var olma sebebinin tersi.
 GUARD = re.compile(
-    r"\n(\t+)if [^\n]*\{\n\t+return (?:[^\n]*, )?(?:&?\w*\.?Err\w+|Err\w+)\n\1\}\n"
+    r"(?<=\n)(\t+)if [^\n]*\{\n\t+return (?:[^\n]*, )?(?:&?\w*\.?Err\w+|Err\w+)\n\1\}\n"
 )
 
 # Bekçinin hemen üstündeki yorumda bu işaret varsa mutasyon denenmez.
@@ -137,10 +144,10 @@ def tara(calisma: pathlib.Path, paketler: list[str]) -> dict:
                     atlanan += 1
                     continue
                 toplam += 1
-                dosya.write_text(ozgun[: m.start()] + "\n" + ozgun[m.end():])
+                dosya.write_text(ozgun[: m.start()] + ozgun[m.end():])
                 try:
                     if testler_geciyor(calisma, paket):
-                        satir = ozgun[: m.start()].count("\n") + 2
+                        satir = ozgun[: m.start()].count("\n") + 1
                         hayatta.append({
                             "paket": paket,
                             "yer": f"{dosya.relative_to(calisma)}:{satir}",

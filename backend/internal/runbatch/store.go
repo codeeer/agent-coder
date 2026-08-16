@@ -595,15 +595,30 @@ hiçbir yolu kalmazdı; bu sırayla yarıda kalan silme tekrar denenebilir.
 ATOMİK DEĞİL: çalışmalar tek tek, kendi işlemlerinde siliniyor. Ortada bir hata
 çıkarsa bir kısmı gitmiş olur ve toplu iş yerinde kalır — kullanıcı aynı silmeyi
 tekrar çalıştırıp tamamlar.
+
+TOPLU İŞ SATIRI BAŞTAN SONA KİLİTLİ (`FOR UPDATE`). Kilit olmadan kontrol ile
+silme arasında `Resume` araya girebiliyordu ve bu YAPILABİLİR bir sıraydı:
+iptal edilmiş ama kesilmiş öğeleri olan bir işte "Kaldığı yerden devam et" ile
+"Sil" düğmeleri aynı anda ekranda duruyor. Kullanıcı ikisine peş peşe
+tıkladığında silme "canlı öğe yok" görüp geçiyor, `Resume` öğeleri sıraya
+alıyor, zamanlayıcı bir container başlatıyor ve ardından toplu iş siliniyordu —
+geriye sahipsiz bir çalışma kalırdı. `Cancel` ve `Resume` zaten aynı satırı
+`FOR UPDATE` ile kilitliyor; silme de aynı kuyruğa giriyor.
 */
 func (s *Store) Delete(ctx context.Context, id uuid.UUID, deleter RunDeleter) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("toplu iş silinemedi: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var status string
 	var canli int
-	err := s.pool.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT b.status,
 		       (SELECT count(*) FROM run_batch_items
 		         WHERE batch_id = b.id AND status IN ('pending','running'))
-		  FROM run_batches b WHERE b.id = $1`, id).Scan(&status, &canli)
+		  FROM run_batches b WHERE b.id = $1 FOR UPDATE OF b`, id).Scan(&status, &canli)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -614,7 +629,7 @@ func (s *Store) Delete(ctx context.Context, id uuid.UUID, deleter RunDeleter) er
 		return ErrRunning
 	}
 
-	rows, err := s.pool.Query(ctx, `
+	rows, err := tx.Query(ctx, `
 		SELECT workflow_run_id FROM run_batch_items
 		 WHERE batch_id = $1 AND workflow_run_id IS NOT NULL`, id)
 	if err != nil {
@@ -625,13 +640,22 @@ func (s *Store) Delete(ctx context.Context, id uuid.UUID, deleter RunDeleter) er
 		return fmt.Errorf("toplu işin çalışmaları okunamadı: %w", err)
 	}
 
+	// Çalışmalar KİLİT ELDEYKEN siliniyor: `DeleteRun` kendi işlemini açıyor ama
+	// yalnızca `workflow_runs`, `workflow_steps` ve `runs` satırlarına
+	// dokunuyor. Buradaki kilit `FOR UPDATE OF b` ile yalnızca `run_batches`
+	// satırını tutuyor; `run_batch_items` üzerindeki SET NULL güncellemesi
+	// `batch_id`'yi değiştirmediği için ana satırda kilit istemiyor. Yani iki
+	// işlem aynı kaynağı ters sırada beklemiyor.
 	for _, runID := range runIDs {
 		if err := deleter.DeleteRun(ctx, runID); err != nil {
 			return fmt.Errorf("akış çalışması silinemedi: %w", err)
 		}
 	}
 
-	if _, err := s.pool.Exec(ctx, `DELETE FROM run_batches WHERE id = $1`, id); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM run_batches WHERE id = $1`, id); err != nil {
+		return fmt.Errorf("toplu iş silinemedi: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("toplu iş silinemedi: %w", err)
 	}
 	return nil

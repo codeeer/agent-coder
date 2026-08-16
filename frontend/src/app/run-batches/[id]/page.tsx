@@ -105,7 +105,16 @@ export default function RunBatchDetailPage() {
     Tıklanmayan bir çöp kutusu göstermek, bu işin baştaki hatasıydı.
   */
   const silinebilir =
-    !isBatchActive(b.status) && b.counts.pending === 0 && b.counts.running === 0;
+    !isBatchActive(b.status) &&
+    b.counts.pending === 0 &&
+    b.counts.running === 0 &&
+    // KESİLMİŞ ÖĞE VARKEN SİLME ÇIKMAZ. Yanında "Kaldığı yerden devam et"
+    // duruyor ve ikisi aynı anda tıklanabiliyordu: silme "canlı öğe yok"
+    // görüp geçerken devam öğeleri sıraya alıyor, zamanlayıcı container
+    // başlatıyor ve iş siliniyordu — geriye sahipsiz bir çalışma kalırdı.
+    // Sunucu tarafındaki kilit bunu artık reddediyor; burası da kullanıcıya
+    // birbirini bozan iki eylemi yan yana göstermiyor.
+    b.counts.interrupted === 0;
 
   return (
     <div className="space-y-6">

@@ -1,10 +1,13 @@
 package sandbox_test
 
 import (
+	"archive/tar"
 	"context"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/docker/docker/client"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -169,9 +172,52 @@ func TestCreate_DizinGirdisiAgentaAitOlur(t *testing.T) {
 	ctx, iptal := context.WithTimeout(context.Background(), 30*time.Second)
 	defer iptal()
 
-	dosyalar, err := c.ReadDir(ctx, "/home/agent/kampanya", 1<<20)
+	/*
+	  SAHİPLİK CONTAINER İÇİNDEN OKUNUYOR.
+
+	  Önceki hali `ReadDir` ile dizinin okunabildiğini gösteriyordu ve bu
+	  HİÇBİR ŞEYİ kanıtlamıyordu: `ReadDir` Docker daemon'ın arşiv API'sini
+	  kullanıyor, container içi kullanıcı ve izinlerden tamamen bağımsız
+	  çalışıyor. Ölçüldü — `Uid/Gid` root'a çevrildiğinde, yani testin
+	  önlemek için var olduğu arıza koda sokulduğunda, test yine geçiyordu.
+	*/
+	bilgi := dizinBilgisi(t, ctx, c.ID, "/home/agent/kampanya")
+	require.Equal(t, 10001, bilgi.uid,
+		"dizin agent kullanıcısına ait olmalı — root ise agent içine yazamaz")
+	require.Equal(t, 10001, bilgi.gid)
+	require.EqualValues(t, 0o700, bilgi.mod, "dizin modu tar girdisinden gelmeli")
+}
+
+type statSonucu struct {
+	uid, gid int
+	mod      int64
+}
+
+// dizinBilgisi, container'ın dosya sisteminden dizin girdisinin sahipliğini ve
+// modunu okur.
+//
+// Arşiv API'si (`CopyFromContainer`) tar başlıklarında GERÇEK uid/gid/mode
+// taşıyor — `docker cp` sahipliği korur. `Container.ReadDir` bu bilgiyi
+// gösteremiyor çünkü düzenli dosya olmayan her girdiyi atıyor; bu yüzden tar
+// burada elle geziliyor.
+func dizinBilgisi(t *testing.T, ctx context.Context, containerID, yol string) statSonucu {
+	t.Helper()
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	require.NoError(t, err)
-	require.NotEmpty(t, dosyalar, "agent kendi dizinini okuyabilmeli")
+	defer func() { _ = cli.Close() }()
+
+	akis, _, err := cli.CopyFromContainer(ctx, containerID, yol)
+	require.NoError(t, err)
+	defer akis.Close()
+
+	tr := tar.NewReader(akis)
+	hdr, err := tr.Next()
+	require.NoError(t, err, "arşivde dizin girdisi yok")
+	require.Equal(t, byte(tar.TypeDir), hdr.Typeflag,
+		"ilk girdi dizinin kendisi olmalı, gelen: %q", hdr.Name)
+
+	return statSonucu{uid: hdr.Uid, gid: hdr.Gid, mod: hdr.Mode & 0o777}
 }
 
 /*

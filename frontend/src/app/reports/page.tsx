@@ -57,7 +57,7 @@ import {
   panelLinkClass,
   type TileTone,
 } from "@/components/ui/primitives";
-import { kpi, type KpiKey } from "@/lib/kpi";
+import { RAPOR_KPI, kpi, type KpiKey } from "@/lib/kpi";
 
 /**
  * Rapor — yönetici özeti.
@@ -358,18 +358,31 @@ export default function ReportsPage() {
  * okuyarak değil simgesinden buluyor. Panoda sekiz kart var ve orada aynı
  * simgeler kazanç sağlamadığı için hiç konmuyor.
  */
-const SERIT: { key: KpiKey; icon: React.ReactNode; tone: TileTone }[] = [
-  { key: "runs", icon: <IconPlay className="size-3.5" />, tone: "accent" },
-  { key: "prsOpened", icon: <IconPullRequest className="size-3.5" />, tone: "success" },
-  { key: "jiraTasks", icon: <IconComment className="size-3.5" />, tone: "info" },
-  { key: "tokens", icon: <IconChip className="size-3.5" />, tone: "series" },
-  { key: "cost", icon: <IconCost className="size-3.5" />, tone: "warning" },
-  { key: "success", icon: <IconCheck className="size-3.5" />, tone: "success" },
-  { key: "avgDuration", icon: <IconPlay className="size-3.5" />, tone: "info" },
-  { key: "filesChanged", icon: <IconEdit className="size-3.5" />, tone: "series" },
-  { key: "linesChanged", icon: <IconEdit className="size-3.5" />, tone: "accent" },
-  { key: "pushedBranches", icon: <IconFolder className="size-3.5" />, tone: "info" },
-];
+/*
+  Simge tablosu ANAHTARLA eşleşiyor, sıra `RAPOR_KPI`'den geliyor.
+
+  Sıra burada elle yazılıyken `lib/kpi.ts` ile ayrışabiliyordu ve test onu
+  göremiyordu. `RAPOR_KPI` `as const` olduğu için bu tablo eksik bir anahtar
+  bırakırsa TypeScript derlemede durur.
+*/
+const GORUNUM: Record<
+  (typeof RAPOR_KPI)[number],
+  { icon: React.ReactNode; tone: TileTone }
+> = {
+  runs: { icon: <IconPlay className="size-3.5" />, tone: "accent" },
+  prsOpened: { icon: <IconPullRequest className="size-3.5" />, tone: "success" },
+  jiraTasks: { icon: <IconComment className="size-3.5" />, tone: "info" },
+  tokens: { icon: <IconChip className="size-3.5" />, tone: "series" },
+  cost: { icon: <IconCost className="size-3.5" />, tone: "warning" },
+  success: { icon: <IconCheck className="size-3.5" />, tone: "success" },
+  avgDuration: { icon: <IconPlay className="size-3.5" />, tone: "info" },
+  filesChanged: { icon: <IconEdit className="size-3.5" />, tone: "series" },
+  linesChanged: { icon: <IconEdit className="size-3.5" />, tone: "accent" },
+  pushedBranches: { icon: <IconFolder className="size-3.5" />, tone: "info" },
+};
+
+const SERIT: { key: KpiKey; icon: React.ReactNode; tone: TileTone }[] =
+  RAPOR_KPI.map((key) => ({ key, ...GORUNUM[key] }));
 
 /**
  * Dönemin on rakamı — her biri yönüyle birlikte.

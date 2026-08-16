@@ -622,13 +622,21 @@ function DeleteRunButton({ run }: { run: Run }) {
     const ipucu = `Bu çalıştırma "${run.workflowName}" akışının bir adımı — akış çalışmasıyla birlikte silinir`;
     return (
       <RowAction>
-        <Link
-          href={`/workflows/${run.workflowId}/runs/${run.workflowRunId}`}
-          title={ipucu}
-          aria-label={ipucu}
-          className="inline-flex size-7 items-center justify-center rounded-md border border-line text-ink-3 transition-colors hover:border-line-strong hover:text-ink"
-        >
-          <IconExternal className="size-4" />
+        {/*
+          DÜĞME KALIBI ELLE YAZILMAZ.
+
+          Önce burada elle bir "ikon düğmesi görünümlü link" vardı ve iki
+          sorunu birden taşıyordu: aynı satırdaki kardeş dalların kullandığı
+          `Button`'dan görsel olarak ayrışmıştı, ve sınırı `line` süsleme
+          token'ıyla çiziliyordu. ÖLÇÜLDÜ: açık temada 1,31:1, koyu temada
+          1,26:1 — denetim sınırı için gereken 3:1'in çok altında, yani
+          "düğme olduğu kenarlığından anlaşılır" kuralı sağlanmıyordu.
+          `Button` `control-line` kullanıyor: iki temada da 3,46:1.
+        */}
+        <Link href={`/workflows/${run.workflowId}/runs/${run.workflowRunId}`}>
+          <Button size="sm" title={ipucu} aria-label={ipucu}>
+            <IconExternal className="size-4" />
+          </Button>
         </Link>
       </RowAction>
     );

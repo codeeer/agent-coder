@@ -851,7 +851,7 @@ export function ConfirmInline({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="flex items-start gap-1.5 text-xs text-ink-2">
-        <IconAlert className="mt-px size-3.5 shrink-0 text-danger" />
+        <IconAlert className="mt-px size-4 shrink-0 text-danger" />
         <span>
           {question}
           {consequence && <> {consequence}</>}

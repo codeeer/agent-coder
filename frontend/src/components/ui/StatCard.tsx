@@ -42,7 +42,7 @@ export interface StatCardProps {
   /** Simge karosunun tonu. Rakamı DEĞİL yalnızca karoyu boyar. */
   tone?: TileTone;
   /**
-   * Rakamın yanındaki kırılım — "+9 −0" gibi.
+   * Rakamın ALTINDAKİ kırılım — "+9 −0" gibi.
    *
    * Bir rakam tek başına iki farklı şeye benzeyebiliyorsa ayrımı bu satır
    * yapar. Gerçek bir vaka: "değişen dosya 9" ile "değişen kod satırı 9"

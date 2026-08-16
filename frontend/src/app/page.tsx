@@ -22,7 +22,7 @@ import {
   formatPercent,
 } from "@/components/charts/format";
 import { StatCard, type StatCardProps } from "@/components/ui/StatCard";
-import { kpi, type KpiKey } from "@/lib/kpi";
+import { PANO_KPI, kpi } from "@/lib/kpi";
 import {
   IconAgent,
   IconCheck,
@@ -256,17 +256,6 @@ export default function DashboardPage() {
 /* ── Rakam şeridi ────────────────────────────────────────────────────────── */
 
 /** Panonun şerit sırası — rapor ekranınınkinden farklı ve bu bilinçli. */
-const KPI_SIRASI: KpiKey[] = [
-  "runs",
-  "succeeded",
-  "success",
-  "prsOpened",
-  "tokens",
-  "cost",
-  "avgDuration",
-  "filesChanged",
-];
-
 /**
  * Dönemin sekiz rakamı — her biri yönüyle birlikte.
  *
@@ -280,7 +269,7 @@ function KpiStrip({ data }: { data: ReportSummary }) {
    * yardım etmiyor, gürültü ekliyor. Rapor ekranındaki on kartlık şeritte
    * durum tersi ve orada simge var.
    */
-  const cards: StatCardProps[] = KPI_SIRASI.map((key) => ({
+  const cards: StatCardProps[] = PANO_KPI.map((key) => ({
     ...kpi(key, data),
     periodNote: "öncekine göre",
   }));
