@@ -48,6 +48,19 @@ export function CredentialCard({
 }) {
   const configured = credential !== undefined;
   const [editing, setEditing] = useState(false);
+  // Onay durumu KARTTA: silme düğmesinin içinde dursaydı onay şeridi
+  // "Değiştir" düğmesinin yanına sıkışır ve kartı taşırırdı.
+  const [confirming, setConfirming] = useState(false);
+
+  const queryClient = useQueryClient();
+  const remove = useMutation({
+    mutationFn: () => api.credentials.remove(spec.kind),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["credentials"] });
+      void queryClient.invalidateQueries({ queryKey: ["models"] });
+      setConfirming(false);
+    },
+  });
 
   return (
     <PanelCard>
@@ -67,12 +80,31 @@ export function CredentialCard({
           </p>
         </div>
 
-        {!editing && (
+        {!editing && !confirming && (
           <div className="flex shrink-0 gap-2">
             <Button onClick={() => setEditing(true)}>
               {configured ? "Değiştir" : "Ekle"}
             </Button>
-            {configured && <DeleteButton kind={spec.kind} title={spec.title} />}
+            {configured && (
+              <Button variant="danger" onClick={() => setConfirming(true)}>
+                Sil
+              </Button>
+            )}
+          </div>
+        )}
+
+        {confirming && (
+          <div className="min-w-0">
+            <ConfirmInline
+              question={
+                <>
+                  <strong>{spec.title}</strong> kimlik bilgisi silinsin mi?
+                </>
+              }
+              busy={remove.isPending}
+              onConfirm={() => remove.mutate()}
+              onCancel={() => setConfirming(false)}
+            />
           </div>
         )}
       </div>
@@ -252,39 +284,3 @@ function describeError(error: unknown): { message: string; hint?: string } {
   }
 }
 
-function DeleteButton({ kind, title }: { kind: CredentialKind; title: string }) {
-  const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
-
-  const remove = useMutation({
-    mutationFn: () => api.credentials.remove(kind),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["credentials"] });
-      void queryClient.invalidateQueries({ queryKey: ["models"] });
-      setConfirming(false);
-    },
-  });
-
-  if (!confirming) {
-    return (
-      <Button variant="danger" onClick={() => setConfirming(true)}>
-        Sil
-      </Button>
-    );
-  }
-
-  return (
-    /* "Emin misiniz?" idi: hangi kimlik bilgisinin silineceğini söylemiyordu ve
-       kartta yan yana birkaç tür duruyor. */
-    <ConfirmInline
-      question={
-        <>
-          <strong>{title}</strong> kimlik bilgisi silinsin mi?
-        </>
-      }
-      busy={remove.isPending}
-      onConfirm={() => remove.mutate()}
-      onCancel={() => setConfirming(false)}
-    />
-  );
-}

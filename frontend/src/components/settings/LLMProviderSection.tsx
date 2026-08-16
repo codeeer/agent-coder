@@ -90,6 +90,15 @@ export function LLMProviderSection() {
 function LLMProviderCard({ provider }: { provider: LLMProvider }) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  /*
+   * Onay durumu KARTTA tutuluyor, silme düğmesinde değil.
+   *
+   * Düğmenin içinde dursaydı onay şeridi, diğer eylemlerin yanına sıkışırdı:
+   * ölçüldü, kart 209px taşıyor ve "Evet, sil" ekranın dışında kalıyordu.
+   * Onay açıkken bütün eylem sırası yerini bırakıyor — git erişimi ve MCP
+   * bölümlerindeki kalıbın aynısı.
+   */
+  const [confirming, setConfirming] = useState(false);
   const spec = TYPES[provider.type];
 
   const invalidate = () => {
@@ -100,6 +109,14 @@ function LLMProviderCard({ provider }: { provider: LLMProvider }) {
   const sync = useMutation({
     mutationFn: () => api.llmProviders.sync(provider.id),
     onSuccess: invalidate,
+  });
+
+  const remove = useMutation({
+    mutationFn: () => api.llmProviders.remove(provider.id),
+    onSuccess: () => {
+      invalidate();
+      setConfirming(false);
+    },
   });
 
   const setDefault = useMutation({
@@ -140,7 +157,7 @@ function LLMProviderCard({ provider }: { provider: LLMProvider }) {
           )}
         </div>
 
-        {!editing && (
+        {!editing && !confirming && (
           <div className="flex shrink-0 flex-wrap justify-end gap-2">
             <Button onClick={() => sync.mutate()} disabled={sync.isPending}>
               {sync.isPending ? "Yenileniyor…" : "Katalogu yenile"}
@@ -154,7 +171,25 @@ function LLMProviderCard({ provider }: { provider: LLMProvider }) {
               </Button>
             )}
             <Button onClick={() => setEditing(true)}>Düzenle</Button>
-            <DeleteButton provider={provider} onDone={invalidate} />
+            <Button variant="danger" onClick={() => setConfirming(true)}>
+              Sil
+            </Button>
+          </div>
+        )}
+
+        {confirming && (
+          <div className="min-w-0">
+            <ConfirmInline
+              question={
+                <>
+                  <strong>{provider.name}</strong> silinsin mi?
+                </>
+              }
+              consequence={`${provider.sync?.modelCount ?? 0} model de silinecek.`}
+              busy={remove.isPending}
+              onConfirm={() => remove.mutate()}
+              onCancel={() => setConfirming(false)}
+            />
           </div>
         )}
       </div>
@@ -301,48 +336,6 @@ function LLMProviderForm({
   return editing ? <div className="mt-4">{body}</div> : <PanelCard>{body}</PanelCard>;
 }
 
-function DeleteButton({
-  provider,
-  onDone,
-}: {
-  provider: LLMProvider;
-  onDone: () => void;
-}) {
-  const [confirming, setConfirming] = useState(false);
-
-  const remove = useMutation({
-    mutationFn: () => api.llmProviders.remove(provider.id),
-    onSuccess: () => {
-      onDone();
-      setConfirming(false);
-    },
-  });
-
-  if (!confirming) {
-    return (
-      <Button variant="danger" onClick={() => setConfirming(true)}>
-        Sil
-      </Button>
-    );
-  }
-
-  return (
-    <>
-      {/* Soru eklendi: önce yalnızca sonuç yazıyordu. */}
-      <ConfirmInline
-        question={
-          <>
-            <strong>{provider.name}</strong> silinsin mi?
-          </>
-        }
-        consequence={`${provider.sync?.modelCount ?? 0} model de silinecek.`}
-        busy={remove.isPending}
-        onConfirm={() => remove.mutate()}
-        onCancel={() => setConfirming(false)}
-      />
-    </>
-  );
-}
 
 /**
  * Form hatası kutusu — LLM ve git erişim formları paylaşır.
