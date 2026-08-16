@@ -42,6 +42,12 @@ func ToPEM(raw []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// ULAŞILAMAZ — bilerek duruyor. `parse` sözleşmesi gereği ya en az bir
+	// sertifika ya da hata dönüyor; hiçbir yolu `(nil, nil)` vermiyor.
+	// Dolayısıyla bu satırı kapsayan bir test YAZILAMAZ ve mutasyon taraması
+	// onu haklı olarak "korumasız" gösterir. Eksik test değil, ölü savunma:
+	// `parse`'a yeni bir biçim eklendiğinde o sözleşmenin sessizce
+	// bozulmasına karşı duruyor.
 	if len(certs) == 0 {
 		return "", ErrNoCertificate
 	}

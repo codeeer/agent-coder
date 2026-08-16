@@ -133,3 +133,27 @@ func TestToPEM_GecerliBase64AmaSertifikaDegil(t *testing.T) {
 	_, err := ToPEM([]byte("aGVsbG8gd29ybGQgYnUgc2VydGlmaWthIGRlZ2ls"))
 	require.ErrorIs(t, err, ErrNoCertificate)
 }
+
+/*
+YALNIZCA ÖZEL ANAHTAR İÇEREN DOSYA REDDEDİLİR.
+
+Bu, "çöp içerik" ile aynı şey DEĞİL: dosya geçerli PEM, ayrıştırma başarılı,
+yalnızca içinden sertifika çıkmıyor. Birçok araç anahtar ve sertifikayı tek
+dosyada verdiği için kullanıcının yanlışlıkla yalnızca anahtar dosyasını
+seçmesi yaygın.
+
+Bekçi olmasaydı `ToPEM` hatasız BOŞ dize dönerdi: kullanıcı "kaydedildi"
+görür, kurumsal sertifika ise hiç yazılmamış olurdu — ve arıza ancak aylar
+sonra, bir runner TLS hatası verdiğinde ortaya çıkardı.
+*/
+func TestToPEM_YalnizcaOzelAnahtarReddedilir(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	require.NoError(t, err)
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+
+	got, err := ToPEM(keyPEM)
+	require.ErrorIs(t, err, ErrNoCertificate, "sertifikasız dosya kabul edilmemeli")
+	require.Empty(t, got)
+}
