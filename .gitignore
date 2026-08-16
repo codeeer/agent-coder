@@ -43,3 +43,10 @@ deploy/data/
 
 # Claude Code yerel ayarları (paylaşılan .claude/agents ve .claude/skills izlenir)
 .claude/settings.local.json
+
+# Python bytecode — `scripts/mutasyon` içe aktarıldığında oluşuyor.
+__pycache__/
+*.pyc
+
+# Tarayıcı araçlarının bıraktığı günlükler.
+.playwright-mcp/
