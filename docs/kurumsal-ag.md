@@ -20,6 +20,7 @@ anlaşılıyor ve hata mesajı çoğu zaman asıl sebebi göstermiyor.
 | Maven deposu adresi | Aynı ekran | Maven Central'a çıkılamıyorsa |
 | Çıkış proxy'si | Arayüz → **Ayarlar → Kurumsal ağ** | İnternete yalnızca kurumun proxy'sinden çıkılabiliyorsa |
 | İzinli domain listesi | Aynı ekran | Sandbox'ın çıkabileceği adresler sınırlanacaksa |
+| Kurum içi domain listesi | Aynı ekran | Kurumun kendi adreslerine proxy'ye uğramadan gidilecekse |
 | Paket deposu süre sınırı | Aynı ekran | Ulaşılamayan depoda çalıştırma dakikalarca beklemesin diye |
 | Parola / token | Aynı ekran → **Kimlik doğrulama** kartı | Depo anonim okumaya kapalıysa |
 | Kurumsal kök sertifika | Arayüz → **Ayarlar → Kurumsal ağ** | Ağ HTTPS'i kendi sertifikasıyla açıp yeniden imzalıyorsa |
@@ -344,6 +345,65 @@ kaçış mümkün değil: DNS `Could not resolve host`, doğrudan IP'ye bağlant
 
 Denetim açıkken aynı Maven'lı görev tekrarlandığında kapı dışına giden bağlantı
 sayısı **0** ölçüldü.
+
+### Kurum içi domain'ler: proxy'ye uğramadan
+
+Kurumsal proxy'ler **dışarı çıkmak** için kurulur. İç adresleri çözmeyi hiç
+bilmeyebilir ya da bilinçli olarak reddederler. Denetim açıkken kurumun kendi
+Bitbucket'ına kendi çıkış proxy'si üzerinden gitmek, kapıdan çıkıp aynı binaya
+ön kapıdan girmeye çalışmaktır — ve proxy o adresi tanımıyorsa klonlama düşer,
+yani denetimi açmak agent'ı kurumun kendi deposundan koparabilir.
+
+**Kurum içi domain listesi** bunu çözer: listedeki adreslere kapı, kurumsal
+proxy'ye uğramadan **kendisi** bağlanır.
+
+```text
+garanti.com.tr
+*.garanti.com.tr
+*.garantidom.com.tr
+```
+
+Söz dizimi izin listesiyle birebir aynıdır. Kurumun birbiriyle akraba olmayan
+birden fazla domain'i varsa hepsi ayrı satır olur.
+
+#### İki liste karıştırılmamalı
+
+| Liste | Sorusu | Boşken |
+| --- | --- | --- |
+| İzinli domain'ler | **Gidilebilir mi?** | Kısıt yok |
+| Kurum içi domain'ler | **Nasıl gidilir?** | Hepsi proxy'den geçer |
+
+Sıra her zaman aynı: **önce izin, sonra yönlendirme.** Kurum içi listesine
+yazmak izin **vermez**; izinli olmayan bir adres, kurum içi listesinde olsa
+bile reddedilir.
+
+Boş listenin anlamı iki listede **zıttır** ve bu bilinçli. İzin listesinde boş
+"kısıt yok" demek. Kurum içi listesinde aynı yorum yapılsaydı liste boşken her
+hedef doğrudan gider ve kurumsal proxy tamamen devre dışı kalırdı.
+
+#### Yalıtım bozulmuyor
+
+Agent ortamına **hiçbir şey söylenmez**: ne yeni ortam değişkeni, ne ağ
+değişikliği. Runner hâlâ internete rotası olmayan network'te doğuyor ve
+yalnızca kapıyı görüyor. Değişen tek şey kapının nereye bağlandığı.
+
+Bu bilinçli bir tercih. `NO_PROXY` ortam değişkeniyle yapılsaydı iki sebeple
+çalışmazdı: runner'ın doğrudan bağlantısı zaten kısıtlı network'ten çıkamazdı,
+ve ölçüm (yukarıda) ortam değişkeniyle yapılan yönlendirmenin atlanabildiğini
+gösteriyor.
+
+#### Listeyi dar tutun
+
+Buradaki risk izin listesindekiyle **aynı yönde değil**. Geniş bir desen daha
+çok şeye izin vermez — daha çok trafiği kurumsal proxy'nin kaydından ve
+denetiminden çıkarır. Çoğu kurumda o proxy aynı zamanda veri sızıntısı
+denetiminin yapıldığı yerdir.
+
+#### Geri düşme yok
+
+Kurum içi bir adrese doğrudan bağlantı kurulamazsa çalıştırma hata alır ve
+ürün **sessizce proxy'yi denemez**. "Bu adres için proxy'den geçme" dendiyse,
+geri düşmek tam da kaçınılmak istenen yoldan kimlik bilgisi geçirmek olurdu.
 
 ### Kapı TLS açmaz
 

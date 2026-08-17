@@ -243,8 +243,47 @@ Bunu sınırlamak için **Ayarlar → Kurumsal ağ**:
   kendi çıkış kapısıdır.
 - **İzinli domain'ler** — satır başına bir domain. Boş bırakılırsa domain
   kısıtı uygulanmaz, ama çıkış yine proxy'den geçer.
+- **Kurum içi domain'ler** — bu adreslere proxy'ye **uğramadan** gidilir.
 
 Proxy boşsa hiçbir kısıt uygulanmaz ve davranış bugünküyle aynıdır.
+
+#### İki liste, iki ayrı soru
+
+Yan yana duran bu iki liste karıştırılmaya müsait ama farklı sorulara cevap
+veriyor:
+
+| Liste | Sorusu | Boş bırakılırsa |
+| ----- | ------ | --------------- |
+| İzinli domain'ler | **Gidilebilir mi?** | Kısıt yok, her adrese gidilebilir |
+| Kurum içi domain'ler | **Nasıl gidilir?** | Her adrese proxy üzerinden gidilir |
+
+Sıra her zaman aynı: **önce izin, sonra yönlendirme.** Kurum içi listesine bir
+adres yazmak ona çıkış izni **vermez**; izinli olmayan bir adres, kurum içi
+listesinde olsa bile reddedilir.
+
+Kurum içi listesi neden gerekli: kurumsal proxy'ler dışarı çıkışı denetlemek
+için kurulur ve iç adresleri çözemeyebilir. Kurumun kendi Bitbucket'ına kendi
+çıkış proxy'si üzerinden gitmek, kapıdan çıkıp aynı binaya ön kapıdan girmeye
+çalışmaktır.
+
+```
+garanti.com.tr
+*.garanti.com.tr
+*.garantidom.com.tr
+```
+
+Söz dizimi izin listesiyle aynı: `ornek.com` yalnızca o adresi,
+`*.ornek.com` alt alan adlarını kapsar. Kurumun birbiriyle akraba olmayan
+birden fazla domain'i varsa hepsi ayrı satır olur.
+
+> **Listeyi dar tutun.** Buradaki risk izin listesindekiyle **aynı yönde
+> değil**: geniş bir desen daha çok şeye izin vermez, daha çok trafiği
+> kurumsal proxy'nin kaydından ve denetiminden çıkarır. Çoğu kurumda o proxy
+> aynı zamanda veri sızıntısı denetiminin yapıldığı yerdir.
+
+Kurum içi bir adrese doğrudan bağlantı kurulamazsa çalıştırma hata alır;
+ürün **sessizce proxy'yi denemez**. "Bu adres için proxy'den geçme" dediyseniz,
+geri düşmek tam da kaçınmak istediğiniz yoldan kimlik bilgisi geçirmek olurdu.
 
 LLM sağlayıcı, kod deposu, paket deposu ve çalıştırma motorunun kendi
 adresleri **kullanıcı yazmasa da izinlidir** ve aynı ekranda listelenir.

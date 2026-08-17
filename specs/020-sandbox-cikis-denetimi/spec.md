@@ -208,3 +208,29 @@ Kabul kriterleri:
   geliyor.
 - [Veri sızıntısı analizi](../../docs/veri-sizintisi-analizi.md): bu spec'in
   gerekçesi ve doğrulama ölçütü o ölçüme dayanıyor.
+
+---
+
+## Karar geçmişi
+
+### 2026-08-17 — Kurum içi adresler proxy'den muaf tutulabiliyor
+
+[Spec 026](../026-kurum-ici-domainler/spec.md) ile kurumun kendi domain'leri
+tanımlanabiliyor; bu adreslere çıkış kapısı kurumsal proxy'ye uğramadan
+bağlanıyor. Varsayılan değişmedi: liste boşken her hedef bugünkü gibi
+proxy'den geçiyor.
+
+**Bu spec'in "İki ayar, tek anahtar" kuralı korundu.** Çıkış proxy'si hâlâ ana
+anahtar: boşken kapı hiç kurulmuyor ve yeni listenin uygulanacağı bir yer yok.
+
+**Yalıtım kararı da korundu.** Muafiyet agent ortamına verilmedi — runner hâlâ
+internete rotası olmayan network'te doğuyor ve yalnızca kapıyı görüyor. Değişen
+tek şey kapının nereye bağlandığı. `NO_PROXY` ile yapılsaydı bu spec'in ölçümle
+aldığı karar ("ortam değişkeniyle yapılan yönlendirme atlanabiliyor") çiğnenmiş
+olurdu; üstelik kısıtlı network'te doğrudan bağlantı zaten çıkamazdı.
+
+**Boş listenin anlamı iki listede zıt.** Bu spec'in H2 kuralı — "boş whitelist
+kısıt değil kısıtsızlıktır" — kurum içi listesinde geçerli DEĞİL: orada boş
+liste "hiçbir hedef doğrudan gitmesin" demek. Aynı yorum yapılsaydı liste
+boşken kurumsal proxy tamamen devre dışı kalırdı. Bu yüzden eşleştirme ayrı
+isimli bir fonksiyonla yapılıyor.
