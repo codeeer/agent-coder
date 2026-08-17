@@ -77,6 +77,34 @@ func egressAllow(spec runner.EgressSpec) ([]hostlist.Pattern, error) {
 }
 
 /*
+ * egressDirect, proxy'ye uğramadan gidilecek hedeflerin listesini kurar
+ * (spec 026).
+ *
+ * `egressAllow`'un TUZAĞI BURADA YOK: orada boş liste "kısıt yok" demek ve
+ * zorunlu adreslerin eklenmesi listeyi boş olmaktan çıkarıyordu. Burada boş
+ * liste "hiçbir hedef doğrudan gitmesin" demek ve hiçbir şey eklenmiyor —
+ * kurumun kendi domain'lerini yalnızca kurum bilir, ürün tahmin edemez.
+ *
+ * AYRIŞTIRMA HATASI ÇALIŞTIRMAYI DÜŞÜRMEZ (spec 026 H3). Ayar zaten yazılırken
+ * doğrulanıyor; buraya bozuk metin gelmesi beklenmiyor. Yine de gelirse
+ * kullanıcının tek kaybı proxy'siz gidiş olur, işin tamamı değil. Sessiz de
+ * kalmaz: bu durumda çıkış proxy'ye döner ve sebebi logda durur.
+ */
+func egressDirect(spec runner.EgressSpec) []hostlist.Pattern {
+	if spec.InternalHosts == "" {
+		return nil
+	}
+	desenler, err := hostlist.Parse(spec.InternalHosts)
+	if err != nil {
+		slog.Warn("kurum içi domain listesi ayrıştırılamadı — bu çalıştırmada "+
+			"tüm hedefler kurumsal proxy üzerinden gidecek",
+			"error", err)
+		return nil
+	}
+	return desenler
+}
+
+/*
  * upstreamAdresi, ayardaki proxy URL'ini `host:port` biçimine çevirir.
  *
  * Port yazılmamışsa şemanın varsayılanı kullanılır: kullanıcıyı `:80` yazmaya
@@ -168,6 +196,7 @@ func (r *Runner) egressOturumuAc(req runner.Request, emit runner.EventFunc) (*ne
 		ID:       req.RunID.String(),
 		Upstream: upstream,
 		Allow:    allow,
+		Direct:   egressDirect(req.Egress),
 		OnDeny:   denyBildirici(req.RunID.String(), emit),
 	})
 }

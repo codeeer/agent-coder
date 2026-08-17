@@ -136,6 +136,19 @@ type EgressSpec struct {
 	 * AllowedHosts DOLUYKEN listeye eklenir.
 	 */
 	Required []string
+
+	/*
+	 * InternalHosts, kurumun kendi domain'leri — HAM METİN, satır başına bir
+	 * domain (spec 026).
+	 *
+	 * Bu adreslere çıkış kapısı kurumsal proxy'ye UĞRAMADAN bağlanır: proxy
+	 * dışarı çıkmak için kurulmuştur ve iç adresleri çözemeyebilir.
+	 *
+	 * İZİN VERMEZ. Çıkış izni `AllowedHosts`'un işi ve orada kalır; buraya
+	 * yazmak yalnızca yolu belirler. Boş olması "hepsi proxy'den geçsin"
+	 * demektir — `AllowedHosts`'un boş hâlinin TERSİ bir anlam.
+	 */
+	InternalHosts string
 }
 
 // Enabled, çıkış denetiminin bu çalıştırmada açık olup olmadığı.

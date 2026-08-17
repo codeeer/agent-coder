@@ -281,6 +281,8 @@ func run() error {
 			return runner.EgressSpec{
 				ProxyURL:     proxy,
 				AllowedHosts: settingsSvc.Text(settings.KeyAllowedHosts),
+				// Kurum içi domain'ler (spec 026): izin değil, yol.
+				InternalHosts: settingsSvc.Text(settings.KeyInternalHosts),
 			}
 		},
 	})

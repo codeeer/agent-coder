@@ -88,6 +88,10 @@ const (
 	// KeyAllowedHosts, sandbox'ın çıkabileceği domain'ler. Yalnızca
 	// KeyEgressProxy doluyken anlam taşır.
 	KeyAllowedHosts = "network.allowed_hosts"
+	// KeyInternalHosts, kurumun kendi domain'leri (spec 026). Bu adreslere
+	// çıkış kapısı proxy'ye uğramadan bağlanır. İZİN VERMEZ; boş liste
+	// "hepsi proxy'den geçsin" demektir — KeyAllowedHosts'un tersi.
+	KeyInternalHosts = "network.internal_hosts"
 
 	KeyRunTimeoutMinutes  = "runner.timeout_minutes"
 	KeyMaxConcurrentRuns  = "runner.max_concurrent"
@@ -398,6 +402,31 @@ var Registry = []Definition{
 			"İzinli bir domain'e tüm portlar açıktır. Boş bırakılırsa domain " +
 			"kısıtı uygulanmaz, ama çıkış yine proxy'den geçmek zorundadır. " +
 			"YALNIZCA çıkış proxy'si tanımlıyken etkilidir.",
+		Default: "",
+	},
+	/*
+	 * Kurum içi domain'ler — spec 026.
+	 *
+	 * İKİ LİSTE, İKİ AYRI SORU: izinli domain'ler "gidebilir mi", bu liste
+	 * "nasıl gidilir" der. Karıştırılmaması yardım metninin asıl işi.
+	 *
+	 * RİSK YÖNÜ TERS: izin listesinde geniş desen "daha çoğuna izin verildi"
+	 * demek. Burada ise "daha çok trafik kurumsal denetimin dışına çıktı" —
+	 * proxy çoğu kurumda aynı zamanda kayıt ve sızıntı denetimi noktası.
+	 * Bu yüzden iki listenin yardım metni aynı olamaz.
+	 */
+	{
+		Key: KeyInternalHosts, Group: GroupNetwork, Kind: KindHostList, Optional: true,
+		Label: "Kurum içi domain'ler",
+		Help: "Kurumun kendi adresleri, satır başına bir tane. Bu adreslere " +
+			"çıkış proxy'ye UĞRAMADAN gidilir — proxy dışarı çıkmak için " +
+			"kurulmuştur ve iç adresleri çözemeyebilir. " +
+			"`ornek.com` yalnızca o adresi, `*.ornek.com` alt alan adlarını " +
+			"kapsar; ikisi de gerekiyorsa iki satır yazın. " +
+			"BU LİSTE İZİN VERMEZ: çıkış izni yukarıdaki listeden gelir. " +
+			"Listeyi dar tutun — buraya yazılan her adres kurumsal proxy'nin " +
+			"kaydından ve denetiminden çıkar. Boş bırakılırsa her adrese " +
+			"proxy üzerinden gidilir.",
 		Default: "",
 	},
 }

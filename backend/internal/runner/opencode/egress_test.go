@@ -154,3 +154,46 @@ func TestUpstreamAdresi(t *testing.T) {
 	_, err = upstreamAdresi("proxy.sirket.local:8080")
 	require.Error(t, err, "şemasız adres reddedilmeli")
 }
+
+// ─── Spec 026: kurum içi domain'ler ─────────────────────────────────────────
+
+func TestEgressDirect_BosAyarBosListe(t *testing.T) {
+	require.Empty(t, egressDirect(runner.EgressSpec{}),
+		"ayar boşken hiçbir hedef doğrudan gitmemeli")
+}
+
+func TestEgressDirect_DesenlereCevrilir(t *testing.T) {
+	desenler := egressDirect(runner.EgressSpec{
+		InternalHosts: "garanti.com.tr\n*.garanti.com.tr\n*.garantidom.com.tr",
+	})
+
+	require.True(t, hostlist.Listed(desenler, "bitbucket.garanti.com.tr"))
+	require.True(t, hostlist.Listed(desenler, "garanti.com.tr"))
+	require.True(t, hostlist.Listed(desenler, "garanti.garantidom.com.tr"))
+	require.False(t, hostlist.Listed(desenler, "github.com"))
+}
+
+/*
+BOZUK LİSTE ÇALIŞTIRMAYI DÜŞÜRMEZ (spec 026 H3).
+
+`egressAllow`'un aksine burada hata DÖNMÜYOR ve bu bilinçli: izin listesi
+bozuksa çalıştırma yanlış izinlerle devam edemez, ama yönlendirme listesi
+bozuksa kullanıcının kaybı yalnızca proxy'siz gidiş olur. İşin tamamını
+düşürmek, ayardaki bir yazım hatasının bedelini fazla ağırlaştırırdı.
+
+Geri düşülen yer GÜVENLİ TARAF: her hedef proxy'den geçer, yani bugünkü
+davranış.
+*/
+func TestEgressDirect_BozukListeCalistirmayiDusurmez(t *testing.T) {
+	require.Empty(t, egressDirect(runner.EgressSpec{InternalHosts: "https://garanti.com.tr"}),
+		"bozuk satır boş liste vermeli — hata değil")
+	require.Empty(t, egressDirect(runner.EgressSpec{InternalHosts: "*"}))
+}
+
+// Yorum ve boş satırlar izin listesindeki gibi atlanır — tek ayrıştırıcı.
+func TestEgressDirect_YorumVeBosSatirAtlanir(t *testing.T) {
+	desenler := egressDirect(runner.EgressSpec{
+		InternalHosts: "# kurumun kendi adresleri\n\ngaranti.com.tr\n\n# jira\n*.garanti.com.tr\n",
+	})
+	require.Len(t, desenler, 2)
+}

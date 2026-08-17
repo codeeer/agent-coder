@@ -46,6 +46,18 @@ type egressResponse struct {
 	Proxy egressProxyInfo `json:"proxy"`
 	// AlwaysAllowed, kullanıcı yazmasa da izinli olan adresler.
 	AlwaysAllowed egressAllowed `json:"alwaysAllowed"`
+
+	/*
+	 * InternalHosts, proxy'ye UĞRAMADAN gidilen adresler (spec 026).
+	 *
+	 * `AlwaysAllowed`'ın yanında ama ONUN PARÇASI DEĞİL: o liste "kullanıcı
+	 * yazmasa da izinli" der, bu liste izinle hiç ilgilenmez. İç içe
+	 * konsaydı ekran ikisini aynı soruya cevap sanırdı.
+	 *
+	 * Bu adresler kurumsal proxy'nin kaydından ve denetiminden çıkıyor;
+	 * ekranda görünmeleri tam da bu yüzden gerekli.
+	 */
+	InternalHosts []string `json:"internalHosts"`
 }
 
 // egressStatus, çıkış denetiminin çözülmüş durumunu döner.
@@ -65,6 +77,21 @@ func (h *Handler) egressStatus(w http.ResponseWriter, r *http.Request) {
 		out.Proxy = egressProxyInfo{Source: "settings", Host: proxyHostu(ayar)}
 	case h.deps.EgressProxyEnv != "":
 		out.Proxy = egressProxyInfo{Source: "env", Host: proxyHostu(h.deps.EgressProxyEnv)}
+	}
+
+	/*
+	 * Kurum içi domain'ler AYRIŞTIRILARAK gösteriliyor (spec 026).
+	 *
+	 * Ham metni bölüp göstermek daha kolaydı ama ekran o zaman kapının
+	 * gerçekte kullandığı listeyi değil, kullanıcının yazdığı metni
+	 * gösterirdi — yorum satırları ve atlanan girdiler dahil. Bu dosyanın
+	 * kuralı: "Liste UYDURULMAZ, gerçek yapılandırmadan türetilir."
+	 */
+	if h.deps.Settings != nil {
+		if desenler, err := hostlist.Parse(
+			h.deps.Settings.Text(settings.KeyInternalHosts)); err == nil {
+			out.InternalHosts = hostlist.Strings(desenler)
+		}
 	}
 
 	if h.deps.EngineHosts != nil {

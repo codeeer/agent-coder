@@ -293,8 +293,16 @@ function TabContent({ tab }: { tab: TabID }) {
             <div className="border-b border-line px-4 py-3.5">
               <EgressStatus />
             </div>
+            {/* SIRA ANLAMLI: önce çıkış var mı (proxy), sonra nereye
+                gidilebilir (izin), en son nasıl gidilir (kurum içi).
+                Yönlendirme listesini izinden önce koymak, kullanıcıya
+                izin listesiymiş gibi okuturdu (spec 026). */}
             <RuntimeSettings
-              keys={["network.proxy_url", "network.allowed_hosts"]}
+              keys={[
+                "network.proxy_url",
+                "network.allowed_hosts",
+                "network.internal_hosts",
+              ]}
               showHeadings={false}
             />
           </Panel>

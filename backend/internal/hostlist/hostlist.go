@@ -84,6 +84,38 @@ type Pattern struct {
 	wildcard bool
 }
 
+/*
+String, deseni kullanıcının yazdığı biçime geri çevirir.
+
+EKRANA GÖSTERMEK İÇİN. Ham ayarı bölüp göstermek daha kolay olurdu ama o
+zaman ekran, ayrıştırıcının atladığı satırları (yorum, boşluk) ve
+normalleştirmeyi görmezdi — yani kullanıcıya "şunlar geçerli" derken
+gerçekte geçerli olmayan bir liste gösterirdi.
+*/
+func (p Pattern) String() string {
+	if p.wildcard {
+		return "*." + p.host
+	}
+	return p.host
+}
+
+/*
+Strings, desen listesini gösterilebilir satırlara çevirir.
+
+Sıra korunuyor — `Hosts` ile aynı gerekçe: her okunuşta farklı sıralanan bir
+liste, değişmiş gibi okunurdu.
+*/
+func Strings(desenler []Pattern) []string {
+	if len(desenler) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(desenler))
+	for _, p := range desenler {
+		out = append(out, p.String())
+	}
+	return out
+}
+
 // Parse, whitelist metnini desenlere çevirir.
 //
 // Boş satır ve `#` ile başlayan yorum satırı atlanır: kullanıcının listeyi

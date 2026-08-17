@@ -86,6 +86,27 @@ export function EgressStatus() {
         </div>
       )}
 
+      {/* KURUM İÇİ ADRESLER AYRI KUTUDA (spec 026).
+          Yukarıdaki listeyle birleştirilseydi "izinli adresler" diye
+          okunurdu; oysa bu liste izinle ilgilenmiyor, yalnızca yolu
+          söylüyor. Ve asıl söylenmesi gereken şey bu adreslerin kurumsal
+          proxy'nin kaydından çıktığı — kullanıcının bilmediği bir kapı
+          bırakılmaz. */}
+      {data.internalHosts && data.internalHosts.length > 0 && (
+        <div className="rounded-lg border border-line">
+          <p className="border-b border-line px-3 py-2 text-xs text-ink-3">
+            Bu adreslere <strong className="text-ink-2">proxy&apos;ye uğramadan</strong>{" "}
+            gidilir; kurumsal proxy&apos;nin kaydına ve denetimine girmezler.
+            Liste izin vermez — çıkış izni yukarıdan gelir.
+          </p>
+          <div className="px-3 py-2">
+            <span className="font-mono text-xs text-ink-1">
+              {data.internalHosts.join(", ")}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ÖLÇÜLEN SINIR, süs değil: kapı TLS açmadığı için yalnızca domain'e
           bakabiliyor. İzinli bir domain'in sunduğu her imkân da açılmış olur.
           Bunu söylememek, listenin verdiğinden fazla güvence vermek olurdu. */}

@@ -394,6 +394,13 @@ export interface EgressStatus {
     repositories: string[] | null;
     registries: string[] | null;
   };
+  /**
+   * Proxy'ye UĞRAMADAN gidilen adresler (spec 026).
+   *
+   * `alwaysAllowed`'ın yanında ama onun parçası değil: o liste "izinli"
+   * der, bu liste izinle ilgilenmez, yalnızca yolu söyler.
+   */
+  internalHosts: string[] | null;
 }
 
 /**
