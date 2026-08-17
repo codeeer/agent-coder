@@ -97,3 +97,41 @@ Plandan sapılırsa **neden** sapıldığı buraya yazılır.
   yazılıp yazılmayacağı) **hayır** varsayımıyla planlandı. Aksi
   kararlaştırılırsa T8-T11'e bir bildirim iddiası eklenir ve spec H5'e kabul
   kriteri girer.
+
+### Uygulama sırasında ortaya çıkanlar (2026-08-17)
+
+- **Plandaki bir varsayım yanlıştı.** "Ayar arayüzde kendiliğinden görünür,
+  yeni bileşen yok" yazmıştım. Render'ı jenerik ama ağ sekmesi ayarları
+  `settings/page.tsx` içinde **açık bir anahtar listesiyle** seçiyor; anahtar
+  oraya eklenmeden alan hiç çizilmedi. Tarayıcıda görüldü, eklendi.
+- **`Pattern.String()` ve `hostlist.Strings` planda yoktu.** Durum ucu ham
+  ayarı bölüp gösterseydi ekran, ayrıştırıcının atladığı yorum ve boş
+  satırları da gösterirdi — yani kapının gerçekte kullandığı listeyi değil.
+  Bu dosyanın kendi kuralı ("liste uydurulmaz, gerçek yapılandırmadan
+  türetilir") ikinci bir yol açmayı engelledi.
+- **Test düzeneğinde yarış vardı.** Sayacı mutex'le yazıp kilitsiz okuyordum;
+  `-race` yakaladı. `atomic.Int32`'ye çevrildi. Düzeneğin kendi kendini
+  doğrulayan testi (T7) tam da bunun için vardı.
+- **Yardım metnindeki backtick'ler ham görünüyor.** Arayüz markdown
+  işlemiyor. Komşu ayar (`İzinli domain'ler`) de aynı durumda olduğu için
+  tutarlılık adına aynı biçim korundu. **Açık kalan iyileştirme:** iki
+  listenin de backtick'lerini temizlemek — bu spec'in kapsamı dışında
+  olduğu için yapılmadı.
+
+### Elle doğrulama nasıl yapıldı
+
+Gerçek bir kurumsal proxy yoktu. Onun yerine **var olmayan** bir proxy
+(`proxy.sirket.local:8080`) tanımlandı; yönlendirme böyle ölçülebilir hale
+geldi — trafik proxy'ye giderse çalıştırma düşer, doğrudan giderse geçer.
+
+| Kurum içi listesi | Sonuç |
+| ----------------- | ----- |
+| Boş | `depoya erişilemedi: klonlama başarısız` — trafik proxy'ye gitti |
+| Hedefler yazılı | Klonlama geçti, motor açıldı, model çağrısına kadar ilerledi |
+
+İkinci çalıştırmadaki hata model sağlayıcısının 500'ü; bu özellikle ilgisiz ve
+spec 025 doğrulamasında da alınmıştı.
+
+T28 (izinsiz + kurum içi → reddedilir) **birim testinde** doğrulandı
+(`TestGate_IzinsizHostDirectOlsaBileReddedilir`); elle tekrarlanmadı, çünkü
+sıra kuralı gerçek ağ gerektirmiyor.
