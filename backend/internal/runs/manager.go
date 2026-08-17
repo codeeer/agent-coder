@@ -55,6 +55,13 @@ type Limits struct {
 	// kurulurken eklenir — onlar ayardan değil o koşudan geliyor.
 	Egress func() runner.EgressSpec
 
+	// WorkdirLayout, projenin çalışma kökünün neresine açılacağı (spec 025).
+	// Diğerleri gibi FONKSİYON: ayar arayüzden değişince yeniden başlatma
+	// beklemeden sonraki çalıştırmada geçerli olmalı.
+	//
+	// nil olabilir; o zaman varsayılan yerleşim uygulanır.
+	WorkdirLayout func() runner.WorkdirLayout
+
 	/*
 		OnSlotFree, bir slot boşaldığında çağrılır. nil olabilir.
 
@@ -226,7 +233,10 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 	egress.Required = zorunluHostlar(in.Provider, in.Repo, paketler, in.Agent.MCPServers)
 
 	req := runner.Request{
-		RunID:       run.ID,
+		RunID: run.ID,
+		// Proje kökü BURADA, bir kez çözülür; env ve talimat metni aynı
+		// alandan okur (spec 025).
+		ProjectDir:  m.projectDir(in.Repo.URL),
 		NodeVersion: in.NodeVersion,
 		Packages:    paketler,
 		CACert:      m.caCert(),
@@ -497,6 +507,25 @@ func (m *Manager) egress() runner.EgressSpec {
 		return runner.EgressSpec{}
 	}
 	return m.limits.Egress()
+}
+
+/*
+projectDir, bu çalıştırmanın proje kökünü çözer (spec 025).
+
+TEK HESAP NOKTASI. Dönen değer `Request.ProjectDir`'e yazılıyor ve oradan hem
+container'ın ortam değişkenine hem agent'ın talimat metnine gidiyor. İkinci
+bir hesap noktası açılırsa iki gerçek doğar ve fark yalnızca üretimde,
+betikler var olmayan bir dizine baktığında görülür.
+
+Ayar okunamıyorsa varsayılan yerleşim: bu bir kolaylık ayarı, çalıştırmayı
+düşürmesi için sebep yok (spec 025 H2).
+*/
+func (m *Manager) projectDir(repoURL string) string {
+	layout := runner.LayoutRoot
+	if m.limits.WorkdirLayout != nil {
+		layout = m.limits.WorkdirLayout()
+	}
+	return runner.ProjectDir(layout, repoURL)
 }
 
 /*

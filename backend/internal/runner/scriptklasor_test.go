@@ -32,7 +32,7 @@ func TestKlasor_DosyaAltDizineYazilir(t *testing.T) {
 		{Name: "ortak", Content: "echo iki"},
 	}, []FolderSpec{{Name: "node-24", Description: "Node yükseltmesi"}})
 
-	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{})
+	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	yollar := map[string]bool{}
@@ -56,7 +56,7 @@ func TestKlasor_DizinGirdisiDosyadanOnce(t *testing.T) {
 		{Name: "01-baslat", Content: "echo", Folder: "node-24"},
 	}, []FolderSpec{{Name: "node-24"}})
 
-	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{})
+	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	var dizinIdx, dosyaIdx = -1, -1
@@ -78,13 +78,13 @@ func TestKlasor_DizinGirdisiDosyadanOnce(t *testing.T) {
 func TestKlasor_BosKlasorYazilmaz(t *testing.T) {
 	a := agentIle(nil, []FolderSpec{{Name: "bos", Description: "içi boş"}})
 
-	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{})
+	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	for _, f := range files {
 		require.NotEqual(t, "/home/agent/scripts/bos", f.Path)
 	}
-	require.NotContains(t, string(buildAgentFile(a, PackageRegistry{})), "bos")
+	require.NotContains(t, string(buildAgentFile(a, PackageRegistry{}, WorkRoot)), "bos")
 }
 
 /*
@@ -102,10 +102,10 @@ func TestKlasor_TalimattakiYolDiskeYazilanlaAyni(t *testing.T) {
 		{Name: "ortak", Content: "echo"},
 	}, []FolderSpec{{Name: "node-24", Description: "Node yükseltmesi"}})
 
-	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{})
+	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
-	talimat := string(buildAgentFile(a, PackageRegistry{}))
+	talimat := string(buildAgentFile(a, PackageRegistry{}, WorkRoot))
 
 	for _, f := range files {
 		if f.IsDir || !strings.HasPrefix(f.Path, scriptsDir+"/") {
@@ -122,7 +122,7 @@ func TestKlasor_TalimatKlasoruAnlatir(t *testing.T) {
 		{Name: "02-devam", Content: "echo", Folder: "node-24"},
 	}, []FolderSpec{{Name: "node-24", Description: "Node 18'den 24'e standart adımlar"}})
 
-	talimat := string(buildAgentFile(a, PackageRegistry{}))
+	talimat := string(buildAgentFile(a, PackageRegistry{}, WorkRoot))
 
 	require.Contains(t, talimat, "node-24")
 	require.Contains(t, talimat, "Node 18'den 24'e standart adımlar",
@@ -144,10 +144,36 @@ func TestKlasor_TalimatKlasoruAnlatir(t *testing.T) {
 func TestKlasor_TalimatProjeDizininiSoyler(t *testing.T) {
 	a := agentIle([]ScriptSpec{{Name: "ortak", Content: "echo"}}, nil)
 
-	talimat := string(buildAgentFile(a, PackageRegistry{}))
+	talimat := string(buildAgentFile(a, PackageRegistry{}, WorkRoot))
 
 	require.Contains(t, talimat, "PROJECT_DIR")
-	require.Contains(t, talimat, ProjectDir)
+	require.Contains(t, talimat, WorkRoot)
+}
+
+/*
+ * TALİMAT METNİ VERİLEN KÖKÜ SÖYLER — sabit bir yolu değil (spec 025 H1).
+ *
+ * Bu testin varlık sebebi ayrışma: aynı yol container'ın `PROJECT_DIR`
+ * değişkenine de yazılıyor. Metin sabit kalsaydı yerleşim değiştiğinde model
+ * `/work`'e, betikler `/work/<ad>`'a bakardı ve ikisi de "çalışıyor" derdi.
+ */
+func TestKlasor_TalimatVerilenKokuSoyler(t *testing.T) {
+	a := agentIle([]ScriptSpec{{Name: "ortak", Content: "echo"}}, nil)
+
+	talimat := string(buildAgentFile(a, PackageRegistry{}, "/work/proje"))
+
+	require.Contains(t, talimat, "`/work/proje` altında")
+	require.NotContains(t, talimat, "`/work` altında",
+		"kök yerleşiminin metni sızmamalı")
+}
+
+// Çağıran proje kökünü vermezse bugünkü metin aynen üretilir — spec 025 H2.
+func TestKlasor_TalimatBosKokteVarsayilanaDuser(t *testing.T) {
+	a := agentIle([]ScriptSpec{{Name: "ortak", Content: "echo"}}, nil)
+
+	require.Equal(t,
+		string(buildAgentFile(a, PackageRegistry{}, WorkRoot)),
+		string(buildAgentFile(a, PackageRegistry{}, "")))
 }
 
 /*
@@ -161,14 +187,14 @@ func TestKlasor_BashKapaliyken(t *testing.T) {
 	}, []FolderSpec{{Name: "node-24", Description: "kampanya"}})
 	a.AllowBash = false
 
-	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{})
+	files, err := BuildConfigFiles(ProviderSpec{Kind: "openrouter", Slug: "or"}, a, "m", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	for _, f := range files {
 		require.NotContains(t, f.Path, "node-24")
 	}
 
-	talimat := string(buildAgentFile(a, PackageRegistry{}))
+	talimat := string(buildAgentFile(a, PackageRegistry{}, WorkRoot))
 	require.NotContains(t, talimat, "node-24")
 	require.NotContains(t, talimat, "Kullanabileceğin betikler")
 }

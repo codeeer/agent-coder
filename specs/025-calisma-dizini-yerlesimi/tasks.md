@@ -1,0 +1,96 @@
+# Görevler: Çalışma dizini yerleşimi
+
+- **Spec no:** 025 — [spec.md](spec.md) · [plan.md](plan.md)
+- **Tarih:** 2026-08-17
+
+Her görev tek oturumda biter ve gözlenebilir bir sonucu vardır.
+`[P]` işaretli görevler paralel yürütülebilir.
+
+---
+
+## Commit (a) — Yol türetme + tek kaynak
+
+- [ ] **T1** `runner.go`'daki `const ProjectDir = "/work"` ikiye ayrılır:
+      `const WorkRoot` ve `type WorkdirLayout` + `LayoutRoot`/`LayoutRepo`
+      sabitleri → `go build ./...` geçer, `ProjectDir` henüz kullanılmadığı
+      için derleme kırılmaz
+- [ ] **T2** `func ProjectDir(layout, repoURL) string` yazılır: son segment,
+      sondaki `/` ve `.git` atılır; kısa SSH biçimi ayrı dalda; güvensiz ad
+      `WorkRoot`'a düşer → fonksiyon derlenir
+- [ ] **T3** `workdir_test.go` tablo testi → `go test ./internal/runner/ -run
+      ProjectDir` yeşil. Vakalar: https+`.git`, https `.git`'siz, sonu `/`,
+      kısa SSH, `http`, boş adres, `..` üreten adres, ayraç üreten adres,
+      adı boş çıkan adres — güvensiz olanların hepsi `/work` döner
+- [ ] **T4** `runner.Request`'e `ProjectDir string` alanı eklenir →
+      `go build ./...` geçer
+- [ ] **T5** `buildEnv` sabit yerine `req.ProjectDir` okur; boşsa `WorkRoot`
+      → `go test ./internal/runner/opencode/` yeşil (mevcut testler
+      değişmeden geçer)
+- [ ] **T6** `buildEnv` için iki test: alan boşken `PROJECT_DIR=/work`,
+      doluyken verilen değer → `go test ./internal/runner/opencode/` yeşil
+- [ ] **T7** `BuildConfigFiles` ve `scriptSection` proje kökünü parametre
+      alır; ~10 test çağrısı `WorkRoot` geçecek şekilde güncellenir →
+      `go test ./internal/runner/` yeşil, talimat metni **birebir aynı**
+- [ ] **T8** `runs.Limits`'e `WorkdirLayout func() runner.WorkdirLayout`
+      eklenir; `execute` içinde bir kez hesaplanıp `Request.ProjectDir`'e
+      yazılır; closure nil ise `LayoutRoot` → `go test ./...` yeşil
+- [ ] **T9** Entegrasyon testi: ayar `repo` iken `execute`'un ürettiği
+      `Request`'te env değeri ile talimat metnindeki yol **aynı** →
+      `go test ./internal/runs/` yeşil
+- [ ] **T10** `go vet ./...` ve `go test ./...` temiz → commit (a)
+
+## Commit (b) — Ayar + arayüz
+
+- [ ] **T11** `settings/registry.go`'ya yeni `Key` + `KindBool` tanımı,
+      varsayılan kapalı, `Help` metni iki yerleşimi de anlatır →
+      `go test ./internal/settings/` yeşil
+- [ ] **T12** `main.go`'da closure ayara bağlanır → sunucu açılır, ayar
+      `GET /api/settings` yanıtında görünür
+- [ ] **T13** [P] `types.ts`'teki `PROJECT_DIR` sabiti `WORK_ROOT` +
+      `projectDirLabel()` ile değiştirilir → `npx tsc --noEmit` temiz
+- [ ] **T14** [P] `ScriptSection.tsx`'teki proje kökü metni ayardan türer →
+      ayar kapalıyken bugünkü cümle aynen görünür, açıkken `/work/<repo-adı>`
+      kalıbı görünür
+- [ ] **T15** [P] `diagrams.tsx`'teki `/work` kutusu yerleşimden bağımsız
+      ifadeye çevrilir → belge diyagramı iki yerleşimde de doğru okunur
+- [ ] **T16** Arayüz elle doğrulama: Ayarlar ekranında seçenek mevcut kart
+      üslubunda görünür, varsayılan kapalı → ekran görüntüsü
+- [ ] **T17** `npx tsc --noEmit` ve `npx eslint .` temiz → commit (b)
+
+## Commit (c) — Belge
+
+- [ ] **T18** `docs/` içinde çalışma dizini / `$PROJECT_DIR` anlatılan yere
+      yeni seçenek ve "betikler `$PROJECT_DIR` kullandığı sürece her iki
+      yerleşimde çalışır" notu eklenir → belge okunduğunda seçeneğin ne
+      yaptığı anlaşılır
+- [ ] **T19** İlgili mevcut spec'in karar geçmişine tarihli madde eklenir
+      (hangisi olduğu `specs/` taranarak bulunur; yoksa docs notu yeter) →
+      karar izlenebilir
+- [ ] **T20** commit (c)
+
+## Doğrulama (commit'lerden sonra)
+
+- [ ] **T21** `bash -n runner/entrypoint.sh` → söz dizimi temiz
+- [ ] **T22** Yerel bare repo ile yalnızca klonlama bloğu denenir
+      (`PROJECT_DIR=/work/x`) → klon `/work/x` altına açılır; gerekiyorsa
+      tek satır `mkdir -p` eklenir ve commit (a)'ya iliştirilir
+- [ ] **T23** Ayar kapalı bir çalıştırma → `PROJECT_DIR=/work`, betik metni
+      bugünküyle aynı
+- [ ] **T24** Ayar açık bir çalıştırma → `PROJECT_DIR=/work/<ad>`, talimat
+      metninde aynı yol
+- [ ] **T25** PR açıklaması yazılır: motivasyon (dış runbook/Jenkins uyumu,
+      repo adını varsayan script'ler), varsayılanın değişmediği, nasıl
+      açıldığı → upstream'e yapıştırılabilir kısa metin
+
+---
+
+## Notlar
+
+Plandan sapılırsa **neden** sapıldığı buraya yazılır.
+
+- T7'nin alternatifi `BuildConfigFiles` için girdi struct'ıydı; bu
+  değişikliğe göre büyük olduğu için elendi (bkz. plan → Riskler). Test
+  çağrıları büyürse yeniden değerlendirilmeli.
+- T22 gerçek bir Docker ortamı gerektiriyor. Ortam yoksa görev
+  **atlanmaz**, engellendiği açıkça bildirilir — `entrypoint.sh`'ın
+  değişmediği varsayımı yalnızca bu adımda doğrulanıyor.

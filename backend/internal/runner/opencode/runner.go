@@ -86,7 +86,8 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 	runCtx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
 
-	configFiles, err := runner.BuildConfigFiles(req.Provider, req.Agent, req.Model, req.Packages)
+	configFiles, err := runner.BuildConfigFiles(req.Provider, req.Agent, req.Model, req.Packages,
+		req.ProjectDir)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", runner.ErrSandbox, err)
 	}
@@ -434,11 +435,16 @@ func buildEnv(req runner.Request, proxy string) map[string]string {
 	 * PROJE DİZİNİ — hem klonlama betiği hem kullanıcının yazdığı script'ler
 	 * bunu okur (spec 022 H6).
 	 *
-	 * TEK TANIM `runner.ProjectDir`. `entrypoint.sh` kendi değerini dayatmıyor,
-	 * bunu okuyor; iki yerde sabit yazılsaydı biri değiştiğinde diğeri geride
-	 * kalır ve script'ler var olmayan bir dizine bakardı.
+	 * DEĞER BURADA HESAPLANMIYOR (spec 025): çalıştırma başında bir kez
+	 * hesaplanıp `req.ProjectDir`'e yazılıyor ve aynı alan agent'ın talimat
+	 * metnine de gidiyor. Burada yeniden hesaplansaydı iki gerçek doğardı.
+	 * `entrypoint.sh` kendi değerini dayatmıyor, bunu okuyor.
 	 */
-	env["PROJECT_DIR"] = runner.ProjectDir
+	projectDir := req.ProjectDir
+	if projectDir == "" {
+		projectDir = runner.WorkRoot
+	}
+	env["PROJECT_DIR"] = projectDir
 
 	if req.Repo.CloneDepth > 0 {
 		env["GIT_CLONE_DEPTH"] = fmt.Sprint(req.Repo.CloneDepth)

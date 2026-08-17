@@ -27,7 +27,7 @@ func TestSettingsXML_AdresYokkenDosyaUretilmez(t *testing.T) {
 func TestBuildConfigFiles_MavenKapaliykenSettingsXMLYok(t *testing.T) {
 	files, err := BuildConfigFiles(
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
-		AgentSpec{Slug: "a"}, "m", PackageRegistry{NPMRegistry: "https://n.local/"})
+		AgentSpec{Slug: "a"}, "m", PackageRegistry{NPMRegistry: "https://n.local/"}, WorkRoot)
 	require.NoError(t, err)
 
 	for _, f := range files {

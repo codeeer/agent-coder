@@ -29,6 +29,7 @@ func TestBuildConfigFiles_AnahtarDosyayaDuzMetinYazilmaz(t *testing.T) {
 		AgentSpec{Slug: "reviewer", Description: "İnceler", Prompt: "Sen incelemecisin."},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -49,6 +50,7 @@ func TestBuildConfigFiles_OpenRouter(t *testing.T) {
 		AgentSpec{Slug: "reviewer", Prompt: "x"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -76,6 +78,7 @@ func TestBuildConfigFiles_OzelSaglayiciOpenAIUyumluSurucuKullanir(t *testing.T) 
 				AgentSpec{Slug: "coder", Prompt: "x"},
 				"model-x",
 				PackageRegistry{},
+				WorkRoot,
 			)
 			require.NoError(t, err)
 
@@ -105,6 +108,7 @@ func TestBuildConfigFiles_OzelSaglayiciAdressizReddedilir(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.Error(t, err)
 }
@@ -115,6 +119,7 @@ func TestBuildConfigFiles_BilinmeyenTurReddedilir(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.Error(t, err)
 }
@@ -125,6 +130,7 @@ func TestBuildConfigFiles_BosSlugReddedilir(t *testing.T) {
 		AgentSpec{Slug: "", Prompt: "x"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.Error(t, err)
 
@@ -133,6 +139,7 @@ func TestBuildConfigFiles_BosSlugReddedilir(t *testing.T) {
 		AgentSpec{Slug: "a", Prompt: "x"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.Error(t, err)
 }
@@ -143,6 +150,7 @@ func TestBuildAgentFile_Bicim(t *testing.T) {
 		AgentSpec{Slug: "reviewer", Description: "Kodu inceler", Prompt: "Sen bir incelemecisin."},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -166,6 +174,7 @@ func TestBuildAgentFile_CokSatirliAciklamaFrontmatteriBozmaz(t *testing.T) {
 		},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -191,6 +200,7 @@ func TestBuildAgentFile_BosAciklamaVarsayilanAlir(t *testing.T) {
 		AgentSpec{Slug: "x", Description: "   ", Prompt: "talimat"},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 	require.Contains(t, string(findFile(t, files, "x.md").Content), `description: "Agent"`)
@@ -207,6 +217,7 @@ func TestBuildConfigFiles_KullanicininDeposunaYazilmaz(t *testing.T) {
 		},
 		"model-x",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -229,7 +240,7 @@ func TestBuildConfigFiles_KullanicininDeposunaYazilmaz(t *testing.T) {
 func TestBuildConfigFiles_Betikler(t *testing.T) {
 	build := func(t *testing.T, a AgentSpec) []ConfigFile {
 		t.Helper()
-		files, err := BuildConfigFiles(ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x", PackageRegistry{})
+		files, err := BuildConfigFiles(ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x", PackageRegistry{}, WorkRoot)
 		require.NoError(t, err)
 		return files
 	}
@@ -368,7 +379,7 @@ func mcpAgent(servers ...MCPServerSpec) AgentSpec {
 func configJSON(t *testing.T, a AgentSpec) map[string]any {
 	t.Helper()
 	files, err := BuildConfigFiles(
-		ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x", PackageRegistry{})
+		ProviderSpec{Slug: "openrouter", Kind: "openrouter"}, a, "model-x", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	var cfg map[string]any
@@ -412,7 +423,7 @@ func TestBuildConfigFiles_MCPAnahtariDosyayaYazilmaz(t *testing.T) {
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		mcpAgent(MCPServerSpec{
 			Name: "sentry", Transport: "http", URL: "https://x.dev/mcp", Secret: secret,
-		}), "model-x", PackageRegistry{})
+		}), "model-x", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	for _, f := range files {
@@ -470,6 +481,7 @@ func TestBuildConfigFiles_CustomSaglayicidaModelTanimli(t *testing.T) {
 				AgentSpec{Slug: "coder", Prompt: "x"},
 				modelID,
 				PackageRegistry{},
+				WorkRoot,
 			)
 			require.NoError(t, err)
 
@@ -503,6 +515,7 @@ func TestBuildConfigFiles_SlugVeModelMesajlaEslesir(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		modelID,
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -527,6 +540,7 @@ func TestBuildConfigFiles_CustomSaglayiciModelsizReddedilir(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		"",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.ErrorContains(t, err, "model")
 }
@@ -539,6 +553,7 @@ func TestBuildConfigFiles_OpenRouterModelsBlogunuAlmaz(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		"anthropic/claude-sonnet-4",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 
@@ -557,6 +572,7 @@ func TestBuildConfigFiles_OpenRouterModelsBlogunuAlmaz(t *testing.T) {
 		AgentSpec{Slug: "coder", Prompt: "x"},
 		"",
 		PackageRegistry{},
+		WorkRoot,
 	)
 	require.NoError(t, err)
 }
@@ -597,7 +613,7 @@ func TestBuildConfigFiles_OrtamDegiskeniReferansiEslesir(t *testing.T) {
 		ProviderSpec{Slug: "openrouter", Kind: "openrouter"},
 		mcpAgent(MCPServerSpec{
 			Name: ad, Transport: "http", URL: "https://x.dev/mcp", Secret: "s3cret-uzun-anahtar",
-		}), "model-x", PackageRegistry{})
+		}), "model-x", PackageRegistry{}, WorkRoot)
 	require.NoError(t, err)
 
 	require.Contains(t, string(files[0].Content), "{env:"+MCPEnvVar(ad)+"}",

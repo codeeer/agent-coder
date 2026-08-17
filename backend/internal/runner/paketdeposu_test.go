@@ -111,7 +111,7 @@ func TestBuildConfigFiles_PaketDeposuDosyasi(t *testing.T) {
 	p := ProviderSpec{Slug: "openrouter", Kind: "openrouter", APIKey: "k"}
 	a := AgentSpec{Slug: "coder", Prompt: "yaz"}
 
-	files, err := BuildConfigFiles(p, a, "model-x", kurulum())
+	files, err := BuildConfigFiles(p, a, "model-x", kurulum(), WorkRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestBuildConfigFiles_PaketDeposuDosyasi(t *testing.T) {
 	}
 
 	// Kapalıyken hiç oluşmamalı.
-	files, err = BuildConfigFiles(p, a, "model-x", PackageRegistry{})
+	files, err = BuildConfigFiles(p, a, "model-x", PackageRegistry{}, WorkRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,12 +182,12 @@ func TestPackageSection(t *testing.T) {
 func TestBuildAgentFile_PaketDeposuBlogu(t *testing.T) {
 	a := AgentSpec{Slug: "coder", Prompt: "Sen kod yazarsın."}
 
-	kapali := string(buildAgentFile(a, PackageRegistry{}))
+	kapali := string(buildAgentFile(a, PackageRegistry{}, WorkRoot))
 	if strings.Contains(kapali, "Paket deposu") {
 		t.Fatalf("kapalıyken talimatta blok var:\n%s", kapali)
 	}
 
-	acik := string(buildAgentFile(a, kurulum()))
+	acik := string(buildAgentFile(a, kurulum(), WorkRoot))
 	if !strings.Contains(acik, "## Paket deposu") {
 		t.Fatalf("açıkken talimatta blok yok:\n%s", acik)
 	}

@@ -64,11 +64,19 @@ const scriptsDir = "/home/agent/scripts"
 // Diğer yapılandırma dosyaları 0o600; betik ÇALIŞTIRILABİLİR olmak zorunda.
 const scriptMode int64 = 0o755
 
-// BuildConfigFiles, bir çalıştırma için container'a kopyalanacak dosyaları üretir.
-//
-// Dosyalar container BAŞLATILMADAN ÖNCE kopyalanır: çalıştırma motoru agent
-// tanımlarını yalnızca açılışta okur, sonradan yazılan dosyayı görmez (ölçüldü).
-func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegistry) ([]ConfigFile, error) {
+/*
+BuildConfigFiles, bir çalıştırma için container'a kopyalanacak dosyaları üretir.
+
+Dosyalar container BAŞLATILMADAN ÖNCE kopyalanır: çalıştırma motoru agent
+tanımlarını yalnızca açılışta okur, sonradan yazılan dosyayı görmez (ölçüldü).
+
+projectDir DIŞARIDAN GELİYOR, burada hesaplanmıyor (spec 025): aynı değer
+container'ın ortam değişkenine de yazılıyor ve ikisi ayrışırsa model ile
+betikler farklı yola bakar — üstelik sessizce. Boş verilirse WorkRoot
+kullanılır; çağıranın unutması çalıştırmayı düşürmez.
+*/
+func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegistry,
+	projectDir string) ([]ConfigFile, error) {
 	if a.Slug == "" {
 		return nil, fmt.Errorf("agent slug boş olamaz")
 	}
@@ -84,7 +92,7 @@ func BuildConfigFiles(p ProviderSpec, a AgentSpec, model string, pkg PackageRegi
 	files := []ConfigFile{
 		{Path: configDir + "/opencode.json", Content: providerCfg, Mode: 0o600},
 		{Path: configDir + "/agents/" + a.Slug + ".md",
-			Content: buildAgentFile(a, pkg), Mode: 0o600},
+			Content: buildAgentFile(a, pkg, projectDir), Mode: 0o600},
 	}
 
 	/*
@@ -320,7 +328,7 @@ func MCPEnvVar(name string) string {
 //
 // Yetkiler burada YAZILMAZ; session açılışında permission kuralı olarak gönderilir
 // (ölçüldü: o yol çalışıyor ve tek kaynak olması karışıklığı önlüyor).
-func buildAgentFile(a AgentSpec, pkg PackageRegistry) []byte {
+func buildAgentFile(a AgentSpec, pkg PackageRegistry, projectDir string) []byte {
 	var b strings.Builder
 
 	b.WriteString("---\n")
@@ -331,7 +339,7 @@ func buildAgentFile(a AgentSpec, pkg PackageRegistry) []byte {
 	if !strings.HasSuffix(a.Prompt, "\n") {
 		b.WriteString("\n")
 	}
-	b.WriteString(scriptSection(a))
+	b.WriteString(scriptSection(a, projectDir))
 	b.WriteString(packageSection(pkg))
 	/*
 	 * Java bölümü KOŞULSUZ yazılır.
@@ -358,10 +366,16 @@ func buildAgentFile(a AgentSpec, pkg PackageRegistry) []byte {
  *
  * Betik yoksa blok hiç yazılmaz: boş bir başlık modelin dikkatini boşa harcar.
  */
-func scriptSection(a AgentSpec) string {
+func scriptSection(a AgentSpec, projectDir string) string {
 	list := scriptsFor(a)
 	if len(list) == 0 {
 		return ""
+	}
+
+	// Çağıran vermemişse kök: yerleşim ayarı gelmeden önce yazılmış
+	// çağrılar ve testler bugünkü metni aynen üretmeye devam eder.
+	if projectDir == "" {
+		projectDir = WorkRoot
 	}
 
 	var b strings.Builder
@@ -375,7 +389,7 @@ func scriptSection(a AgentSpec) string {
 	 * projenin nerede olduğunu bilmesi gerekiyor — kaynağı okuyarak
 	 * öğrenemez.
 	 */
-	b.WriteString("Proje `" + ProjectDir + "` altında; betikler bu yolu ")
+	b.WriteString("Proje `" + projectDir + "` altında; betikler bu yolu ")
 	b.WriteString("`$PROJECT_DIR` değişkeninden okur. ")
 	b.WriteString("Kalıcı olması gereken her değişiklik bu dizinin altında olmalı — ")
 	b.WriteString("başka bir yere yazılan dosya değişiklik kaydına girmez.\n\n")

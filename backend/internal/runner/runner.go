@@ -85,6 +85,19 @@ type Request struct {
 	// döndürüyor; oysa loglara asıl ihtiyaç duyulan an odur.
 	EngineLogs EngineLogFunc
 
+	/*
+	 * ProjectDir, projenin container içindeki kökü (spec 025).
+	 *
+	 * ÇALIŞTIRMA BAŞINA BİR KEZ hesaplanır ve buradan iki yere birden gider:
+	 * container'ın `PROJECT_DIR` değişkenine ve agent'a verilen talimat
+	 * metnine. Tek alan olması bir tercih değil zorunluluk — iki yerde ayrı
+	 * hesaplansaydı biri değiştiğinde diğeri geride kalır, model ile
+	 * betikler farklı yola bakar ve bunu hiçbir test yakalamazdı.
+	 *
+	 * Boşsa WorkRoot: alanı doldurmayan çağıran bugünkü davranışı alır.
+	 */
+	ProjectDir string
+
 	// Timeout, çalıştırmanın azami süresi. Ayarlardan gelir.
 	Timeout time.Duration
 
@@ -258,17 +271,8 @@ type FolderSpec struct {
 	Description string
 }
 
-/*
-ProjectDir, klonlanan projenin container içindeki kökü.
-
-TEK TANIM. Değer `entrypoint.sh`'a `PROJECT_DIR` olarak geçiyor ve betik onu
-okuyor; iki yerde sabit yazılsaydı biri değiştiğinde diğeri geride kalır ve
-kullanıcının yazdığı script'ler var olmayan bir dizine bakardı.
-
-Betikler bu değişkeni kullanır ve ÇALIŞMA DİZİNİNE GÜVENMEZ: bash aracını
-hangi dizinde çalıştırdığı motorun kararı, bizim değil.
-*/
-const ProjectDir = "/work"
+// Klonlanan projenin container içindeki kökü artık sabit değil, yerleşim
+// ayarına göre hesaplanıyor: bkz. `workdir.go` → WorkRoot, ProjectDir.
 
 // MCPServerSpec, tek bir MCP sunucusuna bağlanmak için gerekenler.
 //
