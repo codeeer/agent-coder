@@ -94,6 +94,9 @@ const (
 	KeyRunnerCPULimit     = "runner.cpu_limit"
 	KeyRunnerMemoryLimitG = "runner.memory_limit_gb"
 	KeyCloneDepth         = "runner.clone_depth"
+	// KeyRepoSubdir açıkken proje `/work` yerine `/work/<repo-adı>` altına
+	// klonlanır (spec 025). Kapalıyken bugünkü davranış.
+	KeyRepoSubdir         = "runner.repo_subdir"
 	KeyMaxPromptKB        = "runner.max_prompt_kb"
 	KeyCatalogSyncHours   = "catalog.sync_interval_hours"
 	KeyReportDefaultDays  = "reports.default_days"
@@ -184,6 +187,22 @@ var Registry = []Definition{
 		Help: "Kaç commit'lik geçmiş klonlanacak. 1 en hızlısıdır; agent'ın geçmişe " +
 			"bakması gerekiyorsa arttırın.",
 		Default: "1", Min: p(1), Max: p(1000),
+	},
+	/*
+	 * Çalışma dizini yerleşimi — spec 025.
+	 *
+	 * VARSAYILAN KAPALI ve öyle kalmalı: açmak, çalışan her kurulumdaki proje
+	 * yolunu değiştirir. Betikler `$PROJECT_DIR` okuduğu sürece iki yerleşimde
+	 * de çalışır; yolu elle yazan bir betik varsa kırılır.
+	 */
+	{
+		Key: KeyRepoSubdir, Group: GroupRunner, Kind: KindBool,
+		Label: "Projeyi repo adlı klasöre klonla",
+		Help: "Açıkken proje `/work/<repo-adı>` altına, kapalıyken doğrudan " +
+			"`/work` altına klonlanır. Repo adının klasör olmasını bekleyen " +
+			"dış runbook ve CI betikleri için. Betikler yolu `$PROJECT_DIR` " +
+			"değişkeninden okuduğu sürece her iki yerleşimde de çalışır.",
+		Default: "false",
 	},
 	{
 		Key: KeyMaxPromptKB, Group: GroupRunner, Kind: KindInt,

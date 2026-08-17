@@ -1188,7 +1188,18 @@ export function RunnerAnatomy() {
 
       <Zone x={250} y={30} w={470} h={330} label="GEÇİCİ CONTAINER — iş başına açılır" />
 
-      <Box x={272} y={62} w={200} h={54} title="/work" subtitle="deponun klonu" tone="accent" />
+      {/* Yerleşim ayarına göre /work ya da /work/<repo-adı> (spec 025).
+          Diyagram değişkeni gösteriyor: sabit yol yazılsaydı ayar açıkken
+          belge yanlış olurdu. */}
+      <Box
+        x={272}
+        y={62}
+        w={200}
+        h={54}
+        title="$PROJECT_DIR"
+        subtitle="deponun klonu"
+        tone="accent"
+      />
       <Box x={490} y={62} w={208} h={54} title="opencode motoru" subtitle="başsız (headless)" />
       <Box
         x={272}

@@ -212,6 +212,16 @@ func run() error {
 		MemoryGB:   func() int { return settingsSvc.Int(settings.KeyRunnerMemoryLimitG) },
 		CloneDepth: func() int { return settingsSvc.Int(settings.KeyCloneDepth) },
 
+		// Çalışma dizini yerleşimi (spec 025). Ayar bir bool; adlandırılmış
+		// yerleşime burada çevriliyor ki `runner` paketi ayar biçimini
+		// tanımak zorunda kalmasın.
+		WorkdirLayout: func() runner.WorkdirLayout {
+			if settingsSvc.Bool(settings.KeyRepoSubdir) {
+				return runner.LayoutRepo
+			}
+			return runner.LayoutRoot
+		},
+
 		// Slot boşalınca kuyruk uyandırılır — yoklama yok. Sinyal zaten
 		// üretiliyordu; kuyruk ona bağlanıyor.
 		OnSlotFree: func() {

@@ -238,12 +238,26 @@ export interface UpdateScriptRequest {
 export const SCRIPT_DIR = "/home/agent/scripts";
 
 /**
- * Klonlanan projenin container içindeki kökü.
+ * Çalışma ortamındaki sabit kök.
  *
- * Betikler bu yolu `$PROJECT_DIR` değişkeninden okur ve çalışma dizinine
+ * Betikler proje yolunu `$PROJECT_DIR` değişkeninden okur ve çalışma dizinine
  * GÜVENMEZ — bash aracını hangi dizinde çalıştırdığı motorun kararı.
  */
-export const PROJECT_DIR = "/work";
+export const WORK_ROOT = "/work";
+
+/** Yerleşim ayarının anahtarı (spec 025). */
+export const REPO_SUBDIR_KEY = "runner.repo_subdir";
+
+/**
+ * Betik yazarına gösterilecek proje kökü.
+ *
+ * SOMUT AD DEĞİL KALIP döner: repo adı çalıştırmadan çalıştırmaya değişiyor,
+ * bu ekran ise tek bir depoya ait değil. `/work/<repo-adı>` demek, sabit bir
+ * ad uydurmaktan daha doğru — kullanıcı hangi değerin geleceğini görüyor.
+ */
+export function projectDirLabel(repoAltKlasoru: boolean): string {
+  return repoAltKlasoru ? `${WORK_ROOT}/<repo-adı>` : WORK_ROOT;
+}
 
 /** Bir betiğin container içindeki tam yolu. */
 export function scriptPath(s: {

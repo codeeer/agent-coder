@@ -4,7 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { PROJECT_DIR, scriptPath, type Script } from "@/lib/types";
+import {
+  REPO_SUBDIR_KEY,
+  projectDirLabel,
+  scriptPath,
+  type Script,
+} from "@/lib/types";
 import { IconPlus, IconTrash, IconEdit } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/Pagination";
 import { ScriptFolders } from "./ScriptFolders";
@@ -338,6 +343,21 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
     queryFn: api.scriptFolders.list,
   });
 
+  /*
+   * Proje kökü ARTIK SABİT DEĞİL (spec 025). Betik yazarına gösterilen yol
+   * yerleşim ayarına bağlı; sabit yazılsaydı ayar açıkken kullanıcıya var
+   * olmayan bir dizin söylenirdi.
+   *
+   * Aynı `["settings"]` anahtarı ayarlar bölümünde de kullanılıyor, yani bu
+   * ek bir istek doğurmuyor — önbellekten geliyor.
+   */
+  const settings = useQuery({
+    queryKey: ["settings"],
+    queryFn: api.settings.list,
+  });
+  const repoAltKlasoru =
+    settings.data?.items.find((s) => s.key === REPO_SUBDIR_KEY)?.value === "true";
+
   const secilenKlasor = folders.data?.items.find((f) => f.id === folderId);
 
   const save = useMutation({
@@ -464,8 +484,10 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
           kaynağı okumadan öğrenemezdi. */}
       <Well className="mt-3 p-3">
         <p className="text-xs">
-          <strong>Proje <Mono>{PROJECT_DIR}</Mono> altına klonlanır</strong> ve
-          bu yol betiğe <Mono>$PROJECT_DIR</Mono> olarak geçer. Çalışma dizinine
+          <strong>
+            Proje <Mono>{projectDirLabel(repoAltKlasoru)}</Mono> altına klonlanır
+          </strong>{" "}
+          ve bu yol betiğe <Mono>$PROJECT_DIR</Mono> olarak geçer. Çalışma dizinine
           güvenmeyin, bu değişkeni kullanın:{" "}
           <Mono>&quot;$PROJECT_DIR/config/webpack.config.js&quot;</Mono>
         </p>
