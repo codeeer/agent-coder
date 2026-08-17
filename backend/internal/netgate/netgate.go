@@ -64,6 +64,19 @@ type Run struct {
 	// Allow boşsa TÜM host'lar izinlidir — spec 020: boş whitelist kısıt
 	// değil kısıtsızlıktır.
 	Allow []hostlist.Pattern
+
+	/*
+	 * Direct, kurumsal proxy'ye UĞRAMADAN gidilecek hedefler (spec 026).
+	 *
+	 * Allow'un TERSİ semantik: boşsa hiçbir hedef doğrudan gitmez, hepsi
+	 * proxy'den geçer. Bu yüzden eşleştirmesi `hostlist.Listed` ile yapılır,
+	 * `Match` ile DEĞİL — `Match` boş listeye `true` döndüğü için burada
+	 * kullanılsaydı liste boşken kurumsal proxy tamamen devre dışı kalırdı.
+	 *
+	 * İZİN VERMEZ. Bir hedefin buraya yazılmış olması Allow kontrolünü
+	 * atlatmaz; sıra her zaman önce izin, sonra yönlendirmedir.
+	 */
+	Direct []hostlist.Pattern
 	// OnDeny, reddedilen her host için çağrılır. Çalıştırmanın olay akışına
 	// uyarı yazmak buradan yapılıyor.
 	OnDeny func(host string)
@@ -168,15 +181,25 @@ func (s *Session) duzHTTP(w http.ResponseWriter, r *http.Request) {
 	dis := r.Clone(r.Context())
 	dis.RequestURI = ""
 
-	tasiyici := &http.Transport{
-		Proxy: func(*http.Request) (*url.URL, error) {
+	// Kurum içi hedefte taşıyıcı proxy'siz kurulur (spec 026); `Proxy` nil
+	// olduğunda Go doğrudan hedefe bağlanır.
+	dogrudan := s.dogrudanMi(hostAdi(r))
+
+	tasiyici := &http.Transport{}
+	if !dogrudan {
+		tasiyici.Proxy = func(*http.Request) (*url.URL, error) {
 			return &url.URL{Scheme: "http", Host: s.run.Upstream}, nil
-		},
+		}
 	}
 	defer tasiyici.CloseIdleConnections()
 
 	resp, err := tasiyici.RoundTrip(dis)
 	if err != nil {
+		if dogrudan {
+			// Geri düşme yok — tünelle aynı gerekçe (spec 026 H4).
+			http.Error(w, "kurum içi adrese iletilemedi: "+err.Error(), http.StatusBadGateway)
+			return
+		}
 		http.Error(w, "kurumsal proxy'ye iletilemedi: "+err.Error(), http.StatusBadGateway)
 		return
 	}
@@ -216,18 +239,53 @@ func hostAdi(r *http.Request) string {
  * birbirine bağlar ve aradan çekilir. Gövde TAMPONLANMAZ — Koşu B'de agent
  * 190 MB'lık bir JDK indirmişti; tamponlansaydı kapı o boyutu belleğe alırdı.
  */
+/*
+dogrudanMi, hedefe kurumsal proxy'ye uğramadan gidilip gidilmeyeceğini söyler.
+
+TEK KARAR NOKTASI. Tünel ve düz HTTP ayrı kod yolları ama aynı soruyu soruyor;
+ayrı ayrı yazılsaydı biri güncellenip diğeri geride kalırdı ve fark yalnızca
+tek bir protokolde ortaya çıkardı — yani üretimde.
+*/
+func (s *Session) dogrudanMi(host string) bool {
+	return hostlist.Listed(s.run.Direct, host)
+}
+
 func (s *Session) tunel(w http.ResponseWriter, r *http.Request) {
-	ust, err := net.DialTimeout("tcp", s.run.Upstream, upstreamTimeout)
+	/*
+	 * Kurum içi hedefe DOĞRUDAN bağlanılır (spec 026).
+	 *
+	 * `ustCONNECT` ATLANIR: CONNECT bir proxy'ye "şuraya bağlan" demektir,
+	 * hedefin kendisine gönderilirse hedef onu HTTP isteği sanır. Doğrudan
+	 * bağlantıda taşınacak baytlar zaten TLS el sıkışmasıyla başlıyor.
+	 */
+	hedef := s.run.Upstream
+	dogrudan := s.dogrudanMi(hostAdi(r))
+	if dogrudan {
+		hedef = r.Host
+	}
+
+	ust, err := net.DialTimeout("tcp", hedef, upstreamTimeout)
 	if err != nil {
+		if dogrudan {
+			/*
+			 * PROXY'YE GERİ DÜŞÜLMEZ (spec 026 H4). Yönetici bu adres için
+			 * "proxy'den geçme" dedi; geri düşmek tam da kaçınmak istediği
+			 * yoldan kimlik bilgisi geçirmek olurdu.
+			 */
+			http.Error(w, "kurum içi adrese bağlanılamadı: "+err.Error(), http.StatusBadGateway)
+			return
+		}
 		// Anlaşılır hata: "bilinmeyen hata" yerine sebebi yazılır.
 		http.Error(w, "kurumsal proxy'ye bağlanılamadı: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer ust.Close()
 
-	if err := ustCONNECT(ust, r.Host); err != nil {
-		http.Error(w, "kurumsal proxy CONNECT'i kabul etmedi: "+err.Error(), http.StatusBadGateway)
-		return
+	if !dogrudan {
+		if err := ustCONNECT(ust, r.Host); err != nil {
+			http.Error(w, "kurumsal proxy CONNECT'i kabul etmedi: "+err.Error(), http.StatusBadGateway)
+			return
+		}
 	}
 
 	istemci, _, err := http.NewResponseController(w).Hijack()

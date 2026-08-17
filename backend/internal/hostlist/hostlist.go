@@ -110,15 +110,48 @@ func Parse(text string) ([]Pattern, error) {
 	return desenler, nil
 }
 
-// Match, host'un desenlerden herhangi birine uyup uymadığını söyler.
-//
-// BOŞ LİSTE HER HOST'U GEÇİRİR. Bu bir kolaylık değil, spec 020'nin kuralı:
-// boş whitelist kısıt değil kısıtsızlıktır. Ters yorumlansaydı ayarı ilk açan
-// herkesin ürünü kilitlenirdi.
+/*
+Match, host'un İZİN LİSTESİNDEN geçip geçmediğini söyler.
+
+BOŞ LİSTE HER HOST'U GEÇİRİR. Bu bir kolaylık değil, spec 020'nin kuralı:
+boş whitelist kısıt değil kısıtsızlıktır. Ters yorumlansaydı ayarı ilk açan
+herkesin ürünü kilitlenirdi.
+
+`Listed` ile KARIŞTIRMAYIN — ikisi aynı imzayı taşıyor, yani yanlış olanı
+çağırmak derlenir ve sessizce ters davranır. Bu fonksiyon "geçebilir mi",
+diğeri "listede mi" sorusunu yanıtlar. Bir kümede üyelik arıyorsanız
+`Listed` istiyorsunuz.
+*/
 func Match(desenler []Pattern, host string) bool {
 	if len(desenler) == 0 {
 		return true
 	}
+	return eslesenVar(desenler, host)
+}
+
+/*
+Listed, host'un listede olup olmadığını söyler.
+
+BOŞ LİSTE HİÇBİR HOST'U İÇERMEZ — `Match`'ten tek farkı bu ve bilinçli.
+`Match` bir izin kapısı; orada boş liste "kapı yok" demek. Burada ise soru
+üyelik: boş kümede hiçbir şey yoktur.
+
+NEDEN AYRI FONKSİYON: fark yalnızca boş listede ortaya çıkıyor, yani yanlış
+olanı çağıran kod normal ayarlarla ÇALIŞIYOR görünür ve ancak liste
+boşaldığında ters davranır. Spec 026'da bunun bedeli ölçülebilir: kurum içi
+listesi boşken `Match` kullanılsaydı her hedef doğrudan gider ve kurumsal
+proxy sessizce devre dışı kalırdı.
+*/
+func Listed(desenler []Pattern, host string) bool {
+	if len(desenler) == 0 {
+		return false
+	}
+	return eslesenVar(desenler, host)
+}
+
+// eslesenVar, ortak eşleştirme. Boş liste kararı ÇAĞIRANIN işi — iki
+// fonksiyonun ayrıldığı tek nokta orası.
+func eslesenVar(desenler []Pattern, host string) bool {
 	host = normalize(host)
 	for _, p := range desenler {
 		if p.eslesir(host) {

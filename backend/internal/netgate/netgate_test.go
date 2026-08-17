@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -296,4 +297,234 @@ func TestGate_UpstreamUlasilamazkenAnlasilirHata(t *testing.T) {
 	s := oturumAc(t, Run{ID: "k1", Upstream: "127.0.0.1:1"})
 
 	require.Equal(t, http.StatusBadGateway, connect(t, s, "ornek.com:443"))
+}
+
+// ─── Spec 026: kurum içi domain'ler ─────────────────────────────────────────
+
+/*
+sahteHedef, kapının DOĞRUDAN bağlandığı hedefi taklit eder.
+
+`sahteUpstream`'in ikizi ve testlerin ölçme aracı: yönlendirme testlerinin
+tamamı "hangi taraf bağlantı aldı" sorusuna dayanıyor. İki taraf da sayaç
+tuttuğu için iddia "200 döndü" değil, "şu taraf arandı, diğeri ARANMADI"
+biçiminde kurulabiliyor — 200 dönmesi yönlendirmenin doğru olduğunu
+kanıtlamazdı.
+
+`localhost` üzerinde dinliyor çünkü desen listesi IP kabul etmiyor (spec 020:
+whitelist yalnızca domain). `localhost` tek parçalı geçerli bir addır.
+*/
+func sahteHedef(t *testing.T) (adres string, sayac *atomic.Int32) {
+	t.Helper()
+	l, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+
+	// ATOMİK: test sayacı yoklarken kabul döngüsü onu yazıyor. Mutex'le
+	// yazıp kilitsiz okumak yarış — yarış dedektörüyle yakalandı.
+	var n atomic.Int32
+
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			n.Add(1)
+
+			go func(c net.Conn) {
+				defer c.Close()
+				br := bufio.NewReader(c)
+
+				// Düz HTTP mi tünel mi: proxy'siz taşıyıcı origin-form
+				// gönderir, tünelde ise ham baytlar gelir.
+				if bas, err := br.Peek(4); err == nil && string(bas) == "GET " {
+					_, _ = http.ReadRequest(br)
+					_, _ = c.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n" +
+						"Connection: close\r\n\r\nhedefe"))
+					return
+				}
+				_, _ = io.Copy(c, br) // tünelde yankı
+			}(c)
+		}
+	}()
+
+	return l.Addr().String(), &n
+}
+
+// Düzenek kendi kendini doğrular: sahte hedef gerçekten sayıyor mu?
+func TestSahteHedef_BaglantiSayar(t *testing.T) {
+	hedef, sayac := sahteHedef(t)
+	require.EqualValues(t, 0, sayac.Load())
+
+	c, err := net.Dial("tcp", hedef)
+	require.NoError(t, err)
+	defer c.Close()
+
+	require.Eventually(t, func() bool { return sayac.Load() == 1 },
+		2*time.Second, 10*time.Millisecond)
+}
+
+// Direct BOŞKEN hiçbir hedef doğrudan gitmez — hepsi proxy'den geçer.
+// Bu, `hostlist.Match` yerine `Listed` kullanılmasının tek görünür sonucu.
+func TestGate_DirectBossaUpstreameGider(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream})
+
+	require.Equal(t, http.StatusOK, connect(t, s, "localhost:"+port))
+	require.Equal(t, []string{"localhost:" + port}, *gorulen)
+	require.EqualValues(t, 0, hedefSayac.Load(), "hedefe doğrudan gidilmemeliydi")
+}
+
+func TestGate_DirectEslesirseHedefeDogrudanGider(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	dogrudan, err := hostlist.Parse("localhost")
+	require.NoError(t, err)
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Direct: dogrudan})
+
+	c, br, kod := connectRaw(t, s, "localhost:"+port)
+	require.Equal(t, http.StatusOK, kod)
+
+	// Tünel gerçekten hedefe bağlı mı: yankı hedeften geliyor.
+	_, err = c.Write([]byte("merhaba"))
+	require.NoError(t, err)
+	tampon := make([]byte, 7)
+	_, err = io.ReadFull(br, tampon)
+	require.NoError(t, err)
+	require.Equal(t, "merhaba", string(tampon))
+
+	require.EqualValues(t, 1, hedefSayac.Load(), "hedefe doğrudan bağlanılmalıydı")
+	require.Empty(t, *gorulen, "kurumsal proxy HİÇ aranmamalıydı")
+}
+
+func TestGate_DirectEslesmezseUpstreameGider(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	dogrudan, err := hostlist.Parse("baska.local")
+	require.NoError(t, err)
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Direct: dogrudan})
+
+	require.Equal(t, http.StatusOK, connect(t, s, "localhost:"+port))
+	require.Equal(t, []string{"localhost:" + port}, *gorulen)
+	require.EqualValues(t, 0, hedefSayac.Load())
+}
+
+/*
+SIRA: önce izin, sonra yönlendirme (spec 026 H2).
+
+Direct listesine yazmak izin VERMEZ. Sıra tersine dönseydi, kurum içi
+listesine bir adres yazan yönetici farkında olmadan izin listesini de
+genişletmiş olurdu.
+*/
+func TestGate_IzinsizHostDirectOlsaBileReddedilir(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	izin, err := hostlist.Parse("baska.com")
+	require.NoError(t, err)
+	dogrudan, err := hostlist.Parse("localhost")
+	require.NoError(t, err)
+
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Allow: izin, Direct: dogrudan})
+
+	require.Equal(t, http.StatusForbidden, connect(t, s, "localhost:"+port))
+	require.EqualValues(t, 0, hedefSayac.Load(), "reddedilen istek hedefe gitmemeli")
+	require.Empty(t, *gorulen, "reddedilen istek proxy'ye de gitmemeli")
+}
+
+/*
+GERİ DÜŞME YOK (spec 026 H4).
+
+İddia NEGATİF: doğrudan bağlantı düştüğünde upstream'in ARANMADIĞI. Yalnızca
+dönen koda bakmak yetmezdi — geri düşme olsaydı ve proxy de ulaşılamaz olsaydı
+yine 502 dönerdi. Ölçülen şey sahte upstream'in sayacı.
+*/
+func TestGate_DogrudanBaglantiDuserseProxyDenenmez(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+
+	// `.invalid` hiçbir zaman çözülmez (RFC 2606).
+	dogrudan, err := hostlist.Parse("yok.invalid")
+	require.NoError(t, err)
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Direct: dogrudan})
+
+	require.Equal(t, http.StatusBadGateway, connect(t, s, "yok.invalid:443"))
+	require.Empty(t, *gorulen, "doğrudan bağlantı düşünce proxy DENENMEMELİ")
+}
+
+// ─── Aynı üç karar düz HTTP için ────────────────────────────────────────────
+
+func TestGate_DuzHTTPDirectEslesirseHedefeGider(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	dogrudan, err := hostlist.Parse("localhost")
+	require.NoError(t, err)
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Direct: dogrudan})
+
+	istemci := &http.Client{Transport: &http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse(s.ProxyURL()) },
+	}}
+	resp, err := istemci.Get("http://localhost:" + port + "/paket")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	govde, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, "hedefe", string(govde), "yanıt hedeften gelmeliydi")
+	require.EqualValues(t, 1, hedefSayac.Load())
+	require.Empty(t, *gorulen, "kurumsal proxy HİÇ aranmamalıydı")
+}
+
+func TestGate_DuzHTTPDirectBossaUpstreameGider(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+	hedef, hedefSayac := sahteHedef(t)
+	_, port, err := net.SplitHostPort(hedef)
+	require.NoError(t, err)
+
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream})
+
+	istemci := &http.Client{Transport: &http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse(s.ProxyURL()) },
+	}}
+	resp, err := istemci.Get("http://localhost:" + port + "/paket")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	govde, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, "selam", string(govde), "yanıt proxy'den gelmeliydi")
+	require.EqualValues(t, 0, hedefSayac.Load())
+	require.Len(t, *gorulen, 1)
+}
+
+func TestGate_DuzHTTPDogrudanDuserseProxyDenenmez(t *testing.T) {
+	upstream, gorulen := sahteUpstream(t)
+
+	dogrudan, err := hostlist.Parse("yok.invalid")
+	require.NoError(t, err)
+	s := oturumAc(t, Run{ID: "k1", Upstream: upstream, Direct: dogrudan})
+
+	istemci := &http.Client{Transport: &http.Transport{
+		Proxy: func(*http.Request) (*url.URL, error) { return url.Parse(s.ProxyURL()) },
+	}}
+	resp, err := istemci.Get("http://yok.invalid/paket")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	require.Empty(t, *gorulen, "doğrudan bağlantı düşünce proxy DENENMEMELİ")
 }

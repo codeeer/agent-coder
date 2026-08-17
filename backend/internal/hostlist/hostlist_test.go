@@ -183,3 +183,45 @@ func TestHost_UrettigiAdParseEdilebilir(t *testing.T) {
 		require.True(t, Match(desenler, h))
 	}
 }
+
+/*
+BOŞ LİSTE İKİ FONKSİYONDA ZIT ANLAM TAŞIR — spec 026'nın taşıyıcı kuralı.
+
+Bu testin varlık sebebi ölçülebilir bir hata: kurum içi domain listesi boşken
+`Match` kullanılsaydı her hedef doğrudan gider ve kurumsal proxy sessizce
+devre dışı kalırdı. İki fonksiyon aynı imzayı taşıdığı için yanlış çağrı
+derlenir; farkı ancak bu test tutar.
+*/
+func TestBosListe_MatchGecirir_ListedGecirmez(t *testing.T) {
+	require.True(t, Match(nil, "ornek.com"),
+		"boş izin listesi kısıt değil kısıtsızlıktır (spec 020)")
+	require.False(t, Listed(nil, "ornek.com"),
+		"boş kümede hiçbir host yoktur (spec 026)")
+
+	// Boşluk yalnızca `nil` değil, sıfır uzunluklu dilim için de geçerli.
+	bos := []Pattern{}
+	require.True(t, Match(bos, "ornek.com"))
+	require.False(t, Listed(bos, "ornek.com"))
+}
+
+// Liste DOLUYKEN ikisi aynı cevabı verir; ayrım yalnızca boşlukta.
+func TestDoluListe_MatchVeListedAyniCevap(t *testing.T) {
+	desenler, err := Parse("garanti.com.tr\n*.garanti.com.tr\n*.garantidom.com.tr")
+	require.NoError(t, err)
+
+	for _, tt := range []struct {
+		host    string
+		beklsen bool
+	}{
+		{"garanti.com.tr", true},
+		{"bitbucket.garanti.com.tr", true},
+		{"garanti.garantidom.com.tr", true},
+		{"github.com", false},
+		// Apex, wildcard'la açılmaz: `*.garantidom.com.tr` yazıldı,
+		// `garantidom.com.tr` yazılmadı.
+		{"garantidom.com.tr", false},
+	} {
+		require.Equal(t, tt.beklsen, Match(desenler, tt.host), "Match: %s", tt.host)
+		require.Equal(t, tt.beklsen, Listed(desenler, tt.host), "Listed: %s", tt.host)
+	}
+}
