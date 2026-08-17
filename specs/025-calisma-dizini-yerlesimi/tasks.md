@@ -94,3 +94,27 @@ Plandan sapılırsa **neden** sapıldığı buraya yazılır.
 - T22 gerçek bir Docker ortamı gerektiriyor. Ortam yoksa görev
   **atlanmaz**, engellendiği açıkça bildirilir — `entrypoint.sh`'ın
   değişmediği varsayımı yalnızca bu adımda doğrulanıyor.
+
+### Uygulama sırasında ortaya çıkanlar (2026-08-17)
+
+- **T9 planlandığından farklı yazıldı.** Plan `execute` üzerinden bir
+  entegrasyon testi öngörüyordu; o yol veritabanı gerektiriyor. Bunun yerine
+  asıl iddia iki ayrı yerde sınandı: `runs` paketinde ayar → yerleşim
+  çözümü, `opencode` paketinde ise env ile talimat metninin **aynı istekten
+  üretilip karşılaştırılması**. İkincisi ayrışmayı doğrudan yakalıyor;
+  `execute` testi yalnızca bağlantıyı görürdü.
+- **Mevcut bir test eski sabiti kullanıyordu ve sessizce derleniyordu.**
+  `require.Contains(t, talimat, ProjectDir)` — `Contains` `interface{}`
+  aldığı için sabit fonksiyona dönüşünce de derlendi, yalnızca çalışma
+  anında düştü. Yerine `WorkRoot` kondu.
+- **Ayar yardım metnindeki backtick'ler kaldırıldı.** Tarayıcıda görüldü:
+  arayüz markdown işlemiyor ve Çalıştırma grubundaki diğer ayarlar düz metin
+  kullanıyor; işaretler kullanıcıya ham görünüyordu.
+- **T23/T24 kısmen gözlemle, kısmen dolaylı doğrulandı.** Gerçek bir
+  çalıştırmada container'ın env'i `PROJECT_DIR=/work/Hello-World` olarak
+  **doğrudan görüldü** (`docker inspect`) — ayar → servis → closure →
+  `Request` → container zinciri uçtan uca çalışıyor. Klonun o dizine indiği
+  ise canlı container'da gözlenemedi: model sağlayıcısı 500 döndürdüğü için
+  çalıştırma düştü ve container hemen silindi. Klonlama bunun yerine aynı
+  imajda gerçek depo adresiyle ayrıca sınandı (T22) ve `/work/Hello-World`
+  altına indiği görüldü.

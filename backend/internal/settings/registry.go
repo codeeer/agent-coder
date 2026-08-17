@@ -198,9 +198,11 @@ var Registry = []Definition{
 	{
 		Key: KeyRepoSubdir, Group: GroupRunner, Kind: KindBool,
 		Label: "Projeyi repo adlı klasöre klonla",
-		Help: "Açıkken proje `/work/<repo-adı>` altına, kapalıyken doğrudan " +
-			"`/work` altına klonlanır. Repo adının klasör olmasını bekleyen " +
-			"dış runbook ve CI betikleri için. Betikler yolu `$PROJECT_DIR` " +
+		// Yardım metninde backtick YOK: bu grup düz metin kullanıyor ve
+		// arayüz markdown işlemiyor — işaretler kullanıcıya ham görünürdü.
+		Help: "Açıkken proje /work/<repo-adı> altına, kapalıyken doğrudan " +
+			"/work altına klonlanır. Repo adının klasör olmasını bekleyen " +
+			"dış runbook ve CI betikleri için. Betikler yolu $PROJECT_DIR " +
 			"değişkeninden okuduğu sürece her iki yerleşimde de çalışır.",
 		Default: "false",
 	},
