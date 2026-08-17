@@ -94,16 +94,36 @@ func repoAdi(repoURL string) string {
 
 	if i := strings.LastIndexByte(s, '/'); i >= 0 {
 		s = s[i+1:]
-	}
-	// Port taşıyan adreslerde son `/` zaten geçildiği için buraya yalnızca
-	// slash'sız kısa SSH biçimi düşer.
-	if i := strings.LastIndexByte(s, ':'); i >= 0 {
+	} else if i := strings.LastIndexByte(s, ':'); i >= 0 {
+		/*
+		 * `else` ŞART: iki nokta yalnızca hiç ayraç yokken sınır sayılır,
+		 * yani `git@host:repo.git` biçiminde. Koşulsuz kesilseydi son parçanın
+		 * İÇİNDEKİ iki nokta da sınır sanılırdı ve `.../pro:je.git` adresi
+		 * `je` klasörüne inerdi — sessizce yanlış ad.
+		 */
 		s = s[i+1:]
+	}
+
+	// Sorgu ve parça, `.git` son ekinin soyulmasını engelliyor ve dizin adına
+	// karışıyor: `proje.git?ref=main` → `proje`.
+	if i := strings.IndexAny(s, "?#"); i >= 0 {
+		s = s[:i]
 	}
 
 	s = strings.TrimSuffix(s, ".git")
 
 	if s == "" || s == "." || s == ".." {
+		return ""
+	}
+	/*
+	 * UZUNLUK — çalıştırmayı düşürmemek için (spec 025 H2/H3).
+	 *
+	 * Linux'ta tek dizin adı 255 baytı aşamaz; aşarsa `git clone`
+	 * `ENAMETOOLONG` ile düşer ve entrypoint çalıştırmayı bitirir. Oysa aynı
+	 * depo varsayılan yerleşimde sorunsuz klonlanıyor: ayarı açmak, çalışan
+	 * bir kurulumu bozardı. Ad kullanılamıyorsa köke düşülür.
+	 */
+	if len(s) > 255 {
 		return ""
 	}
 	// Ayraç ve NUL: `repoAdi` son parçayı aldığı için `/` zaten kalmamalı,

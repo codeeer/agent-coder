@@ -50,9 +50,10 @@ const configDir = "/home/agent/.config/opencode"
 /*
  * scriptsDir, hazır betiklerin container içindeki dizini.
  *
- * `/work` altında DEĞİL: orası klonlama hedefi ve boş olmak zorunda; ayrıca
- * bizim dosyalarımız kullanıcının diff'inde görünürdü (spec 012 K6, spec 003
- * davranış kuralı).
+ * KLONLAMA HEDEFİNİN ALTINDA DEĞİL: orası boş olmak zorunda; ayrıca bizim
+ * dosyalarımız kullanıcının diff'inde görünürdü (spec 012 K6, spec 003
+ * davranış kuralı). Hedef artık sabit değil, yerleşim ayarına bağlı
+ * (spec 025) — bu dizin ondan bağımsız durduğu için ayardan etkilenmiyor.
  *
  * Dizin imajda önceden açılır (`runner/Dockerfile`): tar kopyalaması dizin
  * oluşturmuyor.
@@ -480,9 +481,13 @@ func BuildPermissions(a AgentSpec) []PermissionRule {
 	 * `permission=external_directory … action=ask` yazıp bekledi; koşu
 	 * dokuz dakika sonra hâlâ 0 token'daydı.
 	 *
-	 * `external_directory`: /work dışındaki bir yola erişim. Reddetmek ayrıca
-	 * DOĞRU olan: agent'ın işi klonlanan depo; container'ın ev dizininde
-	 * yapılandırma dosyalarımız ve kimlik bilgileri duruyor.
+	 * `external_directory`: proje dizininin dışındaki bir yola erişim.
+	 * Reddetmek ayrıca DOĞRU olan: agent'ın işi klonlanan depo; container'ın
+	 * ev dizininde yapılandırma dosyalarımız ve kimlik bilgileri duruyor.
+	 *
+	 * Sınır yerleşim ayarıyla birlikte kayıyor (spec 025) ama kural aynı
+	 * kalıyor: motorun kökü kendi çalışma dizini, entrypoint de oraya
+	 * geçiyor. Bu yüzden burada yol yazılı değil.
 	 */
 	rules := []PermissionRule{
 		{Permission: "question", Pattern: "*", Action: "deny"},

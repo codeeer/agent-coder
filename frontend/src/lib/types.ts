@@ -249,6 +249,19 @@ export const WORK_ROOT = "/work";
 export const REPO_SUBDIR_KEY = "runner.repo_subdir";
 
 /**
+ * İki durumlu ayarın metin değeri.
+ *
+ * Backend `strconv.ParseBool` kullanıyor, yani "1" ve "t" de geçerli bir
+ * "açık". Arayüz her zaman "true"/"false" yazsa da API'ye doğrudan yazılmış
+ * bir değer anahtarı sessizce KAPALI göstermemeli.
+ *
+ * BURADA DURUYOR, bir bileşenin içinde değil: ayarı okuyan ikinci ekran
+ * çıktığında (spec 025) kural kopyalandı ve kopya daha katıydı — aynı ayar
+ * bir ekranda açık, diğerinde kapalı görünebiliyordu.
+ */
+export const truthy = (v: string) => ["1", "t", "true"].includes(v.trim().toLowerCase());
+
+/**
  * Betik yazarına gösterilecek proje kökü.
  *
  * SOMUT AD DEĞİL KALIP döner: repo adı çalıştırmadan çalıştırmaya değişiyor,

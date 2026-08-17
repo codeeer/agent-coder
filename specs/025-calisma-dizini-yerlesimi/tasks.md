@@ -110,6 +110,24 @@ Plandan sapılırsa **neden** sapıldığı buraya yazılır.
 - **Ayar yardım metnindeki backtick'ler kaldırıldı.** Tarayıcıda görüldü:
   arayüz markdown işlemiyor ve Çalıştırma grubundaki diğer ayarlar düz metin
   kullanıyor; işaretler kullanıcıya ham görünüyordu.
+- **İnceleme sonrası düzeltilenler (bkz. commit `fix(runner)`):**
+  1. Arayüz ayarı `=== "true"` ile okuyordu; backend `strconv.ParseBool`
+     kullandığı için `"1"` ve `"t"` de geçerli "açık". Aynı klasörde tam bu
+     tuzağı belgeleyen `truthy` yardımcısı vardı ve kopyalanmamıştı — ortak
+     bir yere taşındı. `"1"` senaryosu tarayıcıda doğrulandı.
+  2. Ayar yüklenirken metin varsayılana düşüp sonra sessizce değişiyordu;
+     artık okunana kadar yol hiç yazılmıyor. Yazdığım "önbellekten geliyor"
+     yorumu da yanlıştı: betik sekmesine doğrudan girildiğinde sorgu soğuk
+     başlıyor.
+  3. `repoAdi` iki noktayı koşulsuz kesiyordu — `.../pro:je.git` adresi
+     `je` klasörüne inerdi. Kod kendi yorumuyla uyumlu hale getirildi.
+  4. Sorgu ve parça `.git` soyulmasını engelliyordu (`proje.git?ref=main`).
+  5. 255 baytı aşan ad çalıştırmayı düşürüyordu; artık köke düşülüyor —
+     aynı depo varsayılan yerleşimde klonlanabildiği için ayarı açmak
+     çalışan bir kurulumu bozmamalı (H2).
+  6. `TestProjectDir_KokunAltindaKalir` uygulamanın kendi koruma ifadesini
+     tekrar ediyordu, yani koruma kaldırılmadıkça düşemezdi. İddia üretilen
+     **adın kendisi** üzerinden bağımsız kuruldu.
 - **T23/T24 kısmen gözlemle, kısmen dolaylı doğrulandı.** Gerçek bir
   çalıştırmada container'ın env'i `PROJECT_DIR=/work/Hello-World` olarak
   **doğrudan görüldü** (`docker inspect`) — ayar → servis → closure →

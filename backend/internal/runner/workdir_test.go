@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"path"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -56,6 +56,16 @@ func TestProjectDir_RepoAdiTuretme(t *testing.T) {
 		{"nokta içeren ad", "https://h/k/proje.api.git", "/work/proje.api"},
 		{"tire içeren ad", "https://h/k/agent-coder.git", "/work/agent-coder"},
 
+		// ── Ad İÇİNDE iki nokta: sınır sayılmamalı ─────────────────────
+		// Ayraç varken iki nokta kesilirse `pro:je` → `je` olurdu.
+		{"adda iki nokta", "https://h/k/pro:je.git", "/work/pro:je"},
+		{"adda çift iki nokta", "https://h/k/a:b:c.git", "/work/a:b:c"},
+
+		// ── Sorgu ve parça `.git` soyulmasını engellememeli ────────────
+		{"sorgu dizesi", "https://h/k/proje.git?ref=main", "/work/proje"},
+		{"parça", "https://h/k/proje.git#v1", "/work/proje"},
+		{"sorgu, .git yok", "https://h/k/proje?ref=main", "/work/proje"},
+
 		// ── Türetilemeyen: KÖKE DÜŞER, hata vermez ─────────────────────
 		{"boş adres", "", "/work"},
 		{"yalnızca boşluk", "   ", "/work"},
@@ -70,6 +80,17 @@ func TestProjectDir_RepoAdiTuretme(t *testing.T) {
 		{"üst dizin, .git soyulunca ortaya çıkan", "https://h/k/...git", "/work"},
 		{"ters ayraç", "https://h/k/..\\..\\etc.git", "/work"},
 		{"NUL bayt", "https://h/k/pro\x00je.git", "/work"},
+
+		/*
+		 * ÇOK UZUN AD — köke düşer, çalıştırmayı düşürmez.
+		 *
+		 * Tek dizin adı 255 baytı aşarsa `git clone` ENAMETOOLONG ile düşer.
+		 * Aynı depo varsayılan yerleşimde sorunsuz klonlandığı için, ayarı
+		 * açmanın çalışan bir kurulumu bozmaması gerekiyor (spec 025 H2).
+		 */
+		{"255 bayt sınırında", "https://h/k/" + strings.Repeat("a", 255) + ".git",
+			"/work/" + strings.Repeat("a", 255)},
+		{"255 baytı aşan", "https://h/k/" + strings.Repeat("a", 256) + ".git", "/work"},
 	}
 
 	for _, tt := range tests {
@@ -98,11 +119,36 @@ func TestProjectDir_KokunAltindaKalir(t *testing.T) {
 		"..",
 		"../",
 		"....//....//etc",
+		"https://h/k/" + strings.Repeat("u", 400) + ".git",
+		"https://h/k/pro\x00je.git",
+		"https://h/k/..\\..\\etc.git",
+		"file:///etc/shadow",
+		"https://h/k/.",
 	}
 
 	for _, url := range kotu {
 		dir := ProjectDir(LayoutRepo, url)
-		require.True(t, dir == WorkRoot || path.Dir(dir) == WorkRoot,
-			"yol kökün doğrudan altında olmalı: %q → %q", url, dir)
+
+		if dir == WorkRoot {
+			continue // köke düşmüş; sınır zaten aşılmadı
+		}
+
+		/*
+		 * İDDİA UYGULAMADAN BAĞIMSIZ KURULUYOR.
+		 *
+		 * `path.Dir(dir) == WorkRoot` demek, uygulamanın kendi koruma
+		 * ifadesini tekrar etmek olurdu: koruma kaldırılmadıkça test asla
+		 * düşmezdi. Bunun yerine üretilen ADIN kendisi sınanıyor — kökten
+		 * sonra gelen parça tek bir bileşen mi, içinde ayraç veya üst dizin
+		 * ifadesi var mı.
+		 */
+		ad := strings.TrimPrefix(dir, WorkRoot+"/")
+		require.NotEqual(t, dir, ad, "yol kökün altında olmalı: %q → %q", url, dir)
+		require.NotContains(t, ad, "/", "ad ayraç içeremez: %q → %q", url, ad)
+		require.NotContains(t, ad, `\`, "ad ters ayraç içeremez: %q → %q", url, ad)
+		require.NotContains(t, ad, "\x00", "ad NUL içeremez: %q → %q", url, ad)
+		require.NotEqual(t, "..", ad, "ad üst dizin olamaz: %q", url)
+		require.NotEqual(t, ".", ad, "ad geçerli bir dizin adı olmalı: %q", url)
+		require.LessOrEqual(t, len(ad), 255, "ad dosya sistemi sınırını aşamaz: %q", url)
 	}
 }

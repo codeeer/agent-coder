@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import type { SettingValue } from "@/lib/types";
+import { truthy, type SettingValue } from "@/lib/types";
 import { filterSettings } from "@/components/settings/setting-search";
 import {
   Badge,
@@ -17,14 +17,8 @@ import {
 } from "@/components/ui/primitives";
 import { IconSearch } from "@/components/ui/icons";
 
-/**
- * İki durumlu ayarın metin değeri.
- *
- * Backend `strconv.ParseBool` kullanıyor, yani "1" ve "t" de geçerli bir
- * "açık". Arayüz her zaman "true"/"false" yazsa da API'ye doğrudan yazılmış
- * bir değer anahtarı sessizce KAPALI göstermemeli.
- */
-const truthy = (v: string) => ["1", "t", "true"].includes(v.trim().toLowerCase());
+// truthy `@/lib/types`'a taşındı: ayarı okuyan ikinci ekran çıkınca kural
+// kopyalanmıştı ve kopya daha katıydı (spec 025).
 
 /**
  * Çalışma ayarları bölümü.

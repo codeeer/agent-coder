@@ -8,6 +8,7 @@ import {
   REPO_SUBDIR_KEY,
   projectDirLabel,
   scriptPath,
+  truthy,
   type Script,
 } from "@/lib/types";
 import { IconPlus, IconTrash, IconEdit } from "@/components/ui/icons";
@@ -348,15 +349,18 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
    * yerleşim ayarına bağlı; sabit yazılsaydı ayar açıkken kullanıcıya var
    * olmayan bir dizin söylenirdi.
    *
-   * Aynı `["settings"]` anahtarı ayarlar bölümünde de kullanılıyor, yani bu
-   * ek bir istek doğurmuyor — önbellekten geliyor.
+   * BEKLEMEDEN GÖSTERİLMEZ: bu sekmeye doğrudan girildiğinde sorgu soğuk
+   * başlıyor (ayar bölümü ayrı sekmede). Yükleme sırasında varsayılana
+   * düşseydi ekran önce `/work` der, sonra sessizce değişirdi — ve o ilk
+   * hali okuyup betiğine yazan kullanıcı yanlış yolu sabitlerdi.
    */
   const settings = useQuery({
     queryKey: ["settings"],
     queryFn: api.settings.list,
   });
-  const repoAltKlasoru =
-    settings.data?.items.find((s) => s.key === REPO_SUBDIR_KEY)?.value === "true";
+  const repoAltKlasoru = truthy(
+    settings.data?.items.find((s) => s.key === REPO_SUBDIR_KEY)?.value ?? "",
+  );
 
   const secilenKlasor = folders.data?.items.find((f) => f.id === folderId);
 
@@ -481,14 +485,26 @@ function ScriptForm({ script, onDone }: { script?: Script; onDone: () => void })
 
       {/* PROJE DİZİNİ — betik yazarının bilmediği tek şey bu.
           Kullanıcı projesinin İÇİNDEKİ yolu biliyor; kökün nereye açıldığını
-          kaynağı okumadan öğrenemezdi. */}
+          kaynağı okumadan öğrenemezdi.
+
+          Yol ayardan geldiği için ayar OKUNANA KADAR hiç yazılmıyor: yanlış
+          bir yol göstermek, hiç göstermemekten kötü. */}
       <Well className="mt-3 p-3">
         <p className="text-xs">
-          <strong>
-            Proje <Mono>{projectDirLabel(repoAltKlasoru)}</Mono> altına klonlanır
-          </strong>{" "}
-          ve bu yol betiğe <Mono>$PROJECT_DIR</Mono> olarak geçer. Çalışma dizinine
-          güvenmeyin, bu değişkeni kullanın:{" "}
+          {settings.isSuccess ? (
+            <>
+              <strong>
+                Proje <Mono>{projectDirLabel(repoAltKlasoru)}</Mono> altına klonlanır
+              </strong>{" "}
+              ve bu yol betiğe <Mono>$PROJECT_DIR</Mono> olarak geçer.
+            </>
+          ) : (
+            <>
+              <strong>Projenin klonlandığı yol</strong> betiğe{" "}
+              <Mono>$PROJECT_DIR</Mono> olarak geçer.
+            </>
+          )}{" "}
+          Çalışma dizinine güvenmeyin, bu değişkeni kullanın:{" "}
           <Mono>&quot;$PROJECT_DIR/config/webpack.config.js&quot;</Mono>
         </p>
         <p className="mt-2 text-2xs text-ink-2">
