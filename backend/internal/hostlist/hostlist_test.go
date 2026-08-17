@@ -206,20 +206,20 @@ func TestBosListe_MatchGecirir_ListedGecirmez(t *testing.T) {
 
 // Liste DOLUYKEN ikisi aynı cevabı verir; ayrım yalnızca boşlukta.
 func TestDoluListe_MatchVeListedAyniCevap(t *testing.T) {
-	desenler, err := Parse("garanti.com.tr\n*.garanti.com.tr\n*.garantidom.com.tr")
+	desenler, err := Parse("kurumsal.com.tr\n*.kurumsal.com.tr\n*.kurumsaltest.com.tr")
 	require.NoError(t, err)
 
 	for _, tt := range []struct {
 		host    string
 		beklsen bool
 	}{
-		{"garanti.com.tr", true},
-		{"bitbucket.garanti.com.tr", true},
-		{"garanti.garantidom.com.tr", true},
+		{"kurumsal.com.tr", true},
+		{"bitbucket.kurumsal.com.tr", true},
+		{"kurumsal.kurumsaltest.com.tr", true},
 		{"github.com", false},
-		// Apex, wildcard'la açılmaz: `*.garantidom.com.tr` yazıldı,
-		// `garantidom.com.tr` yazılmadı.
-		{"garantidom.com.tr", false},
+		// Apex, wildcard'la açılmaz: `*.kurumsaltest.com.tr` yazıldı,
+		// `kurumsaltest.com.tr` yazılmadı.
+		{"kurumsaltest.com.tr", false},
 	} {
 		require.Equal(t, tt.beklsen, Match(desenler, tt.host), "Match: %s", tt.host)
 		require.Equal(t, tt.beklsen, Listed(desenler, tt.host), "Listed: %s", tt.host)

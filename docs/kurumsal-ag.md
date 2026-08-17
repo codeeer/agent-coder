@@ -358,9 +358,9 @@ yani denetimi açmak agent'ı kurumun kendi deposundan koparabilir.
 proxy'ye uğramadan **kendisi** bağlanır.
 
 ```text
-garanti.com.tr
-*.garanti.com.tr
-*.garantidom.com.tr
+kurumsal.com.tr
+*.kurumsal.com.tr
+*.kurumsaltest.com.tr
 ```
 
 Söz dizimi izin listesiyle birebir aynıdır. Kurumun birbiriyle akraba olmayan

@@ -164,12 +164,12 @@ func TestEgressDirect_BosAyarBosListe(t *testing.T) {
 
 func TestEgressDirect_DesenlereCevrilir(t *testing.T) {
 	desenler := egressDirect(runner.EgressSpec{
-		InternalHosts: "garanti.com.tr\n*.garanti.com.tr\n*.garantidom.com.tr",
+		InternalHosts: "kurumsal.com.tr\n*.kurumsal.com.tr\n*.kurumsaltest.com.tr",
 	})
 
-	require.True(t, hostlist.Listed(desenler, "bitbucket.garanti.com.tr"))
-	require.True(t, hostlist.Listed(desenler, "garanti.com.tr"))
-	require.True(t, hostlist.Listed(desenler, "garanti.garantidom.com.tr"))
+	require.True(t, hostlist.Listed(desenler, "bitbucket.kurumsal.com.tr"))
+	require.True(t, hostlist.Listed(desenler, "kurumsal.com.tr"))
+	require.True(t, hostlist.Listed(desenler, "kurumsal.kurumsaltest.com.tr"))
 	require.False(t, hostlist.Listed(desenler, "github.com"))
 }
 
@@ -185,7 +185,7 @@ Geri düşülen yer GÜVENLİ TARAF: her hedef proxy'den geçer, yani bugünkü
 davranış.
 */
 func TestEgressDirect_BozukListeCalistirmayiDusurmez(t *testing.T) {
-	require.Empty(t, egressDirect(runner.EgressSpec{InternalHosts: "https://garanti.com.tr"}),
+	require.Empty(t, egressDirect(runner.EgressSpec{InternalHosts: "https://kurumsal.com.tr"}),
 		"bozuk satır boş liste vermeli — hata değil")
 	require.Empty(t, egressDirect(runner.EgressSpec{InternalHosts: "*"}))
 }
@@ -193,7 +193,7 @@ func TestEgressDirect_BozukListeCalistirmayiDusurmez(t *testing.T) {
 // Yorum ve boş satırlar izin listesindeki gibi atlanır — tek ayrıştırıcı.
 func TestEgressDirect_YorumVeBosSatirAtlanir(t *testing.T) {
 	desenler := egressDirect(runner.EgressSpec{
-		InternalHosts: "# kurumun kendi adresleri\n\ngaranti.com.tr\n\n# jira\n*.garanti.com.tr\n",
+		InternalHosts: "# kurumun kendi adresleri\n\nkurumsal.com.tr\n\n# jira\n*.kurumsal.com.tr\n",
 	})
 	require.Len(t, desenler, 2)
 }

@@ -267,9 +267,9 @@ için kurulur ve iç adresleri çözemeyebilir. Kurumun kendi Bitbucket'ına ken
 çalışmaktır.
 
 ```
-garanti.com.tr
-*.garanti.com.tr
-*.garantidom.com.tr
+kurumsal.com.tr
+*.kurumsal.com.tr
+*.kurumsaltest.com.tr
 ```
 
 Söz dizimi izin listesiyle aynı: `ornek.com` yalnızca o adresi,
