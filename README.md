@@ -686,8 +686,8 @@ agent'ın ortamına konur ve talimatına yol + açıklamayla yazılır.
 
 ### Proje nerede? `$PROJECT_DIR`
 
-Depo her çalıştırmada `/work` altına klonlanır ve bu yol betiğe
-**`$PROJECT_DIR`** olarak geçer.
+Depo her çalıştırmada belirli bir dizine klonlanır ve bu yol betiğe
+**`$PROJECT_DIR`** olarak geçer. Varsayılan `/work`'tür.
 
 **Çalışma dizinine güvenmeyin, bu değişkeni kullanın.** Siz projenizin
 *içindeki* yolu biliyorsunuz (`config/webpack.config.js`); kökün nereye
@@ -702,6 +702,29 @@ rm -f "$PROJECT_DIR/config/webpack.legacy.js"
 > Kalıcı olması gereken her değişiklik bu dizinin altında olmalı. Başka bir
 > yere yazılan dosya değişiklik kaydına girmez, branch'e gitmez ve çalıştırma
 > bitince kaybolur.
+
+#### Yerleşim: `/work` mü, `/work/<repo-adı>` mı?
+
+**Ayarlar → Çalıştırma → "Projeyi repo adlı klasöre klonla"** ile depo kökün
+altında kendi adını taşıyan bir klasöre açılabilir:
+
+| Ayar | Klonlama hedefi |
+| ---- | --------------- |
+| Kapalı (varsayılan) | `/work` |
+| Açık | `/work/<repo-adı>` |
+
+Bu seçenek, projenin `<kök>/<repo-adı>` altında durduğunu varsayan **dış
+runbook, Jenkins işi ve yardımcı betikler** için var — çoğu CI aracı ve
+geliştiricinin kendi makinesi böyle çalıştığı için bu varsayım yaygın.
+
+**Betikleriniz `$PROJECT_DIR` kullandığı sürece her iki yerleşimde de
+değişiklik gerektirmeden çalışır.** Yalnızca yolu elle yazan bir betik
+(`cd /work` gibi) ayar açıldığında kırılır — zaten kaçınılması önerilen
+kullanım budur.
+
+Repo adı adresin son parçasından türetilir (`.../takim/proje.git` → `proje`).
+Ad türetilemezse veya güvenli değilse köke düşülür; çalıştırma bu yüzden
+başarısız olmaz.
 
 ### Çok adımlı işler: kampanya klasörleri
 

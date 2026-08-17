@@ -239,6 +239,18 @@ Kabul kriterleri:
 
 ## Karar geçmişi
 
+### 2026-08-17 — Proje kökü sabit olmaktan çıktı
+
+[Spec 025](../025-calisma-dizini-yerlesimi/spec.md) ile depo, ayara bağlı
+olarak `/work` yerine `/work/<repo-adı>` altına da klonlanabiliyor.
+Varsayılan değişmedi.
+
+Bu spec'in H-kriteri **"script çalışma dizinine güvenmeden çalışabilir:
+`$PROJECT_DIR/...`"** bu yüzden artık yalnızca bir kolaylık değil, yerleşimden
+bağımsızlığın da taşıyıcısı: `$PROJECT_DIR` okuyan betikler iki yerleşimde de
+değişiklik gerektirmeden çalışıyor, yolu elle yazanlar ayar açıldığında
+kırılıyor. Kriterin gerekçesi güçlendi, kendisi değişmedi.
+
 ### 2026-08-15 — Ekran ölçüldü ve yeniden kuruldu
 
 Spec 023'ün canlı testinde beş betiklik bir kampanya açılınca ekranın ölçeği

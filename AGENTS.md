@@ -377,8 +377,8 @@ geliştiriciyi "madem duruyor, izin de verelim" demeye davet eder. `BuildPermiss
 özellik için **hiç değişmedi**; "yeni yetenek açmıyor" iddiasının tek kanıtı bu, bir test de
 bunu kilitliyor.
 
-**Betikler `/home/agent/scripts/<ad>.sh`, mod `0o755`.** `/work` altına konamaz: orası
-klonlama hedefi ve boş olmak zorunda, ayrıca bizim dosyalarımız kullanıcının diff'ine karışır.
+**Betikler `/home/agent/scripts/<ad>.sh`, mod `0o755`.** Klonlama hedefinin altına konamaz:
+orası boş olmak zorunda, ayrıca bizim dosyalarımız kullanıcının diff'ine karışır.
 Dizin imajda önceden açılır — tar kopyalaması dizin oluşturmuyor. Betik adı doğrudan dosya
 adına dönüştüğü için dar (`[a-z0-9-]`) ve sessizce dönüştürülmez, baştan reddedilir.
 
