@@ -72,6 +72,20 @@ type Request struct {
 	// Egress, sandbox çıkış denetimi (spec 020).
 	Egress EgressSpec
 
+	/*
+	 * DependencyCache, indirilen bağımlılıkların koşular arasında saklanıp
+	 * saklanmayacağı (spec 027).
+	 *
+	 * BOOLEAN OLARAK TAŞINIYOR, bağlanacak yollar veya volume adları olarak
+	 * değil: onlar çalışma ortamının iç bilgisi ve bu tipi kullanan katman
+	 * (`runs`) onları tanımamalı. Aynı sebeple kurumsal sertifika da içerik
+	 * olarak taşınıyor, dosya yolu olarak değil.
+	 *
+	 * Varsayılan kapalı: hiçbir ayar değiştirilmemiş bir kurulum bugünkü
+	 * davranışı gösterir.
+	 */
+	DependencyCache bool
+
 	// NodeVersion, sandbox'ın koşacağı Node sürümü. Boşsa taban imaj kullanılır.
 	//
 	// Sürüm KOŞU ANINDA İNDİRİLMEZ: her desteklenen sürümün imajı derleme

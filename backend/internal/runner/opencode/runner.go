@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"sort"
 	"strings"
@@ -142,6 +143,26 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 			Message: "çıkış denetimi açık — dışarıya yalnızca izinli adreslere, proxy üzerinden"})
 	}
 
+	/*
+	 * Bağımlılık önbelleği — container YARATILMADAN ÖNCE hazırlanır (spec 027).
+	 *
+	 * HATA ÖLÜMCÜL DEĞİL. Önbellek bir hızlandırıcıdır, önkoşul değil: volume
+	 * açılamazsa koşu önbelleksiz sürer. Aksi hâlde 50 projelik bir kampanya,
+	 * kendisini hızlandırması gereken şey yüzünden kaybolurdu.
+	 *
+	 * Ama SESSİZ de değil: sebep olay akışına yazılır. Aksi halde kullanıcı
+	 * hızlanma beklerken gördüğü yavaş koşuyu hata sanar ve sebebini aramaz.
+	 */
+	caches := dependencyCaches(req.DependencyCache)
+	if len(caches) > 0 {
+		err := r.sandbox.EnsureCaches(runCtx, caches)
+		if err != nil {
+			slog.WarnContext(runCtx, "bağımlılık önbelleği hazırlanamadı",
+				"run_id", req.RunID, "error", err)
+		}
+		caches = cachesOrNone(caches, err, emit)
+	}
+
 	ct, err := r.sandbox.Create(runCtx, sandbox.Spec{
 		RunID:    req.RunID.String(),
 		Image:    image,
@@ -150,6 +171,7 @@ func (r *Runner) Run(ctx context.Context, req runner.Request, emit runner.EventF
 		CPUCores: req.Limits.CPUCores,
 		MemoryGB: req.Limits.MemoryGB,
 		Files:    toSandboxFiles(configFiles),
+		Caches:   caches,
 	})
 	if err != nil {
 		return nil, classify(err, runCtx, ctx)

@@ -255,3 +255,19 @@ func TestValidate_IzinliHostlar(t *testing.T) {
 	require.Error(t, err, "URL yazılan satır reddedilmeli")
 	require.Contains(t, err.Error(), "2", "hata kaçıncı satır olduğunu söylemeli")
 }
+
+/*
+BAĞIMLILIK ÖNBELLEĞİ VARSAYILAN KAPALI GELİR (spec 027 H2).
+
+Spec'in ilk kabul kriteri: hiçbir ayar değiştirilmemiş bir kurulum bugünkü
+davranışı gösterir. Varsayılan bir gün "true"ya çevrilirse, yükselten her
+kurulum haberi olmadan koşular arası paylaşılan yazılabilir bir alan kazanır —
+bu bir tercih olabilir ama SESSİZCE olmamalı. Test o sessizliği engeller.
+*/
+func TestKayitDefteri_BagimlilikOnbellegiVarsayilanKapali(t *testing.T) {
+	def, ok := Lookup(KeyDependencyCache)
+	require.True(t, ok, "ayar kayıt defterinde tanımlı olmalı")
+	require.Equal(t, KindBool, def.Kind)
+	require.Equal(t, "false", def.Default)
+	require.Equal(t, GroupRunner, def.Group)
+}

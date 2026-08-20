@@ -32,6 +32,7 @@ import (
 	"github.com/agent-coder/backend/internal/reports"
 	"github.com/agent-coder/backend/internal/runbatch"
 	"github.com/agent-coder/backend/internal/runbuild"
+	"github.com/agent-coder/backend/internal/runner"
 	"github.com/agent-coder/backend/internal/runs"
 	"github.com/agent-coder/backend/internal/scripts"
 	"github.com/agent-coder/backend/internal/settings"
@@ -107,6 +108,10 @@ type Deps struct {
 	// Çalıştırma
 	Runs       *runs.Store
 	RunManager *runs.Manager
+	// Runner, çalışma ortamı uygulaması. Bakım uçları için: `runner.CacheAdmin`
+	// sağlıyorsa bağımlılık önbelleği yönetilebilir (spec 027). Sağlamayan bir
+	// uygulamada o uçlar kapalıdır — bakım isteğe bağlı bir yetenek.
+	Runner runner.Runner
 	// RunBuilder, istekten çalıştırma girdisi üretir (workflow motoru da kullanır).
 	RunBuilder *runbuild.Builder
 	Pusher     *runs.Pusher
@@ -227,6 +232,15 @@ func (h *Handler) Routes() http.Handler {
 			r.Get("/", h.listSettings)
 			r.Put("/{key}", h.putSetting)
 			r.Delete("/{key}", h.resetSetting)
+		})
+
+		// Bağımlılık önbelleği bakımı (spec 027). Temizleme AYAR YAZMA
+		// sınıfındadır; kimlik geldiğinde `/settings` ile aynı kapıdan
+		// geçmelidir (spec 024 H1'e kabul kriteri olarak yazıldı).
+		r.Route("/dependency-cache", func(r chi.Router) {
+			r.Get("/", h.dependencyCacheStatus)
+			r.Post("/{id}/clear", h.clearDependencyCache)
+			r.Post("/{id}/verify", h.verifyDependencyCache)
 		})
 
 		r.Route("/projects", func(r chi.Router) {

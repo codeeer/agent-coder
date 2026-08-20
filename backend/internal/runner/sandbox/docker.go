@@ -51,6 +51,13 @@ type Spec struct {
 
 	// Files, container BAŞLATILMADAN ÖNCE içine kopyalanacak dosyalar.
 	Files []File
+
+	// Caches, koşular arası paylaşılan bağımlılık önbellekleri (spec 027).
+	//
+	// Boşsa hiç mount kurulmaz ve container tanımı önbellek özelliğinden
+	// önceki hâliyle birebir aynı olur. Volume'lerin var olduğundan emin olmak
+	// çağıranın işi: `EnsureCaches`.
+	Caches []CacheMount
 }
 
 /** Kurumsal CA'nın container içindeki yolu. */
@@ -165,7 +172,7 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (c *Container, err erro
 			// Dışarıya port yayınlanmaz; backend izole ağ üzerinden erişir.
 			NetworkMode: container.NetworkMode(spec.Network),
 			/*
-			 * BAĞLAMA YOK.
+			 * HOST DOSYASI BAĞLANMAZ.
 			 *
 			 * Kurumsal kök sertifika eskiden host'tan `:ro` bağlanıyordu.
 			 * İki sorunu vardı: dosyanın DOCKER HOST'unda bulunmasını
@@ -173,7 +180,15 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (c *Container, err erro
 			 * üretim için tam olarak onu öneriyor — ve değiştirmek yeniden
 			 * başlatma istiyordu. Sertifika artık diğer yapılandırma
 			 * dosyaları gibi container'a KOPYALANIYOR (spec 017).
+			 *
+			 * Bağımlılık önbelleği (spec 027) bu yasağın İSTİSNASI DEĞİL,
+			 * kapsamı dışındadır: bağlanan şey host'ta bulunması gereken bir
+			 * dosya değil, ürünün oluşturduğu adlandırılmış bir volume. O
+			 * daemon tarafında yaşar, yani uzak host'ta da çalışır — yasağın
+			 * gerekçesi burada doğmuyor. Önbellek kapalıyken `Mounts` alanı
+			 * hiç yazılmaz.
 			 */
+			Mounts: cacheMounts(spec.Caches),
 			Resources: container.Resources{
 				NanoCPUs: int64(spec.CPUCores) * 1_000_000_000,
 				Memory:   int64(spec.MemoryGB) << 30,

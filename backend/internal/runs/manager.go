@@ -28,6 +28,14 @@ type Limits struct {
 	MemoryGB      func() int
 	CloneDepth    func() int
 
+	// DependencyCache, bağımlılıkların koşular arasında saklanıp saklanmayacağı
+	// (spec 027). Diğerleri gibi FONKSİYON: ayar arayüzden değişince yeniden
+	// başlatma beklemeden sonraki koşuda geçerli olmalı.
+	//
+	// nil olabilir; o zaman önbellek KAPALI sayılır — kapalı hâl özellikten
+	// önceki davranış olduğu için güvenli taraf orası.
+	DependencyCache func() bool
+
 	// EngineLogPersist, motor loglarının saklanıp saklanmayacağı.
 	// Kapalıysa toplama da yapılmaz — container'dan boşuna okumayız.
 	EngineLogPersist func() bool
@@ -236,17 +244,18 @@ func (m *Manager) execute(ctx context.Context, run Run, in StartInput) {
 		RunID: run.ID,
 		// Proje kökü BURADA, bir kez çözülür; env ve talimat metni aynı
 		// alandan okur (spec 025).
-		ProjectDir:  m.projectDir(in.Repo.URL),
-		NodeVersion: in.NodeVersion,
-		Packages:    paketler,
-		CACert:      m.caCert(),
-		Egress:      egress,
-		Repo:        in.Repo,
-		Agent:       in.Agent,
-		Provider:    in.Provider,
-		Model:       run.ModelID,
-		Task:        run.Task,
-		Timeout:     m.limits.Timeout(),
+		ProjectDir:      m.projectDir(in.Repo.URL),
+		NodeVersion:     in.NodeVersion,
+		Packages:        paketler,
+		CACert:          m.caCert(),
+		Egress:          egress,
+		DependencyCache: m.dependencyCache(),
+		Repo:            in.Repo,
+		Agent:           in.Agent,
+		Provider:        in.Provider,
+		Model:           run.ModelID,
+		Task:            run.Task,
+		Timeout:         m.limits.Timeout(),
 		// Loglar container SİLİNMEDEN önce toplanır; saklama kapalıysa
 		// callback hiç verilmez, yani okuma maliyeti de doğmaz.
 		EngineLogs: m.engineLogSink(writeCtx, run.ID),
@@ -502,6 +511,20 @@ func (m *Manager) caCert() string {
 //
 // nil olması denetimin KAPALI olması demektir — testlerde ve ayar servisi
 // olmayan kurulumlarda bugünkü davranış sürer.
+/*
+dependencyCache, bağımlılık önbelleğinin açık olup olmadığı (spec 027).
+
+Erişimci tanımsızsa KAPALI: kapalı hâl özellikten önceki davranış, yani
+belirsizlikte doğru taraf orası. Önbellek zaten bir hızlandırıcı; yokluğu
+koşuyu düşürmez.
+*/
+func (m *Manager) dependencyCache() bool {
+	if m.limits.DependencyCache == nil {
+		return false
+	}
+	return m.limits.DependencyCache()
+}
+
 func (m *Manager) egress() runner.EgressSpec {
 	if m.limits.Egress == nil {
 		return runner.EgressSpec{}

@@ -72,6 +72,7 @@ type Definition struct {
 
 // Ayar anahtarları. Kod bu sabitleri kullanır, düz metin yazmaz.
 const (
+	KeyDependencyCache    = "runner.dependency_cache"
 	KeyEngineLogPersist   = "runner.engine_log_persist"
 	KeyEngineLogRetention = "runner.engine_log_retention_days"
 	KeyEngineLogMaxKB     = "runner.engine_log_max_kb"
@@ -208,6 +209,27 @@ var Registry = []Definition{
 			"/work altına klonlanır. Repo adının klasör olmasını bekleyen " +
 			"dış runbook ve CI betikleri için. Betikler yolu $PROJECT_DIR " +
 			"değişkeninden okuduğu sürece her iki yerleşimde de çalışır.",
+		Default: "false",
+	},
+	/*
+	 * Bağımlılık önbelleği — koşular arası paylaşılan artefakt deposu.
+	 *
+	 * KAPALI GELİYOR. Diğer yönde bir gerekçe yok: açık gelseydi, yükselten
+	 * her kurulum haberi olmadan koşular arası paylaşılan yazılabilir bir alan
+	 * kazanırdı. Kampanya yürüten kullanıcı bunu bilerek açar (spec 027 H2).
+	 *
+	 * Paylaşımın güven sınırı spec 027'de açıkça kabul edildi: bir koşunun
+	 * indirdiği artefaktı sonraki koşu kullanır. Aynı kurumun projeleri ve aynı
+	 * paket deposu varsayımı geçerli olduğu sürece kabul edilebilir.
+	 */
+	{
+		Key: KeyDependencyCache, Group: GroupRunner, Kind: KindBool,
+		Label: "Bağımlılık önbelleği",
+		// Yardım metninde backtick YOK: bu grup düz metin kullanıyor.
+		Help: "Açıkken indirilen Maven ve npm bağımlılıkları koşular arasında " +
+			"saklanır; ikinci koşu aynı ağacı yeniden indirmez. Önbellek bütün " +
+			"projeler arasında paylaşılır ve kullanıldıkça dolar. Kapatmak " +
+			"biriken önbelleği silmez.",
 		Default: "false",
 	},
 	{

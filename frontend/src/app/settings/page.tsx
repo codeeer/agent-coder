@@ -13,6 +13,7 @@ import { McpAccessSection } from "@/components/settings/McpAccessSection";
 import { McpServerSection } from "@/components/settings/McpServerSection";
 import { LLMProviderSection } from "@/components/settings/LLMProviderSection";
 import { CACertStatus } from "@/components/settings/CACertStatus";
+import { DependencyCacheStatus } from "@/components/settings/DependencyCacheStatus";
 import { EgressStatus } from "@/components/settings/EgressStatus";
 import { RuntimeSettings } from "@/components/settings/RuntimeSettings";
 import { ScriptSection } from "@/components/settings/ScriptSection";
@@ -254,13 +255,27 @@ function TabContent({ tab }: { tab: TabID }) {
 
     case "runner":
       return (
-        <Panel
-          title="Çalıştırma"
-          description="Süre sınırı, eşzamanlılık ve kaynak limitleri. Değişiklik sunucu yeniden başlatılmadan geçerli olur."
-          padded={false}
-        >
-          <RuntimeSettings groups={["runner"]} showHeadings={false} />
-        </Panel>
+        <div className="space-y-4">
+          <Panel
+            title="Çalıştırma"
+            description="Süre sınırı, eşzamanlılık ve kaynak limitleri. Değişiklik sunucu yeniden başlatılmadan geçerli olur."
+            padded={false}
+          >
+            <RuntimeSettings groups={["runner"]} showHeadings={false} />
+          </Panel>
+
+          {/* AYRI PANO. Ayarın kendisi yukarıdaki listede; burası onun
+              DURUMU ve bakımı — biriken boyut, temizleme, doğrulama. Aynı
+              panoya konsaydı bir aç/kapat satırının altına iki eylemli iki
+              satır sıkışır ve hangisinin hangi ayara ait olduğu okunmazdı. */}
+          <Panel
+            title="Bağımlılık önbelleği"
+            description="Koşular arasında saklanan Maven ve npm artefaktları. Bütün projeler aynı önbelleği paylaşır; ilk koşu doldurur, sonrakiler hazır bulur."
+            padded={false}
+          >
+            <DependencyCacheStatus />
+          </Panel>
+        </div>
       );
 
     case "network":

@@ -83,6 +83,36 @@ RUN set -eux; \
     rm /tmp/maven.tar.gz; \
     ln -s /opt/maven/bin/mvn /usr/local/bin/mvn
 
+# ─── Süreçler arası yerel depo kilidi (spec 027 R6) ─────────────────────────
+#
+# Paylaşılan bağımlılık önbelleğinde aynı yerel depoya BİRDEN FAZLA KOŞU aynı
+# anda yazabiliyor. Maven Resolver'ın varsayılan kilidi JVM İÇİ; iki container
+# iki ayrı JVM demek, yani varsayılan hâlde koruma yok. `file-lock` fabrikası
+# süreçler arası dosya kilidi kullanır.
+#
+# NEDEN `MAVEN_OPTS` DEĞİL: ölçüldü — bayrak MAVEN_OPTS ile verildiğinde JVM'e
+# ulaşıyor, ama agent koşu içinde `export MAVEN_OPTS=-Xmx2g` derse bayrak
+# SESSİZCE kayboluyor ve kilit kapanıyor. Bu niyet gerektirmiyor; bellek
+# ayarlamak sıradan bir davranış.
+#
+# NEDEN `/opt/maven/bin`: ölçüldü — `PATH` içinde `/opt/maven/bin`,
+# `/usr/local/bin`'den ÖNCE geliyor. Sarmalayıcı `/usr/local/bin/mvn`'e
+# konsaydı hiç çalışmazdı.
+#
+# SINIR: bu, KAZAYLA kapatmaya karşı korur. `/opt/maven/bin/mvn.real`'i
+# doğrudan çağıran bir agent yine atlar; tam kapatma sandbox'ın işi değil ve
+# spec 027'nin güven modeli bunu zaten kabul ediyor.
+RUN set -eux; \
+    mv /opt/maven/bin/mvn /opt/maven/bin/mvn.real; \
+    printf '%s\n' \
+      '#!/bin/sh' \
+      '# agent-coder: süreçler arası depo kilidi (spec 027). Bayrak ARGÜMANLARDAN' \
+      '# SONRA ekleniyor ki aynı özelliği veren bir kullanıcı argümanı olsa bile' \
+      '# bu kazansın.' \
+      'exec /opt/maven/bin/mvn.real "$@" -Daether.syncContext.named.factory=file-lock' \
+      > /opt/maven/bin/mvn; \
+    chmod 0755 /opt/maven/bin/mvn
+
 ENV JAVA_HOME=/opt/java/25
 ENV PATH="${JAVA_HOME}/bin:/opt/maven/bin:${PATH}"
 
@@ -97,6 +127,29 @@ RUN npm install -g "opencode-ai@${OPENCODE_VERSION}" \
 RUN useradd --create-home --uid 10001 --shell /bin/bash agent \
     && mkdir -p /work \
     && chown -R agent:agent /work
+
+# ─── Bağımlılık önbelleğinin bağlanma noktaları (spec 027) ──────────────────
+#
+# Bu iki dizin, önbellek KAPALIYKEN DE imajda durur; boş kalırlar ve hiçbir
+# maliyetleri yoktur. Açıkken üzerlerine birer volume bağlanır.
+#
+# İMAJDA VAR OLMALARI ŞART. Docker boş bir adlandırılmış volume'ü ancak
+# bağlandığı yol imajda VARSA o yolun içeriği ve SAHİPLİĞİYLE doldurur. Yol
+# yoksa mount noktasını `root:root` açar; agent (uid 10001) kendi önbelleğine
+# yazamaz ve önbellek sessizce hiç çalışmaz — koşu başarılı görünür, her
+# seferinde yeniden indirir.
+#
+# Aynı sebeple volume'e dokunan HER container bu imajdan doğmalıdır (yardımcı
+# container dahil): ilk mount'u başka bir imaj yaparsa sahiplik yine kayar.
+#
+# BU SATIRI SADELEŞTİRME ADINA KALDIRMAYIN. Görünüşte gereksiz — dizinler boş
+# ve imaj onlarsız da çalışıyor. Kaldırılırsa hiçbir şey hata vermez; yalnızca
+# önbellek sessizce çalışmayı bırakır ve her koşu yeniden indirir.
+# `TestRunnerImaji_OnbellekDizinleriAgentaAitVeYazilabilir` tam olarak bunu
+# yakalar (backend/internal/runner/sandbox/cachedocker_test.go). Karşı ölçüm
+# yapıldı: dizin imajda yokken sahiplik `root:root` çıkıyor.
+RUN mkdir -p /home/agent/.m2/repository /home/agent/.npm/_cacache \
+    && chown -R agent:agent /home/agent/.m2 /home/agent/.npm
 
 # ─── Sağlayıcı sürücüleri ───────────────────────────────────────────────────
 #

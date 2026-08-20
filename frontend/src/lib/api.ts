@@ -6,6 +6,9 @@
  */
 
 import type {
+  CacheClearResult,
+  CacheVerifyResult,
+  DependencyCacheStatus,
   CreateGitProviderRequest,
   CreateLLMProviderRequest,
   Credential,
@@ -382,6 +385,19 @@ export const api = {
 
     remove: (kind: CredentialKind) =>
       apiFetch<null>(`/api/credentials/${kind}`, { method: "DELETE" }),
+  },
+
+  dependencyCache: {
+    /** Ekosistem başına boyut ve kullanım durumu. */
+    status: () => apiFetch<DependencyCacheStatus>("/api/dependency-cache"),
+
+    /** Önbelleği boşaltır; boşalan baytı döner. */
+    clear: (id: string) =>
+      apiFetch<CacheClearResult>(`/api/dependency-cache/${id}/clear`, { method: "POST" }),
+
+    /** Bütünlük taraması; uyuşmayanları siler, denetlenemeyene dokunmaz. */
+    verify: (id: string) =>
+      apiFetch<CacheVerifyResult>(`/api/dependency-cache/${id}/verify`, { method: "POST" }),
   },
 
   network: {

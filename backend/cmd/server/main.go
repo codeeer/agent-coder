@@ -231,6 +231,7 @@ func run() error {
 		},
 
 		// Motor logları: saklama, boyut sınırı ve yaşam süresi.
+		DependencyCache:  func() bool { return settingsSvc.Bool(settings.KeyDependencyCache) },
 		EngineLogPersist: func() bool { return settingsSvc.Bool(settings.KeyEngineLogPersist) },
 		EngineLogMaxKB:   func() int { return settingsSvc.Int(settings.KeyEngineLogMaxKB) },
 		EngineLogRetention: func() time.Duration {
@@ -419,6 +420,7 @@ func run() error {
 		Agents:         agentStore,
 		Runs:           runStore,
 		RunManager:     runManager,
+		Runner:         agentRunner,
 		RunBuilder:     runBuilder,
 		Pusher:         runPusher,
 		Bus:            bus,

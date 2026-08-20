@@ -759,6 +759,46 @@ export type NodeKind =
   | "jira.comment"
   | "mcp.call";
 
+/* ── Bağımlılık önbelleği (spec 027) ─────────────────────────────────────── */
+
+export interface DependencyCacheInfo {
+  id: "maven" | "npm";
+  label: string;
+  /** Bayt cinsinden. `used` false ise ANLAMSIZDIR — okunmaz. */
+  sizeBytes: number;
+  /**
+   * Önbellek hiç kullanıldı mı.
+   *
+   * "Henüz kullanılmadı" ile "boş" AYRI ŞEYLER: sıfır göstermek, çalışmış ama
+   * boşaltılmış bir önbellekle karıştırır (spec 027 H3).
+   */
+  used: boolean;
+}
+
+export interface DependencyCacheStatus {
+  enabled: boolean;
+  caches: DependencyCacheInfo[];
+}
+
+export interface CacheClearResult {
+  freedBytes: number;
+  caches: DependencyCacheInfo[];
+}
+
+export interface CacheVerifyResult {
+  checked: number;
+  /**
+   * Özetiyle uyuşmayan artefakt sayısı.
+   *
+   * npm için HER ZAMAN 0: npm bozulmayı referanssız içeriğin toplanmasından
+   * ayırmıyor, bu yüzden npm sonucunda "bozuk" denmez (spec 027 T42).
+   */
+  mismatched: number;
+  /** Özeti okunamadığı için denetlenemeyen — SİLİNMEYEN — artefakt sayısı. */
+  unverifiable: number;
+  removed: number;
+}
+
 export interface WorkflowNodeConfig {
   // Agent adımı
   agentId?: string;
