@@ -1,7 +1,9 @@
-# 03 — Bağımlılık Önbelleği: Ölçüldü, Çözülmedi
+# 03 — Bağımlılık Önbelleği: Ölçüldü, Çözüldü
 
 - **Tarih:** 2026-08-14
-- **Durum:** Açık — çözüm düşünülecek
+- **Durum:** **Çözüldü** (2026-08-19) — [spec 027](../specs/027-bagimlilik-onbellegi/spec.md)
+- **Not:** Karar verildi ve uygulandı; iki ölçüm kullanıcı ortamında açık
+  (aşağıda "Kapanışta açık kalanlar")
 - **Kapsam:** Çalışma ortamı imajı ve koşu süresi (npm + Maven ortak)
 
 ---
@@ -87,9 +89,85 @@ gömme yanlış araçtır ve volume tarafının tehdit modeli konuşulmalıdır.
 Aynı yöntem npm için de geçerli; npm tarafı hiç ölçülmedi (bkz. spec 018:
 Kapsam dışı).
 
+---
+
+## Kapanış — 2026-08-19
+
+**Seçilen yol: kalıcı paylaşılan volume.** Bu belgenin "Denenmemiş yollar"
+tablosunda listelenen dört seçenekten ikincisi. Uygulaması
+[spec 027](../specs/027-bagimlilik-onbellegi/spec.md).
+
+### "Zehirlenme" itirazına verilen cevap
+
+Bu belge volume yolunun yanına şunu yazmıştı: *"Koşular arası yazılabilir
+kanal — çalıştırılan şey modelin yazdığı kod; bir koşu diğerinin bağımlılığını
+zehirleyebilir. Ayrı tehdit modeli ister."* İtiraz geçerliydi ve **ortadan
+kalkmadı; bilerek kabul edildi.** Gerekçesi spec 027'nin Davranış Kuralları
+bölümünde yazılı: bu kurulumdaki projelerin tamamı aynı kuruma ait,
+artefaktların tamamı aynı kurumsal paket deposundan geliyor ve koşular zaten o
+depoya ve kod deposuna erişebiliyor — paylaşılan önbellek var olmayan bir güven
+sınırı açmıyor.
+
+Kabul, iki hafifleticiyle birlikte geldi:
+
+1. **Önbellek doğrulanabilir.** İndirme sırasında kaydedilen özetlerle
+   karşılaştırma yapan bir tarama var; uyuşmayan artefakt siliniyor ve bir
+   sonraki koşuda kaynağından yeniden iniyor. Zehirlenmeyi **önlemiyor**, ama
+   fark edilebilir ve geri alınabilir kılıyor — bu belge yazıldığında öyle bir
+   imkân hiç yoktu.
+2. **Salt okunur mod kapsam dışı bırakıldı**, yok sayılmadı: güven varsayımı
+   değişirse (birbirine güvenmeyen ekiplerin aynı kurulumu paylaşması)
+   değerlendirilecek ilk seçenek o.
+
+**Varsayım açıkça yazıldı ki sessizce miras alınmasın.** Bu kurulum çok
+kullanıcılı hâle gelirken (spec 024) kararın yeniden tartılması gerekecek.
+
+### Gömme yolu neden gereksizleşti
+
+Bu belgenin "Bir sonraki adımın ölçüsü" bölümü bir ölçüm öneriyordu: imaja
+zaman damgası koyup gerçek koşulardan sonra ıskalanan artefakt kümesini
+çıkarmak, birkaç projede tekrarlamak ve kesişime bakmak.
+
+**O ölçüm yapılmadı ve yapılmasına gerek kalmadı.** Ölçümün amacı NEYİN
+GÖMÜLECEĞİNİ belirlemekti; volume yolu sürüm tahmini gerektirmiyor, kendi
+kendine ısınıyor. Kesişim büyük çıksa da küçük çıksa da volume aynı işi
+yapıyor — yani ölçümün cevaplayacağı soru ortadan kalktı. Gömme yolunun asıl
+zayıflığı zaten isabetti ve bu belge onu 569 MB'ın %3'ü rakamıyla göstermişti.
+
+### Ölçülen ve doğrulananlar
+
+- **Sahiplik taşıyıcıdır, süs değil.** Boş bir adlandırılmış volume, imajda
+  önceden oluşturulup `chown` edilmiş bir yola bağlanınca `agent`'a ait oluyor;
+  yol imajda YOKSA `root:root` açılıyor ve agent kendi önbelleğine yazamıyor —
+  önbellek sessizce hiç çalışmıyor. Her iki yön de ölçüldü.
+- **Uzak Docker host'ta çalışıyor.** Ayrı bir daemon TCP üzerinden ayağa
+  kaldırılıp ölçüldü; volume istemci host'unun dosya sisteminde bulunmuyor.
+  Bu, hem adlandırılmış volume tercihinin gerekçesini kanıtlıyor hem de boyut
+  ölçümü ile doğrulamanın neden yardımcı container içinde çalıştığını
+  açıklıyor: backend volume'ün içini göremiyor.
+- **Maven'ın süreçler arası kilidi varsayılan DEĞİL.** Paylaşılan yerel depoya
+  iki koşunun aynı anda yazması tam olarak bu özelliğin yarattığı durum. Kilit
+  `mvn` sarmalayıcısıyla açıldı — ortam değişkeniyle değil, çünkü ölçüldü:
+  agent `export MAVEN_OPTS=…` derse bayrak sessizce kayboluyor.
+
+### Kapanışta açık kalanlar
+
+İkisi de kullanıcının kendi ortamında (gerçek Nexus, gerçek proje) ölçülecek;
+yapay bir projede ölçmek kurumsal ortamı temsil etmiyor:
+
+- **Eşzamanlı iki koşunun bozuk artefakt üretmediği.** Kilidin Maven'a
+  *geçtiği* ölçüldü; o kilidin *yeterli olduğu* ölçülmedi. İkisi ayrı iddia.
+- **Süren koşu varken temizlemenin reddedildiği** (`Active() > 0` dalı).
+
+Spec 027 "Uygulandı" sayılmayacak ve bu iki ölçüm gelmeden kapatılmayacak.
+
 ## İlgili
 
 - [spec 018](../specs/018-maven-paket-deposu/spec.md) — Java/Maven; bu konu
   oradan çıkarıldı, gerekçesi orada da yazılı
 - [spec 015](../specs/015-motor-loglari/spec.md) — saklama politikası olan bir
   özelliğin emsali; volume yolu seçilirse aynı soru orada da vardı
+- [spec 027](../specs/027-bagimlilik-onbellegi/spec.md) — bu belgeyi kapatan
+  uygulama
+- [spec 024](../specs/024-guvenlik-sertlestirme/spec.md) — kimlik geldiğinde
+  önbellek temizleme "ayar yazma sınıfı" olarak aynı kapıdan geçecek
